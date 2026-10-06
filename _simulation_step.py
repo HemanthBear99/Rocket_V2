@@ -613,6 +613,75 @@ def _check_runtime_safety_limits(
     return None
 
 
+def _thrust_magnitude(mission_mgr, phase, stage: int, vehicle_model: str,
+                      config: SimulationConfig) -> tuple[float | None, float]:
+    """Return (booster thrust override or None, scaled thrust magnitude in N)."""
+    override = None
+    if mission_mgr.vehicle_type == "booster" and stage == 1 and vehicle_model == "booster":
+        override = {
+            MissionPhase.BOOSTER_BOOSTBACK: C.BOOSTBACK_THRUST,
+            MissionPhase.BOOSTER_ENTRY: C.ENTRY_THRUST,
+            MissionPhase.BOOSTER_LANDING: C.LANDING_THRUST,
+        }.get(phase)
+    base = (
+        float(override)
+        if override is not None
+        else float(config.stage2_thrust_vac if stage == 2 else C.THRUST_MAGNITUDE)
+    )
+    return override, base * float(config.runtime_thrust_scale)
+
+
+def _stage_max_torque(config: SimulationConfig, stage: int, vehicle_model: str,
+                      s2_recovery_attitude: bool) -> float:
+    if s2_recovery_attitude:
+        return config.max_torque * (C.BOOSTER_MAX_TORQUE_NM / C.MAX_TORQUE)
+    if stage == 2:
+        return config.max_torque * (2.0e6 / C.MAX_TORQUE)
+    if vehicle_model == "booster":
+        return config.max_torque * (C.BOOSTER_MAX_TORQUE_NM / C.MAX_TORQUE)
+    return config.max_torque
+
+
+def _tvc_authority(thrust_active: bool, throttle: float, thrust_magnitude_n: float,
+                   stage: int, vehicle_model: str, config: SimulationConfig) -> float:
+    """Maximum transverse torque the gimballed engine can produce right now."""
+    if not (thrust_active and throttle > 0.0 and thrust_magnitude_n > 0.0):
+        return 0.0
+    return (
+        float(thrust_magnitude_n) * float(throttle)
+        * float(np.sin(C.MAX_GIMBAL_ANGLE))
+        * _tvc_lever_arm(stage, vehicle_model, config=config)
+    )
+
+
+def _apply_ground_contact(state: State, new_state: State, vehicle_model: str,
+                          phase, config: SimulationConfig) -> State:
+    """Hold the stack on the pad during liftoff; clip other ground crossings."""
+    pad_r = _pad_radius_m(state, config)
+    alt_above_pad = float(vec_norm(state.r)) - pad_r
+    contact_tolerance = max(C.ZERO_TOLERANCE, np.finfo(float).eps * pad_r)
+    if (
+        vehicle_model == "stacked"
+        and phase == MissionPhase.ASCENT
+        and alt_above_pad <= contact_tolerance
+    ):
+        return apply_launch_pad_constraint(new_state, config)
+    if state.altitude > 0.0 and new_state.altitude < 0.0:
+        return _interpolate_ground_crossing(state, new_state)
+    return new_state
+
+
+def _log_force_breakdown(guidance: dict, force_breakdown) -> None:
+    guidance['force_gravity_n'] = float(force_breakdown['gravity_magnitude'])
+    guidance['force_thrust_n'] = float(force_breakdown['thrust_magnitude'])
+    guidance['force_drag_n'] = float(force_breakdown['drag_magnitude'])
+    guidance['force_lift_n'] = float(force_breakdown['lift_magnitude'])
+    guidance['grid_fin_force_n'] = float(
+        force_breakdown.get('grid_fin_magnitude', guidance.get('grid_fin_force_n', 0.0))
+    )
+    guidance['force_total_n'] = float(vec_norm(force_breakdown['total']))
+
+
 def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionManager,
                     dt: float, dry_mass: float = C.DRY_MASS, stage: int = 1,
                     vehicle_model: str = "stacked",
@@ -683,21 +752,9 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
         )
     actuator = ActuatorState(thrust_dir=actuator.thrust_dir, throttle=actual_throttle)
     thrust_active = requested_thrust_on and propellant_available and actual_throttle > 0.0
-    thrust_magnitude_override = None
-    if mission_mgr.vehicle_type == "booster" and stage == 1 and vehicle_model == "booster":
-        if phase == MissionPhase.BOOSTER_BOOSTBACK:
-            thrust_magnitude_override = C.BOOSTBACK_THRUST
-        elif phase == MissionPhase.BOOSTER_ENTRY:
-            thrust_magnitude_override = C.ENTRY_THRUST
-        elif phase == MissionPhase.BOOSTER_LANDING:
-            thrust_magnitude_override = C.LANDING_THRUST
-    thrust_magnitude_n = (
-        float(thrust_magnitude_override)
-        if thrust_magnitude_override is not None
-        else float(
-            config.stage2_thrust_vac if stage == 2 else C.THRUST_MAGNITUDE
-        )
-    ) * float(config.runtime_thrust_scale)
+    thrust_magnitude_override, thrust_magnitude_n = _thrust_magnitude(
+        mission_mgr, phase, stage, vehicle_model, config,
+    )
 
                                                                             
     I_tensor = compute_inertia_tensor(
@@ -709,18 +766,8 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
     if gs.rcs_state is None and config.enable_rcs:
         gs.rcs_state = RCSState(propellant_remaining_kg=config.rcs_propellant_mass)
 
-    s2_recovery_attitude = (
-        vehicle_model == "orbiter"
-        and phase in (MissionPhase.S2_DEORBIT, MissionPhase.S2_ENTRY, MissionPhase.S2_LANDING)
-    )
-    if s2_recovery_attitude:
-        stage_max_torque = config.max_torque * (C.BOOSTER_MAX_TORQUE_NM / C.MAX_TORQUE)
-    elif stage == 2:
-        stage_max_torque = config.max_torque * (2.0e6 / C.MAX_TORQUE)
-    elif vehicle_model == "booster":
-        stage_max_torque = config.max_torque * (C.BOOSTER_MAX_TORQUE_NM / C.MAX_TORQUE)
-    else:
-        stage_max_torque = config.max_torque
+    s2_recovery_attitude = s2_recovery_phase
+    stage_max_torque = _stage_max_torque(config, stage, vehicle_model, s2_recovery_attitude)
 
     if s2_recovery_attitude:
         available_torque = stage_max_torque
@@ -749,13 +796,9 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
     # contribution rather than from a torque-magnitude literal inside
     # control.py, so the attitude deadband tracks the actual actuator state
     # (unpowered ascent/coast/landing) instead of an unreachable threshold.
-    tvc_authority = 0.0
-    if thrust_active and actual_throttle > 0.0 and thrust_magnitude_n > 0.0:
-        tvc_authority = (
-            float(thrust_magnitude_n) * float(actual_throttle)
-            * float(np.sin(C.MAX_GIMBAL_ANGLE))
-            * _tvc_lever_arm(stage, vehicle_model, config=config)
-        )
+    tvc_authority = _tvc_authority(
+        thrust_active, actual_throttle, thrust_magnitude_n, stage, vehicle_model, config,
+    )
     rcs_only = bool(tvc_authority <= 0.0 and available_torque > 0.0)
 
     control = compute_control_output(
@@ -789,14 +832,9 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
 
                                                                            
     if config.enable_rcs and gs.rcs_state is not None:
-        tvc_capacity = 0.0
-        if thrust_active and actual_throttle > 0.0 and thrust_magnitude_n > 0.0:
-            tvc_capacity = (
-                thrust_magnitude_n * float(actual_throttle)
-                * np.sin(C.MAX_GIMBAL_ANGLE) * _tvc_lever_arm(stage, vehicle_model, config=config)
-            )
+        # RCS covers only the torque beyond what the TVC can provide.
         xy_torque = float(vec_norm(control['torque'][:2]))
-        rcs_xy_torque = max(0.0, xy_torque - tvc_capacity)
+        rcs_xy_torque = max(0.0, xy_torque - tvc_authority)
         roll_torque = float(abs(control['torque'][2])) if len(control['torque']) > 2 else 0.0
         gs.rcs_state = update_rcs_propellant(
             gs.rcs_state, float(np.hypot(rcs_xy_torque, roll_torque)), dt, config,
@@ -838,18 +876,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
                                                                                
                                                                                       
                                                                                
-    pad_r = _pad_radius_m(state, config)
-    r_now = float(vec_norm(state.r))
-    alt_above_pad = r_now - pad_r
-    contact_tolerance = max(C.ZERO_TOLERANCE, np.finfo(float).eps * pad_r)
-    if (
-        vehicle_model == "stacked"
-        and phase == MissionPhase.ASCENT
-        and alt_above_pad <= contact_tolerance
-    ):
-        new_state = apply_launch_pad_constraint(new_state, config)
-    elif state.altitude > 0.0 and new_state.altitude < 0.0:
-        new_state = _interpolate_ground_crossing(state, new_state)
+    new_state = _apply_ground_contact(state, new_state, vehicle_model, phase, config)
 
                                                                             
     force_breakdown = compute_specific_forces(
@@ -864,12 +891,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
         grid_fin_command=grid_fin_command, config=config,
         control_torque_xy=np.asarray(control['torque'], dtype=float)[:2],
     )
-    guidance['force_gravity_n'] = float(force_breakdown['gravity_magnitude'])
-    guidance['force_thrust_n'] = float(force_breakdown['thrust_magnitude'])
-    guidance['force_drag_n'] = float(force_breakdown['drag_magnitude'])
-    guidance['force_lift_n'] = float(force_breakdown['lift_magnitude'])
-    guidance['grid_fin_force_n'] = float(force_breakdown.get('grid_fin_magnitude', guidance.get('grid_fin_force_n', 0.0)))
-    guidance['force_total_n'] = float(vec_norm(force_breakdown['total']))
+    _log_force_breakdown(guidance, force_breakdown)
     guidance['attitude_torque_used_fraction'] = (
         float(control['torque_magnitude']) / max(float(available_torque), 1e-9)
         if available_torque > 0.0 else 0.0
