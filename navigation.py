@@ -19,6 +19,7 @@ import numpy as np
 
 from . import constants as C
 from .config_definition import SimulationConfig
+from .utils import vec_norm
 
 
 @dataclass(frozen=True)
@@ -96,8 +97,8 @@ class GPSReceiver:
             velocity_eci_mps=velocity,
             time_s=float(state.t),
             available=True,
-            position_error_m=float(np.linalg.norm(position_noise)),
-            velocity_error_mps=float(np.linalg.norm(velocity_noise)),
+            position_error_m=float(vec_norm(position_noise)),
+            velocity_error_mps=float(vec_norm(velocity_noise)),
         )
 
 
@@ -134,7 +135,7 @@ class LandingAltimeter:
 
     def measure(self, state, config: SimulationConfig) -> AltimeterMeasurement:
         """Measure altitude above the local spherical surface and vertical speed."""
-        altitude = float(np.linalg.norm(state.r) - C.R_EARTH)
+        altitude = float(vec_norm(state.r) - C.R_EARTH)
         if (
             not bool(config.enable_landing_altimeter)
             or altitude > float(config.landing_altimeter_max_altitude_m)
@@ -180,7 +181,7 @@ class NavigationState:
 
 
 def _unit_or_default(vector: np.ndarray) -> np.ndarray:
-    norm = float(np.linalg.norm(vector))
+    norm = float(vec_norm(vector))
     if norm < 1e-9:
         return np.array([1.0, 0.0, 0.0])
     return np.asarray(vector, dtype=float) / norm
@@ -208,8 +209,8 @@ def _with_error_metrics(estimate: NavigationEstimate, state) -> NavigationEstima
         time_s=estimate.time_s,
         gps_available=estimate.gps_available,
         uses_truth_fallback=estimate.uses_truth_fallback,
-        position_error_m=float(np.linalg.norm(estimate.position_eci_m - state.r)),
-        velocity_error_mps=float(np.linalg.norm(estimate.velocity_eci_mps - state.v)),
+        position_error_m=float(vec_norm(estimate.position_eci_m - state.r)),
+        velocity_error_mps=float(vec_norm(estimate.velocity_eci_mps - state.v)),
         imu_available=estimate.imu_available,
         altimeter_available=estimate.altimeter_available,
         altimeter_altitude_m=estimate.altimeter_altitude_m,
@@ -311,7 +312,7 @@ def update_navigation_estimate(
                                                                                
                                                                        
         r_current = np.asarray(state.r, dtype=float)
-        r_norm = float(np.linalg.norm(r_current))
+        r_norm = float(vec_norm(r_current))
         g_accel = -C.MU_EARTH * r_current / max(r_norm ** 3, 1.0)
         specific_force = true_accel_eci - g_accel
         measured_specific_force = nav_state.imu_propagator.measure_acceleration(

@@ -32,6 +32,7 @@ from .mass import (
     compute_inertia_tensor,
     compute_mass_derivative,
 )
+from .utils import cross3
 
 if TYPE_CHECKING:
     from .config_definition import SimulationConfig
@@ -107,7 +108,7 @@ def compute_angular_acceleration(omega: np.ndarray, torque: np.ndarray,
 
 
     I_omega = I_tensor @ omega
-    gyroscopic = np.cross(omega, I_omega)
+    gyroscopic = cross3(omega, I_omega)
 
     total_torque = torque - gyroscopic
 

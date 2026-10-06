@@ -22,6 +22,7 @@ import numpy as np
 
 from . import constants as C
 from .state import State
+from .utils import vec_norm
 
 
 class ValidationError(Exception):
@@ -58,7 +59,7 @@ def check_quaternion_norm(q: np.ndarray, tolerance: float = None) -> bool:
     if tolerance is None:
         tolerance = C.QUATERNION_NORM_TOL
     
-    norm = np.linalg.norm(q)
+    norm = vec_norm(q)
     if abs(norm - 1.0) > tolerance:
         raise ValidationError(
             f"Quaternion norm violation: |q| = {norm:.10f}, "
@@ -77,7 +78,7 @@ def check_position_valid(r: np.ndarray) -> bool:
     Returns:
         True if valid, raises ValidationError otherwise
     """
-    r_norm = np.linalg.norm(r)
+    r_norm = vec_norm(r)
     
     if r_norm < C.R_EARTH * 0.5:                      
         raise ValidationError(
@@ -129,7 +130,7 @@ def check_velocity_reasonable(v: np.ndarray) -> bool:
     Returns:
         True if valid, raises ValidationError otherwise
     """
-    v_mag = np.linalg.norm(v)
+    v_mag = vec_norm(v)
     
                                                       
                                          
@@ -153,7 +154,7 @@ def check_angular_velocity_reasonable(omega: np.ndarray) -> bool:
     Returns:
         True if valid, raises ValidationError otherwise
     """
-    omega_mag = np.linalg.norm(omega)
+    omega_mag = vec_norm(omega)
     
                                                    
     max_reasonable_omega = 10.0                      
@@ -211,8 +212,8 @@ def compute_total_energy(r: np.ndarray, v: np.ndarray, m: float) -> float:
     Returns:
         Total mechanical energy (J)
     """
-    r_norm = np.linalg.norm(r)
-    v_norm = np.linalg.norm(v)
+    r_norm = vec_norm(r)
+    v_norm = vec_norm(v)
     
     if r_norm < C.ZERO_TOLERANCE:
         return 0.0

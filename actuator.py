@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from . import constants as C
+from .utils import cross3, vec_norm
 
 
 @dataclass
@@ -25,15 +26,15 @@ class ActuatorState:
 
 def _limit_rotation(current: np.ndarray, desired: np.ndarray, max_rate: float, dt: float) -> np.ndarray:
     """Limit change in direction to respect max gimbal rate (rad/s)."""
-    cur_n = current / (np.linalg.norm(current) + 1e-12)
-    des_n = desired / (np.linalg.norm(desired) + 1e-12)
+    cur_n = current / (vec_norm(current) + 1e-12)
+    des_n = desired / (vec_norm(desired) + 1e-12)
     dot = np.clip(np.dot(cur_n, des_n), -1.0, 1.0)
     angle = np.arccos(dot)
     if angle <= max_rate * dt:
         return des_n
                                                
-    axis = np.cross(cur_n, des_n)
-    axis_norm = np.linalg.norm(axis)
+    axis = cross3(cur_n, des_n)
+    axis_norm = vec_norm(axis)
     if axis_norm < 1e-9:
         if dot >= 0.0:
                                                                                
@@ -44,14 +45,14 @@ def _limit_rotation(current: np.ndarray, desired: np.ndarray, max_rate: float, d
         perp = np.array([1.0, 0.0, 0.0])
         if abs(float(cur_n[0])) > 0.9:
             perp = np.array([0.0, 1.0, 0.0])
-        axis = np.cross(cur_n, perp)
-        axis_norm = np.linalg.norm(axis)
+        axis = cross3(cur_n, perp)
+        axis_norm = vec_norm(axis)
     axis /= axis_norm
     theta = max_rate * dt
                         
     return (
         cur_n * np.cos(theta)
-        + np.cross(axis, cur_n) * np.sin(theta)
+        + cross3(axis, cur_n) * np.sin(theta)
         + axis * np.dot(axis, cur_n) * (1 - np.cos(theta))
     )
 

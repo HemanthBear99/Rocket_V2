@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Optional
 import numpy as np
 
 from . import constants as C
+from .utils import cross3, vec_norm
 
 if TYPE_CHECKING:
     from .config_definition import SimulationConfig
@@ -64,7 +65,7 @@ class State:
                                                                                 
                                                                                
                                                                                
-        q_norm = float(np.linalg.norm(self.q))
+        q_norm = float(vec_norm(self.q))
         if np.isfinite(q_norm) and abs(q_norm - 1.0) > C.QUATERNION_NORM_TOL:
             raise ValueError(
                 f"State quaternion must be unit length (norm={q_norm:.8f}); "
@@ -129,7 +130,7 @@ class State:
     @property
     def speed(self) -> float:
         """Magnitude of velocity (m/s)."""
-        return np.linalg.norm(self.v)
+        return vec_norm(self.v)
     
     @property
     def propellant_remaining(self) -> float:
@@ -176,7 +177,7 @@ def create_initial_state(config=None) -> State:
         State object initialized with launch conditions.
     """
     r0 = _configured_launch_position(config)
-    v0 = np.cross(np.array([0.0, 0.0, C.EARTH_ROTATION_RATE], dtype=float), r0)
+    v0 = cross3(np.array([0.0, 0.0, C.EARTH_ROTATION_RATE], dtype=float), r0)
     q0 = C._quaternion_align_body_z(r0)
 
     if config is not None:

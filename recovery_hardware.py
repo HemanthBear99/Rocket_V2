@@ -10,7 +10,12 @@ import numpy as np
 from . import constants as C
 from .config_definition import SimulationConfig
 from .forces import compute_configured_atmosphere_properties
-from .utils import compute_ground_relative_velocity, compute_relative_velocity
+from .utils import (
+    compute_ground_relative_velocity,
+    compute_relative_velocity,
+    cross3,
+    vec_norm,
+)
 
 
 class LandingLegStatus(str, Enum):
@@ -59,7 +64,7 @@ class TouchdownAssessment:
 
 
 def _local_vertical(r: np.ndarray) -> np.ndarray:
-    norm = float(np.linalg.norm(r))
+    norm = float(vec_norm(r))
     if norm < 1e-9:
         return np.array([1.0, 0.0, 0.0])
     return np.asarray(r, dtype=float) / norm
@@ -71,7 +76,7 @@ def _horizontal_component(vector: np.ndarray, vertical: np.ndarray) -> np.ndarra
 
 
 def _unit_or_zero(vector: np.ndarray) -> np.ndarray:
-    norm = float(np.linalg.norm(vector))
+    norm = float(vec_norm(vector))
     if norm < 1e-9:
         return np.zeros(3)
     return np.asarray(vector, dtype=float) / norm
@@ -126,18 +131,18 @@ def command_grid_fins_to_target(
     if not bool(config.enable_grid_fins):
         return GridFinState()
 
-    altitude = float(np.linalg.norm(r) - C.R_EARTH)
+    altitude = float(vec_norm(r) - C.R_EARTH)
     if altitude > float(config.grid_fin_deploy_altitude_m):
         return GridFinState()
 
     deployed_fraction = 1.0
     vertical = _local_vertical(r)
     site_vec = _horizontal_component(np.asarray(target_site_eci, dtype=float) - r, vertical)
-    site_dist = float(np.linalg.norm(site_vec))
+    site_dist = float(vec_norm(site_vec))
     toward_site = _unit_or_zero(site_vec)
 
     omega_earth = np.array([0.0, 0.0, C.EARTH_ROTATION_RATE])
-    v_ground = v - np.cross(omega_earth, r)
+    v_ground = v - cross3(omega_earth, r)
     v_ground_horiz = _horizontal_component(v_ground, vertical)
     v_vert = float(np.dot(v_ground, vertical))
 
@@ -165,7 +170,7 @@ def command_grid_fins_to_target(
                                                                         
                                                                             
     a_desired = (6.0 / (t_go ** 2)) * zem + (2.0 / t_go) * v_ground_horiz
-    a_mag = float(np.linalg.norm(a_desired))
+    a_mag = float(vec_norm(a_desired))
 
     if a_mag < 1e-9:
         return GridFinState(deployed_fraction=deployed_fraction)
@@ -177,7 +182,7 @@ def command_grid_fins_to_target(
         r, v,
         wind_offset_mps=config.runtime_wind_offset_mps if wind_offset_mps is None else wind_offset_mps,
     )
-    speed = float(np.linalg.norm(v_rel))
+    speed = float(vec_norm(v_rel))
     _, _, rho, _ = compute_configured_atmosphere_properties(altitude, config)
 
                                                                              
@@ -197,9 +202,9 @@ def command_grid_fins_to_target(
                                                         
     max_deflection = float(config.grid_fin_max_deflection_deg)
     east_like = toward_site if site_dist > 100.0 else _unit_or_zero(v_ground_horiz)
-    if np.linalg.norm(east_like) <= 0.0:
+    if vec_norm(east_like) <= 0.0:
         east_like = np.array([0.0, 1.0, 0.0])
-    north_like = _unit_or_zero(np.cross(vertical, east_like))
+    north_like = _unit_or_zero(cross3(vertical, east_like))
 
     raw_pitch = deflection_fraction * max_deflection * float(np.dot(force_direction, east_like))
     raw_yaw = deflection_fraction * max_deflection * float(np.dot(force_direction, north_like))
@@ -248,7 +253,7 @@ def compute_grid_fin_force(
         v,
         wind_offset_mps=config.runtime_wind_offset_mps if wind_offset_mps is None else wind_offset_mps,
     )
-    speed = float(np.linalg.norm(v_rel))
+    speed = float(vec_norm(v_rel))
     if speed < C.SMALL_VELOCITY_TOL:
         return np.zeros(3)
 
@@ -268,7 +273,7 @@ def compute_grid_fin_force(
         if command.force_direction is not None
         else np.zeros(3)
     )
-    if np.linalg.norm(force_direction) <= 0.0:
+    if vec_norm(force_direction) <= 0.0:
         return np.zeros(3)
 
     drag_mag = q_dyn * area * float(config.grid_fin_cd_increment) * deflection * deployed
@@ -287,8 +292,8 @@ def assess_touchdown_contact(
     vertical = _local_vertical(state.r)
     v_ground = compute_ground_relative_velocity(state.r, state.v)
     vertical_speed = float(np.dot(v_ground, vertical))
-    horizontal_speed = float(np.linalg.norm(_horizontal_component(v_ground, vertical)))
-    touchdown_speed = float(np.linalg.norm(v_ground))
+    horizontal_speed = float(vec_norm(_horizontal_component(v_ground, vertical)))
+    touchdown_speed = float(vec_norm(v_ground))
     site_error = float(site_error_m)
     leg_status = (leg_state or LandingLegState()).status
 

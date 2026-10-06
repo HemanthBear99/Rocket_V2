@@ -28,6 +28,7 @@ from .frames import (
     quaternion_normalize,
     quaternion_to_rotation_matrix,
 )
+from .utils import cross3, vec_norm
 
 if TYPE_CHECKING:
     from .config_definition import SimulationConfig
@@ -64,7 +65,7 @@ def compute_thrust_axis_error(q_current: np.ndarray, desired_direction: np.ndarr
     """
     q_current = quaternion_normalize(q_current)
     desired = np.asarray(desired_direction, dtype=float)
-    desired_norm = float(np.linalg.norm(desired))
+    desired_norm = float(vec_norm(desired))
     if desired_norm < C.ZERO_TOLERANCE:
         return np.zeros(3), 0.0
     desired = desired / desired_norm
@@ -76,8 +77,8 @@ def compute_thrust_axis_error(q_current: np.ndarray, desired_direction: np.ndarr
     if angle < C.ZERO_TOLERANCE:
         return np.zeros(3), 0.0
 
-    axis_inertial = np.cross(body_z_inertial, desired)
-    axis_norm = float(np.linalg.norm(axis_inertial))
+    axis_inertial = cross3(body_z_inertial, desired)
+    axis_norm = float(vec_norm(axis_inertial))
     if axis_norm < C.ZERO_TOLERANCE:
                                                               
         axis_body = np.array([1.0, 0.0, 0.0])
@@ -190,7 +191,7 @@ def _apply_integral_anti_windup(
     
                                      
     tau_i_trans = tau_i[0:2]
-    mag_trans = float(np.linalg.norm(tau_i_trans))
+    mag_trans = float(vec_norm(tau_i_trans))
     if limit_transverse > 0.0 and mag_trans > limit_transverse:
         integral_error[0:2] = integral_error[0:2] * (limit_transverse / mag_trans)
     elif limit_transverse <= 0.0:
@@ -299,7 +300,7 @@ def pd_control_law(q_error_vector: np.ndarray, error_angle: float,
     if controller == "pid" and control_state is not None and dt > 0.0:
         integrate = True
         pre_torque = tau_p + tau_d + ki * control_state.integral_error
-        pre_mag = float(np.linalg.norm(pre_torque))
+        pre_mag = float(vec_norm(pre_torque))
         if pre_mag >= max_torque * 0.999:
             integrate = False
         if integrate:
@@ -316,7 +317,7 @@ def pd_control_law(q_error_vector: np.ndarray, error_angle: float,
     torque = tau_p + tau_d + tau_i
 
                      
-    torque_magnitude = np.linalg.norm(torque)
+    torque_magnitude = vec_norm(torque)
     if torque_magnitude > max_torque:
         torque = torque * (max_torque / torque_magnitude)
 
@@ -383,10 +384,10 @@ def compute_control_output(q_current: np.ndarray, omega: np.ndarray,
         'error_angle': error_angle,
         'error_degrees': np.degrees(error_angle),
         'torque': torque,
-        'torque_magnitude': np.linalg.norm(torque),
-        'saturated': np.linalg.norm(torque) >= max_torque * 0.999,
+        'torque_magnitude': vec_norm(torque),
+        'saturated': vec_norm(torque) >= max_torque * 0.999,
         'attitude_controller': controller,
         'integral_torque': integral_torque,
-        'integral_torque_magnitude': float(np.linalg.norm(integral_torque)),
+        'integral_torque_magnitude': float(vec_norm(integral_torque)),
         'control_state': control_state,
     }

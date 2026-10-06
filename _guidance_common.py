@@ -12,7 +12,7 @@ import numpy as np
 
 from . import constants as C
 from .config_definition import SimulationConfig
-from .utils import compute_relative_velocity
+from .utils import compute_relative_velocity, cross3, vec_norm
 
 
 @dataclass
@@ -96,7 +96,7 @@ def _limit_aoa(thrust_dir: np.ndarray, velocity: np.ndarray,
     Returns:
         AoA-limited thrust direction (unit vector)
     """
-    v_norm = np.linalg.norm(velocity)
+    v_norm = vec_norm(velocity)
     if v_norm < 50.0:
         return thrust_dir                              
 
@@ -109,24 +109,24 @@ def _limit_aoa(thrust_dir: np.ndarray, velocity: np.ndarray,
 
                                                                  
                                                                  
-    axis = np.cross(v_hat, thrust_dir)
-    axis_norm = np.linalg.norm(axis)
+    axis = cross3(v_hat, thrust_dir)
+    axis_norm = vec_norm(axis)
     if axis_norm < 1e-9:
         return thrust_dir                             
 
     axis = axis / axis_norm
                                                                                  
     limited = (v_hat * np.cos(max_aoa_rad)
-               + np.cross(axis, v_hat) * np.sin(max_aoa_rad)
+               + cross3(axis, v_hat) * np.sin(max_aoa_rad)
                + axis * np.dot(axis, v_hat) * (1.0 - np.cos(max_aoa_rad)))
-    limited_norm = np.linalg.norm(limited)
+    limited_norm = vec_norm(limited)
     if limited_norm > 1e-9:
         limited /= limited_norm
     return limited
 
 
 def compute_local_vertical(r: np.ndarray) -> np.ndarray:
-    r_norm = np.linalg.norm(r)
+    r_norm = vec_norm(r)
     if r_norm < C.ZERO_TOLERANCE:
         return np.array([1.0, 0.0, 0.0])
     return r / r_norm
@@ -135,19 +135,19 @@ def compute_local_vertical(r: np.ndarray) -> np.ndarray:
 def compute_local_frame(r: np.ndarray):
     vertical = compute_local_vertical(r)
     k_axis = np.array([0.0, 0.0, 1.0])
-    east = np.cross(k_axis, vertical)
-    if np.linalg.norm(east) < C.ZERO_TOLERANCE:
+    east = cross3(k_axis, vertical)
+    if vec_norm(east) < C.ZERO_TOLERANCE:
         east = np.array([0.0, 1.0, 0.0])
-    east = east / np.linalg.norm(east)
-    north = np.cross(vertical, east)
-    north = north / np.linalg.norm(north)
+    east = east / vec_norm(east)
+    north = cross3(vertical, east)
+    north = north / vec_norm(north)
     return vertical, east, north
 
 
 def compute_local_horizontal(r: np.ndarray, v: np.ndarray) -> np.ndarray:
     vertical = compute_local_vertical(r)
     v_rel = compute_relative_velocity(r, v)
-    v_rel_norm = float(np.linalg.norm(v_rel))
+    v_rel_norm = float(vec_norm(v_rel))
     if v_rel_norm < C.ZERO_TOLERANCE:
         return vertical
     return v_rel / v_rel_norm

@@ -24,6 +24,7 @@ from .config_definition import SimulationConfig
 from .config_factory import create_default_config
 from .mission_summary import assess_full_mission
 from .recovery import target_landing_site_eci
+from .utils import cross3, vec_norm
 
 _MC_THRUST_DISPERSION = 0.02
 _MC_ISP_DISPERSION = 0.01
@@ -186,12 +187,12 @@ def _run_case(base: SimulationConfig, case: dict[str, Any]) -> dict[str, Any]:
             config=config,
         )
         site_vertical = touchdown_site / max(
-            float(np.linalg.norm(touchdown_site)),
+            float(vec_norm(touchdown_site)),
             1.0,
         )
-        east = np.cross(np.array([0.0, 0.0, 1.0]), site_vertical)
-        east /= max(float(np.linalg.norm(east)), 1e-9)
-        north = np.cross(site_vertical, east)
+        east = cross3(np.array([0.0, 0.0, 1.0]), site_vertical)
+        east /= max(float(vec_norm(east)), 1e-9)
+        north = cross3(site_vertical, east)
         miss_vector = touchdown_site - result.booster_final_state.r
         miss_vector -= float(np.dot(miss_vector, site_vertical)) * site_vertical
         row = {

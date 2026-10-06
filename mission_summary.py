@@ -23,7 +23,7 @@ from .recovery import (
 )
 from .recovery_hardware import LandingLegStatus
 from .state import State
-from .utils import compute_ground_relative_velocity
+from .utils import compute_ground_relative_velocity, vec_norm
 
 
 @dataclass
@@ -325,7 +325,7 @@ def _landing_metrics_from_result(
     speed, site_error = extract_landing_metrics(result.booster_reason)
     if speed is None:
         speed = float(
-            np.linalg.norm(
+            vec_norm(
                 compute_ground_relative_velocity(
                     result.booster_final_state.r,
                     result.booster_final_state.v,
@@ -347,19 +347,19 @@ def _landing_velocity_components(
     config: SimulationConfig,
 ) -> tuple[float | None, float | None]:
     state = result.booster_final_state
-    r_norm = float(np.linalg.norm(state.r))
+    r_norm = float(vec_norm(state.r))
     if r_norm < 1e-9:
         return None, None
     vertical = state.r / r_norm
     v_ground = compute_ground_relative_velocity(state.r, state.v)
     vertical_speed = float(np.dot(v_ground, vertical))
-    horizontal_speed = float(np.linalg.norm(v_ground - vertical_speed * vertical))
+    horizontal_speed = float(vec_norm(v_ground - vertical_speed * vertical))
     return vertical_speed, horizontal_speed
 
 
 def _terminal_touchdown_tilt_deg(result: FullMissionResult) -> float | None:
     state = result.booster_final_state
-    r_norm = float(np.linalg.norm(state.r))
+    r_norm = float(vec_norm(state.r))
     if r_norm < 1e-9:
         return None
     body_z = rotate_vector_by_quaternion(C.BODY_Z_AXIS, state.q)
@@ -487,7 +487,7 @@ def _extract_s2_recovery(
     )
 
     fs = result.orbiter_final_state
-    v_touchdown = float(np.linalg.norm(
+    v_touchdown = float(vec_norm(
         compute_ground_relative_velocity(fs.r, fs.v)
     ))
     downrange_km = great_circle_distance_m(

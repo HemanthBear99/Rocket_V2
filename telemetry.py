@@ -19,6 +19,8 @@ from rlv_sim.recovery import (
 )
 from rlv_sim.utils import surface_relative_speed
 
+from .utils import vec_norm
+
 
 def extract_telemetry_point(state: Any, guidance: dict, phase_name: str, config: SimulationConfig) -> dict:
     """
@@ -34,7 +36,7 @@ def extract_telemetry_point(state: Any, guidance: dict, phase_name: str, config:
         _, _, rho_atm, _ = compute_configured_atmosphere_properties(alt_m, config)
     else:
         rho_atm = 0.0
-    v_rel_mag = float(np.linalg.norm(v_rel))
+    v_rel_mag = float(vec_norm(v_rel))
     
     q_dyn = compute_dynamic_pressure(rho_atm, v_rel_mag)
     r_nose = C.REFERENCE_DIAMETER / 2.0
@@ -86,8 +88,8 @@ def extract_mission_progress(progress: MissionProgress, config: SimulationConfig
         config.booster_landing_target_downrange_km,
         config=config,
     )
-    booster_hat = booster_state.r / float(np.linalg.norm(booster_state.r))
-    landing_hat = landing_site / float(np.linalg.norm(landing_site))
+    booster_hat = booster_state.r / float(vec_norm(booster_state.r))
+    landing_hat = landing_site / float(vec_norm(landing_site))
     central_angle = float(np.arccos(np.clip(np.dot(booster_hat, landing_hat), -1.0, 1.0)))
     landing_error_m = float(C.R_EARTH * central_angle)
     fuel_remaining = max(0.0, booster_state.m - float(config.stage1_dry_mass))

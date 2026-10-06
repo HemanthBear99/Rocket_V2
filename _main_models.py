@@ -14,7 +14,7 @@ from ._guidance_common import compute_local_vertical
 from .forces import compute_configured_atmosphere_properties
 from .frames import rotate_vector_by_quaternion
 from .state import State
-from .utils import axisymmetric_angle_of_attack
+from .utils import axisymmetric_angle_of_attack, vec_norm
 
 
 class SimulationLog:
@@ -48,14 +48,14 @@ class SimulationLog:
         vertical = compute_local_vertical(state.r)
         v_vert = float(np.dot(v_rel, vertical))
         v_horiz_vec = v_rel - v_vert * vertical
-        v_horiz = float(np.linalg.norm(v_horiz_vec))
+        v_horiz = float(vec_norm(v_horiz_vec))
         v_radial = float(np.dot(state.v, vertical))
         v_horiz_inertial_vec = state.v - v_radial * vertical
         torque_vec = np.asarray(control.get('torque', np.zeros(3)), dtype=float)
         cmd_thrust_dir = guidance.get('thrust_direction', np.array([0.0, 0.0, 1.0]))
-        r_norm = float(np.linalg.norm(state.r))
+        r_norm = float(vec_norm(state.r))
 
-        r0_hat = C.INITIAL_POSITION / np.linalg.norm(C.INITIAL_POSITION)
+        r0_hat = C.INITIAL_POSITION / vec_norm(C.INITIAL_POSITION)
         r_hat = state.r / r_norm
         central_angle = float(np.arccos(np.clip(np.dot(r_hat, r0_hat), -1.0, 1.0)))
 
@@ -64,9 +64,9 @@ class SimulationLog:
         y_ecef = -state.r[0] * np.sin(theta) + state.r[1] * np.cos(theta)
         z_ecef = state.r[2]
         r_ecef = np.array([x_ecef, y_ecef, z_ecef])
-        r_ecef_norm = np.linalg.norm(r_ecef)
+        r_ecef_norm = vec_norm(r_ecef)
         if r_ecef_norm > C.ZERO_TOLERANCE:
-            r0_ecef_hat = C.INITIAL_POSITION / np.linalg.norm(C.INITIAL_POSITION)
+            r0_ecef_hat = C.INITIAL_POSITION / vec_norm(C.INITIAL_POSITION)
             central_angle_ground = float(np.arccos(
                 np.clip(np.dot(r_ecef / r_ecef_norm, r0_ecef_hat), -1.0, 1.0)
             ))
@@ -101,7 +101,7 @@ class SimulationLog:
             alt_m,
             state.sim_config,
         )
-        v_rel_mag = float(np.linalg.norm(v_rel))
+        v_rel_mag = float(vec_norm(v_rel))
         mach = v_rel_mag / a_atm if a_atm > 1.0 else 0.0
         q_dyn = 0.5 * rho_atm * v_rel_mag ** 2
 
@@ -150,7 +150,7 @@ class SimulationLog:
             'velocity_horizontal': v_horiz,
             'velocity_vertical': v_vert,
             'radial_velocity': v_radial,
-            'horizontal_velocity_inertial': float(np.linalg.norm(v_horiz_inertial_vec)),
+            'horizontal_velocity_inertial': float(vec_norm(v_horiz_inertial_vec)),
             'velocity_x': float(state.v[0]),
             'velocity_y': float(state.v[1]),
             'velocity_z': float(state.v[2]),
@@ -177,7 +177,7 @@ class SimulationLog:
             'omega_x': float(state.omega[0]),
             'omega_y': float(state.omega[1]),
             'omega_z': float(state.omega[2]),
-            'quaternion_norm': float(np.linalg.norm(state.q)),
+            'quaternion_norm': float(vec_norm(state.q)),
             'actual_pitch_angle': np.degrees(np.arccos(cos_pitch)),
             'gamma_command_deg': gamma_cmd_deg,
             'gamma_actual_deg': gamma_actual,

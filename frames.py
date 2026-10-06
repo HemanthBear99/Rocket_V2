@@ -10,6 +10,7 @@ Quaternion Convention: [w, x, y, z] where w is the scalar component.
 import numpy as np
 
 from . import constants as C
+from .utils import cross3, vec_norm
 
 
 def quaternion_normalize(q: np.ndarray) -> np.ndarray:
@@ -22,7 +23,7 @@ def quaternion_normalize(q: np.ndarray) -> np.ndarray:
     Returns:
         Normalized quaternion
     """
-    norm = np.linalg.norm(q)
+    norm = vec_norm(q)
     if norm < C.ZERO_TOLERANCE:
                                                            
         return np.array([1.0, 0.0, 0.0, 0.0])
@@ -181,13 +182,13 @@ def direction_to_quaternion(direction: np.ndarray,
         reference = np.array([0.0, 0.0, 1.0])
     
                                                 
-    d_norm = np.linalg.norm(direction)
+    d_norm = vec_norm(direction)
     if d_norm < 1e-10:
         return np.array([1.0, 0.0, 0.0, 0.0])
 
                       
     d = direction / d_norm
-    r_norm = np.linalg.norm(reference)
+    r_norm = vec_norm(reference)
     if r_norm < C.ZERO_TOLERANCE:
         raise ValueError("reference direction must be non-zero")
     r = reference / r_norm
@@ -201,13 +202,13 @@ def direction_to_quaternion(direction: np.ndarray,
     elif dot < -0.9999:
                                                                                      
         perp = np.array([1, 0, 0]) if abs(r[0]) < 0.9 else np.array([0, 1, 0])
-        axis = np.cross(r, perp)
-        axis = axis / np.linalg.norm(axis)
+        axis = cross3(r, perp)
+        axis = axis / vec_norm(axis)
         return np.array([0.0, axis[0], axis[1], axis[2]])
     
                   
-    axis = np.cross(r, d)
-    axis = axis / np.linalg.norm(axis)
+    axis = cross3(r, d)
+    axis = axis / vec_norm(axis)
     angle = np.arccos(dot)
     
                                 

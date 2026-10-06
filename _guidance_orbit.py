@@ -24,7 +24,7 @@ from ._types import GuidanceOutput
 from .config_definition import SimulationConfig
 from .recovery import estimate_suicide_burn
 from .state import State
-from .utils import compute_relative_velocity
+from .utils import compute_relative_velocity, vec_norm
 
 
 def compute_orbit_insertion_guidance(
@@ -38,9 +38,9 @@ def compute_orbit_insertion_guidance(
     """Guidance logic for Stage 2 orbit insertion."""
     gs = _resolve_guidance_state(gs)
 
-    altitude = float(np.linalg.norm(r) - C.R_EARTH)
-    v_inertial = float(np.linalg.norm(v))
-    r_mag = float(np.linalg.norm(r))
+    altitude = float(vec_norm(r) - C.R_EARTH)
+    v_inertial = float(vec_norm(v))
+    r_mag = float(vec_norm(r))
     vertical = compute_local_vertical(r)
 
     target_alt = (
@@ -59,7 +59,7 @@ def compute_orbit_insertion_guidance(
 
     v_radial = float(np.dot(v, vertical))
     v_horiz_vec = v - v_radial * vertical
-    v_horiz = float(np.linalg.norm(v_horiz_vec))
+    v_horiz = float(vec_norm(v_horiz_vec))
     if v_horiz > 10.0:
         horiz_hat = v_horiz_vec / v_horiz
     else:
@@ -244,7 +244,7 @@ def compute_orbit_insertion_guidance(
         np.cos(pitch_target_rad) * horiz_hat
         + np.sin(pitch_target_rad) * vertical
     )
-    target_dir = target_dir / max(np.linalg.norm(target_dir), 1e-12)
+    target_dir = target_dir / max(vec_norm(target_dir), 1e-12)
 
     dt_since_start = t - gs.oi_start_time
     ramp_duration = 20.0
@@ -253,7 +253,7 @@ def compute_orbit_insertion_guidance(
         blend = x * x * (3.0 - 2.0 * x)
         start_dir = gs.oi_start_direction
         blended = (1.0 - blend) * start_dir + blend * target_dir
-        blended_norm = np.linalg.norm(blended)
+        blended_norm = vec_norm(blended)
         desired_dir = blended / blended_norm if blended_norm > 1e-9 else target_dir
     else:
         desired_dir = target_dir
@@ -266,10 +266,10 @@ def compute_orbit_insertion_guidance(
 
     wind_offset = float(config.runtime_wind_offset_mps) if config is not None else 0.0
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset)
-    v_rel_norm = float(np.linalg.norm(v_rel))
+    v_rel_norm = float(vec_norm(v_rel))
     v_vert = float(np.dot(v_rel, vertical))
     v_horiz_vec_rel = v_rel - v_vert * vertical
-    v_horiz_rel = float(np.linalg.norm(v_horiz_vec_rel))
+    v_horiz_rel = float(vec_norm(v_horiz_vec_rel))
     gamma_actual = float(np.degrees(np.arctan2(v_vert, max(v_horiz_rel, 1e-6))))
 
     if v_inertial > 1.0:
@@ -342,8 +342,8 @@ def compute_deorbit_guidance(
     """
     gs = _resolve_guidance_state(gs)
 
-    altitude = float(np.linalg.norm(r) - C.R_EARTH)
-    v_inertial = float(np.linalg.norm(v))
+    altitude = float(vec_norm(r) - C.R_EARTH)
+    v_inertial = float(vec_norm(v))
     vertical = compute_local_vertical(r)
     retrograde = -v / v_inertial if v_inertial > 1.0 else -vertical
 
@@ -399,7 +399,7 @@ def compute_deorbit_guidance(
 
     wind_offset = float(config.runtime_wind_offset_mps) if config is not None else 0.0
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset)
-    v_rel_norm = float(np.linalg.norm(v_rel))
+    v_rel_norm = float(vec_norm(v_rel))
     cos_pitch = float(np.clip(np.dot(vertical, retrograde), -1.0, 1.0))
 
     output = {
@@ -445,10 +445,10 @@ def compute_s2_entry_landing_guidance(
     """
     gs = _resolve_guidance_state(gs)
 
-    altitude = float(np.linalg.norm(r) - C.R_EARTH)
+    altitude = float(vec_norm(r) - C.R_EARTH)
     wind_offset = float(config.runtime_wind_offset_mps) if config is not None else 0.0
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset)
-    v_rel_norm = float(np.linalg.norm(v_rel))
+    v_rel_norm = float(vec_norm(v_rel))
     vertical = compute_local_vertical(r)
     prograde = v_rel / v_rel_norm if v_rel_norm > 1.0 else vertical
     retrograde = -prograde
@@ -510,14 +510,14 @@ def compute_s2_entry_landing_guidance(
         if should_burn:
             gs.booster_landing_burn_started = True
             thrust_on = True
-            g_loc = float(C.MU_EARTH / max(np.linalg.norm(r) ** 2, 1.0))
+            g_loc = float(C.MU_EARTH / max(vec_norm(r) ** 2, 1.0))
             t_accel = float(s2_thrust / max(m, 1.0))
             h_stop = max(altitude - 40.0, 1.0)
 
             v_vert_signed = float(np.dot(v_rel, vertical))
             v_descent = max(-v_vert_signed, 0.0)
             v_horiz_vec = v_rel - v_vert_signed * vertical
-            v_horiz_mag = float(np.linalg.norm(v_horiz_vec))
+            v_horiz_mag = float(vec_norm(v_horiz_vec))
 
             a_vert = v_descent ** 2 / (2.0 * h_stop) + g_loc
             tau_h = 8.0
@@ -525,7 +525,7 @@ def compute_s2_entry_landing_guidance(
             a_cmd = a_vert * vertical
             if v_horiz_mag > 1e-6:
                 a_cmd = a_cmd - a_horiz * (v_horiz_vec / v_horiz_mag)
-            a_cmd_mag = float(np.linalg.norm(a_cmd))
+            a_cmd_mag = float(vec_norm(a_cmd))
             desired_dir = a_cmd / max(a_cmd_mag, 1e-6)
             throttle = float(np.clip(a_cmd_mag / max(t_accel, 1e-6), 0.0, 1.0))
             if altitude < 3.0 and v_rel_norm < 1.5:
@@ -534,7 +534,7 @@ def compute_s2_entry_landing_guidance(
 
     cos_pitch = float(np.clip(np.dot(vertical, desired_dir), -1.0, 1.0))
     v_vert = float(np.dot(v_rel, vertical))
-    v_horiz = float(np.linalg.norm(v_rel - v_vert * vertical))
+    v_horiz = float(vec_norm(v_rel - v_vert * vertical))
     gamma_deg = float(np.degrees(np.arctan2(v_vert, max(v_horiz, 1e-6)))) if v_rel_norm > 1.0 else -90.0
 
     output = {
@@ -548,7 +548,7 @@ def compute_s2_entry_landing_guidance(
         'velocity_tilt_deg': gamma_deg,
         'blend_alpha': 1.0,
         'altitude': altitude,
-        'velocity': float(np.linalg.norm(v)),
+        'velocity': float(vec_norm(v)),
         'local_vertical': vertical,
         'local_horizontal': compute_local_horizontal(r, v),
         'prograde': prograde,
@@ -568,12 +568,12 @@ def compute_coast_guidance(
     """Guidance logic for unpowered coast."""
     gs = _resolve_guidance_state(gs)
 
-    altitude = float(np.linalg.norm(r) - C.R_EARTH)
+    altitude = float(vec_norm(r) - C.R_EARTH)
     s2_dry = float(config.stage2_dry_mass) + float(config.payload_mass) if config is not None else C.STAGE2_DRY_MASS
     wind_offset = float(config.runtime_wind_offset_mps) if config is not None else 0.0
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset)
-    v_rel_norm = float(np.linalg.norm(v_rel))
-    v_inertial = float(np.linalg.norm(v))
+    v_rel_norm = float(vec_norm(v_rel))
+    v_inertial = float(vec_norm(v))
 
     if v_inertial > 1.0:
         prograde = v / v_inertial
@@ -593,7 +593,7 @@ def compute_coast_guidance(
 
     v_vert = float(np.dot(v_rel, vertical))
     v_horiz_vec = v_rel - v_vert * vertical
-    v_horiz = float(np.linalg.norm(v_horiz_vec))
+    v_horiz = float(vec_norm(v_horiz_vec))
     gamma_actual = float(np.degrees(np.arctan2(v_vert, v_horiz)))
 
     output = {
@@ -607,7 +607,7 @@ def compute_coast_guidance(
         'velocity_tilt_deg': gamma_actual,
         'blend_alpha': 1.0,
         'altitude': altitude,
-        'velocity': float(np.linalg.norm(v)),
+        'velocity': float(vec_norm(v)),
         'local_vertical': vertical,
         'local_horizontal': compute_local_horizontal(r, v),
         'prograde': desired_dir,

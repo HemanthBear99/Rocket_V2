@@ -8,12 +8,13 @@ from ._guidance_common import compute_local_vertical
 from .config_definition import SimulationConfig
 from .frames import rotate_vector_by_quaternion
 from .state import State, create_initial_state
+from .utils import cross3, vec_norm
 
 
 def _compute_separation_axis(state: State) -> np.ndarray:
     """Preferred inertial split axis for optional separation dynamics."""
     axis = rotate_vector_by_quaternion(C.BODY_Z_AXIS, state.q)
-    axis_norm = float(np.linalg.norm(axis))
+    axis_norm = float(vec_norm(axis))
     if axis_norm < C.ZERO_TOLERANCE:
         return compute_local_vertical(state.r)
     return axis / axis_norm
@@ -22,11 +23,11 @@ def _compute_separation_axis(state: State) -> np.ndarray:
 def _compute_separation_spin_axis(state: State, separation_axis: np.ndarray) -> np.ndarray:
     """Stable axis perpendicular to the split direction for residual tumble."""
     reference = state.v if state.speed > C.ZERO_TOLERANCE else state.r
-    spin_axis = np.cross(separation_axis, reference)
-    spin_norm = float(np.linalg.norm(spin_axis))
+    spin_axis = cross3(separation_axis, reference)
+    spin_norm = float(vec_norm(spin_axis))
     if spin_norm < C.ZERO_TOLERANCE:
-        spin_axis = np.cross(separation_axis, np.array([0.0, 0.0, 1.0], dtype=float))
-        spin_norm = float(np.linalg.norm(spin_axis))
+        spin_axis = cross3(separation_axis, np.array([0.0, 0.0, 1.0], dtype=float))
+        spin_norm = float(vec_norm(spin_axis))
     if spin_norm < C.ZERO_TOLERANCE:
         return np.array([1.0, 0.0, 0.0], dtype=float)
     return spin_axis / spin_norm

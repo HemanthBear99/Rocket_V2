@@ -25,7 +25,7 @@ from ._guidance_common import (
 from ._types import GuidanceOutput
 from .config_definition import SimulationConfig
 from .forces import compute_configured_atmosphere_properties
-from .utils import compute_relative_velocity
+from .utils import compute_relative_velocity, vec_norm
 
 
 def compute_max_q_throttle(
@@ -93,7 +93,7 @@ def compute_desired_thrust_direction(
     """
     gs = _resolve_guidance_state(gs)
 
-    altitude = float(np.linalg.norm(r) - C.R_EARTH)
+    altitude = float(vec_norm(r) - C.R_EARTH)
     vertical, east, north = compute_local_frame(r)
     pitchover_start_alt = (
         float(config.pitchover_start_altitude)
@@ -125,11 +125,11 @@ def compute_desired_thrust_direction(
 
                                      
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset)
-    v_rel_norm = float(np.linalg.norm(v_rel))
+    v_rel_norm = float(vec_norm(v_rel))
 
     v_vert = float(np.dot(v_rel, vertical))
     v_horiz_vec = v_rel - v_vert * vertical
-    v_horiz = float(np.linalg.norm(v_horiz_vec))
+    v_horiz = float(vec_norm(v_horiz_vec))
 
     if v_rel_norm < 1e-3:
         gamma_meas_deg = 90.0
@@ -179,7 +179,7 @@ def compute_desired_thrust_direction(
         horiz_axis = east
 
     guidance_dir = np.cos(pitch_cmd_rad) * vertical + np.sin(pitch_cmd_rad) * horiz_axis
-    guidance_dir /= np.linalg.norm(guidance_dir)
+    guidance_dir /= vec_norm(guidance_dir)
 
                                                                               
                                                                           
@@ -189,7 +189,7 @@ def compute_desired_thrust_direction(
             np.cos(C.PITCHOVER_AZIMUTH) * north
             + np.sin(C.PITCHOVER_AZIMUTH) * east
         )
-        pitchover_axis /= np.linalg.norm(pitchover_axis)
+        pitchover_axis /= vec_norm(pitchover_axis)
                                                                              
                                                                               
                                                                                
@@ -216,7 +216,7 @@ def compute_desired_thrust_direction(
                 np.cos(pitchover_angle) * vertical
                 + np.sin(pitchover_angle) * pitchover_axis
             )
-            pitchover_dir /= np.linalg.norm(pitchover_dir)
+            pitchover_dir /= vec_norm(pitchover_dir)
             guidance_dir = pitchover_dir
 
                                                                        
@@ -243,7 +243,7 @@ def compute_desired_thrust_direction(
 
     thrust_dir_mixed = (1.0 - w_prograde) * guidance_dir + w_prograde * prograde
 
-    norm_mixed = np.linalg.norm(thrust_dir_mixed)
+    norm_mixed = vec_norm(thrust_dir_mixed)
     if norm_mixed > 1e-6:
         thrust_dir_mixed /= norm_mixed
     else:
@@ -295,7 +295,7 @@ def compute_guidance_output(
     if meco_mass is None:
         meco_mass = C.DRY_MASS + C.STAGE1_LANDING_FUEL_RESERVE
 
-    altitude = float(np.linalg.norm(r) - C.R_EARTH)
+    altitude = float(vec_norm(r) - C.R_EARTH)
     pitchover_start_alt = (
         float(config.pitchover_start_altitude)
         if config is not None
@@ -308,7 +308,7 @@ def compute_guidance_output(
     )
     wind_offset = float(config.runtime_wind_offset_mps) if config is not None else 0.0
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset)
-    v_rel_norm = float(np.linalg.norm(v_rel))
+    v_rel_norm = float(vec_norm(v_rel))
     thrust_dir, gamma_cmd, gamma_meas, gs = compute_desired_thrust_direction(
         r,
         v,
@@ -367,7 +367,7 @@ def compute_guidance_output(
         'velocity_tilt_deg': gamma_meas,
         'blend_alpha': alpha,
         'altitude': altitude,
-        'velocity': float(np.linalg.norm(v)),
+        'velocity': float(vec_norm(v)),
         'local_vertical': vertical,
         'local_horizontal': compute_local_horizontal(r, v),
         'prograde': prograde,

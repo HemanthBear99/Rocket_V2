@@ -61,7 +61,7 @@ from .recovery_hardware import (
     update_landing_leg_state,
 )
 from .state import State
-from .utils import compute_relative_velocity, surface_relative_speed
+from .utils import compute_relative_velocity, surface_relative_speed, vec_norm
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +213,7 @@ def _run_booster_hardware(
         guidance['grid_fin_deployed_fraction'] = grid_fin_command.deployed_fraction
         guidance['grid_fin_pitch_cmd_deg'] = grid_fin_command.pitch_cmd_deg
         guidance['grid_fin_yaw_cmd_deg'] = grid_fin_command.yaw_cmd_deg
-        guidance['grid_fin_force_n'] = float(np.linalg.norm(grid_fin_force))
+        guidance['grid_fin_force_n'] = float(vec_norm(grid_fin_force))
         guidance['grid_fin_saturated'] = grid_fin_command.saturated
         guidance['landing_leg_status'] = gs.landing_leg_state.status.value
         guidance['landing_leg_deployed_fraction'] = gs.landing_leg_state.deployed_fraction
@@ -282,12 +282,12 @@ def _allocate_attitude_torque(
 
     xy_limit = min(float(structural_limit), tvc_limit + rcs_limit)
     xy = torque[:2]
-    xy_norm = float(np.linalg.norm(xy))
+    xy_norm = float(vec_norm(xy))
     if xy_norm > xy_limit and xy_norm > 1e-9:
         torque[:2] = xy * (xy_limit / xy_norm)
     torque[2] = float(np.clip(torque[2], -rcs_limit, rcs_limit))
 
-    total_norm = float(np.linalg.norm(torque))
+    total_norm = float(vec_norm(torque))
     if total_norm > structural_limit and total_norm > 1e-9:
         torque *= float(structural_limit) / total_norm
     return torque
@@ -316,7 +316,7 @@ def apply_launch_pad_constraint(
     pad_r = _pad_radius_m(state, config)
     r = np.asarray(state.r, dtype=float).copy()
     v = np.asarray(state.v, dtype=float).copy()
-    r_norm = float(np.linalg.norm(r))
+    r_norm = float(vec_norm(r))
     if r_norm < C.ZERO_TOLERANCE:
         return state
 
@@ -364,7 +364,7 @@ def _interpolate_ground_crossing(old_state: State, new_state: State) -> State:
         dry_mass_kg=new_state.dry_mass_kg,
     )
     pad_r = _pad_radius_m(crossed)
-    r_norm = float(np.linalg.norm(crossed.r))
+    r_norm = float(vec_norm(crossed.r))
     if r_norm > C.ZERO_TOLERANCE:
         crossed.r = crossed.r * (pad_r / r_norm)
     return crossed
@@ -422,7 +422,7 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
     if phase == MissionPhase.S2_LANDING and state.altitude <= 0.1:
         if cfg is None:
             raise RuntimeError("S2 landing termination requires SimulationConfig")
-        v_touchdown = float(np.linalg.norm(
+        v_touchdown = float(vec_norm(
             compute_relative_velocity(
                 state.r, state.v,
                 wind_offset_mps=cfg.runtime_wind_offset_mps if cfg is not None else 0.0,
@@ -449,7 +449,7 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
         touchdown_tolerance_m = 0.1
         if phase == MissionPhase.BOOSTER_LANDING and state.altitude <= touchdown_tolerance_m:
             cfg = mission_mgr.config
-            v_touchdown_rel = float(np.linalg.norm(
+            v_touchdown_rel = float(vec_norm(
                 compute_relative_velocity(
                     state.r,
                     state.v,
@@ -558,7 +558,7 @@ def _check_runtime_safety_limits(
         return None
 
     v_rel = np.asarray(guidance.get('v_rel', state.v), dtype=float)
-    v_rel_mag = float(np.linalg.norm(v_rel))
+    v_rel_mag = float(vec_norm(v_rel))
     effective_alt = _altitude_from_r(state.r, config)
     enable_upper = bool(getattr(config, 'enable_upper_atmosphere', False))
     _, _, rho_atm, _ = compute_atmosphere_properties(effective_alt, enable_upper_atm=enable_upper)
@@ -662,7 +662,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
         MissionPhase.S2_DEORBIT, MissionPhase.S2_ENTRY, MissionPhase.S2_LANDING
     )
     if vehicle_model == "booster" or s2_recovery_phase:
-        n_des = np.linalg.norm(desired_dir)
+        n_des = vec_norm(desired_dir)
         thrust_dir_cmd = desired_dir / n_des if n_des > 1e-9 else compute_local_vertical(state.r)
         actuator = ActuatorState(thrust_dir=thrust_dir_cmd, throttle=actuator.throttle)
     else:
@@ -774,7 +774,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
 
     if s2_recovery_attitude:
         tau = np.asarray(control['torque'], dtype=float)
-        tau_norm = float(np.linalg.norm(tau))
+        tau_norm = float(vec_norm(tau))
         if tau_norm > stage_max_torque and tau_norm > 1e-9:
             tau = tau * (stage_max_torque / tau_norm)
         control['torque'] = tau
@@ -784,7 +784,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
             thrust_active, stage, vehicle_model, config, stage_max_torque,
             rcs_state=gs.rcs_state,
         )
-    control['torque_magnitude'] = float(np.linalg.norm(control['torque']))
+    control['torque_magnitude'] = float(vec_norm(control['torque']))
     control['saturated'] = control['torque_magnitude'] >= max(available_torque, 1e-9) * 0.999
 
                                                                            
@@ -795,7 +795,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
                 thrust_magnitude_n * float(actual_throttle)
                 * np.sin(C.MAX_GIMBAL_ANGLE) * _tvc_lever_arm(stage, vehicle_model, config=config)
             )
-        xy_torque = float(np.linalg.norm(control['torque'][:2]))
+        xy_torque = float(vec_norm(control['torque'][:2]))
         rcs_xy_torque = max(0.0, xy_torque - tvc_capacity)
         roll_torque = float(abs(control['torque'][2])) if len(control['torque']) > 2 else 0.0
         gs.rcs_state = update_rcs_propellant(
@@ -839,7 +839,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
                                                                                       
                                                                                
     pad_r = _pad_radius_m(state, config)
-    r_now = float(np.linalg.norm(state.r))
+    r_now = float(vec_norm(state.r))
     alt_above_pad = r_now - pad_r
     contact_tolerance = max(C.ZERO_TOLERANCE, np.finfo(float).eps * pad_r)
     if (
@@ -869,7 +869,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
     guidance['force_drag_n'] = float(force_breakdown['drag_magnitude'])
     guidance['force_lift_n'] = float(force_breakdown['lift_magnitude'])
     guidance['grid_fin_force_n'] = float(force_breakdown.get('grid_fin_magnitude', guidance.get('grid_fin_force_n', 0.0)))
-    guidance['force_total_n'] = float(np.linalg.norm(force_breakdown['total']))
+    guidance['force_total_n'] = float(vec_norm(force_breakdown['total']))
     guidance['attitude_torque_used_fraction'] = (
         float(control['torque_magnitude']) / max(float(available_torque), 1e-9)
         if available_torque > 0.0 else 0.0

@@ -41,7 +41,7 @@ from .recovery import (
     is_near_pad_target,
     target_landing_site_eci,
 )
-from .utils import compute_ground_relative_velocity, compute_relative_velocity
+from .utils import compute_ground_relative_velocity, compute_relative_velocity, vec_norm
 
 
 @dataclass(frozen=True)
@@ -59,7 +59,7 @@ class RecoveryPlanDiagnostics:
 
 
 def _planner_unit(vector: np.ndarray, fallback: np.ndarray) -> np.ndarray:
-    norm = float(np.linalg.norm(vector))
+    norm = float(vec_norm(vector))
     if norm < 1e-9:
         return fallback
     return vector / norm
@@ -78,7 +78,7 @@ def _planner_mass_flow(
     scale = float(thrust_n) / max(float(C.THRUST_MAGNITUDE), 1e-9)
     mdot = C.MASS_FLOW_RATE * scale * float(np.clip(throttle, 0.0, 1.0))
     if r is not None:
-        altitude = float(np.linalg.norm(r)) - C.R_EARTH
+        altitude = float(vec_norm(r)) - C.R_EARTH
         _, P_amb, _, _ = compute_configured_atmosphere_properties(altitude, config)
         pressure_ratio = float(np.clip(P_amb / C.ATM_P0, 0.0, 1.2))
         dynamic_isp = C.ISP_VAC - (C.ISP_VAC - C.ISP) * pressure_ratio
@@ -156,7 +156,7 @@ def _propagate_candidate(
     hit_ground = False
     elapsed = 0.0
     while elapsed < horizon_s:
-        altitude = float(np.linalg.norm(r) - C.R_EARTH)
+        altitude = float(vec_norm(r) - C.R_EARTH)
         if altitude <= 0.0:
             hit_ground = True
             break
@@ -221,7 +221,7 @@ def score_recovery_candidates(
                 vf,
                 wind_offset_mps=float(getattr(config, "runtime_wind_offset_mps", 0.0)),
             )
-            speed = float(np.linalg.norm(v_rel_f))
+            speed = float(vec_norm(v_rel_f))
             prop = max(0.0, float(mf) - float(config.stage1_dry_mass))
             time_to_go = max(float(tf - t), 1.0)
             required_lat = 2.0 * miss / (time_to_go ** 2)
@@ -311,20 +311,20 @@ def _limit_direction_cone(
     max_angle_rad: float,
 ) -> np.ndarray:
     """Limit a unit direction to a cone about a unit reference direction."""
-    direction = direction / max(float(np.linalg.norm(direction)), 1e-9)
-    reference = reference / max(float(np.linalg.norm(reference)), 1e-9)
+    direction = direction / max(float(vec_norm(direction)), 1e-9)
+    reference = reference / max(float(vec_norm(reference)), 1e-9)
     cosine = float(np.clip(np.dot(direction, reference), -1.0, 1.0))
     angle = float(np.arccos(cosine))
     if angle <= max_angle_rad:
         return direction
 
     transverse = direction - cosine * reference
-    transverse_norm = float(np.linalg.norm(transverse))
+    transverse_norm = float(vec_norm(transverse))
     if transverse_norm <= 1e-9:
         return reference
     transverse /= transverse_norm
     limited = np.cos(max_angle_rad) * reference + np.sin(max_angle_rad) * transverse
-    return limited / max(float(np.linalg.norm(limited)), 1e-9)
+    return limited / max(float(vec_norm(limited)), 1e-9)
 
 
 def _compute_boostback_direction(
@@ -381,13 +381,13 @@ def _compute_boostback_direction(
     predicted ballistic apogee significantly exceeds the cap.
     """
     vertical = compute_local_vertical(r)
-    r_norm = float(np.linalg.norm(r))
+    r_norm = float(vec_norm(r))
     altitude = r_norm - C.R_EARTH
     g_local = C.MU_EARTH / max(r_norm ** 2, 1.0)
-    v_norm = float(np.linalg.norm(v))
+    v_norm = float(vec_norm(v))
     v_radial = float(np.dot(v, vertical))
     v_horiz_vec = v - v_radial * vertical
-    v_horiz_mag = float(np.linalg.norm(v_horiz_vec))
+    v_horiz_mag = float(vec_norm(v_horiz_vec))
 
                                                                            
     h_apogee_pred = estimate_ballistic_apogee(altitude, v_radial, g_local)
@@ -413,12 +413,12 @@ def _compute_boostback_direction(
                                                                             
     v_guidance_h = v_horiz_vec
     v_error = v_desired_h - v_guidance_h
-    v_error_mag = float(np.linalg.norm(v_error))
+    v_error_mag = float(vec_norm(v_error))
 
     if v_error_mag > 1.0:
         thrust_dir = v_error / v_error_mag
         thrust_dir = thrust_dir - float(np.dot(thrust_dir, vertical)) * vertical
-        t_dir_norm = float(np.linalg.norm(thrust_dir))
+        t_dir_norm = float(vec_norm(thrust_dir))
         if t_dir_norm > 1e-9:
             thrust_dir = thrust_dir / t_dir_norm
         else:
@@ -441,7 +441,7 @@ def _compute_boostback_direction(
                                                                           
         down_weight = float(np.clip(apogee_excess / 180000.0, 0.0, 0.42))
         thrust_dir = (1.0 - down_weight) * thrust_dir + down_weight * (-vertical)
-        thrust_dir /= max(float(np.linalg.norm(thrust_dir)), 1e-6)
+        thrust_dir /= max(float(vec_norm(thrust_dir)), 1e-6)
 
     return thrust_dir
 
@@ -507,12 +507,12 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
     throttle = 0.0
 
     predicted_site = ctx.landing_site_now
-    site_vertical = predicted_site / max(float(np.linalg.norm(predicted_site)), 1.0)
+    site_vertical = predicted_site / max(float(vec_norm(predicted_site)), 1.0)
     r_to_site_horiz = _horizontal_component(predicted_site - ctx.r, site_vertical)
-    site_dist = float(np.linalg.norm(r_to_site_horiz))
+    site_dist = float(vec_norm(r_to_site_horiz))
     predicted_landing_error = site_dist
     v_horiz_site = _horizontal_component(ctx.v_ground, site_vertical)
-    v_horiz_site_mag = float(np.linalg.norm(v_horiz_site))
+    v_horiz_site_mag = float(vec_norm(v_horiz_site))
     target_entry_descent_rate = 150.0
     # Time-to-go for the entry-descent lateral guidance must reflect the
     # vehicle's ACTUAL remaining flight time, not altitude/assumed-descent-rate.
@@ -532,6 +532,7 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
         180.0,
     ))
     impact_miss_for_capture = site_dist
+    impact = None  # ballistic prediction; computed at most once per call
     if site_dist > 500.0:
         toward_site = r_to_site_horiz / site_dist
         anti_drift = -v_horiz_site / max(v_horiz_site_mag, 1e-9)
@@ -550,12 +551,12 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
             if impact.miss_distance_m > 500.0:
                 impact_toward = impact.miss_vector_m / max(impact.miss_distance_m, 1e-9)
                 impact_toward = _horizontal_component(impact_toward, site_vertical)
-                impact_toward_norm = float(np.linalg.norm(impact_toward))
+                impact_toward_norm = float(vec_norm(impact_toward))
                 if impact_toward_norm > 1e-9:
                     impact_toward /= impact_toward_norm
                     predictor_weight = float(np.clip(impact.miss_distance_m / 10000.0, 0.15, 0.55))
                     toward_site = (1.0 - predictor_weight) * toward_site + predictor_weight * impact_toward
-                    toward_site /= max(float(np.linalg.norm(toward_site)), 1e-9)
+                    toward_site /= max(float(vec_norm(toward_site)), 1e-9)
                     landing_target_lead_time = impact.time_to_impact_s
 
         alt_factor = float(np.clip(
@@ -582,7 +583,7 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
         )
         lateral_dir = anti_drift if needs_horizontal_brake else toward_site
         desired_dir = (1.0 - site_bias) * retrograde + site_bias * lateral_dir
-        desired_dir /= max(float(np.linalg.norm(desired_dir)), 1e-9)
+        desired_dir /= max(float(vec_norm(desired_dir)), 1e-9)
         cone_reference = (
             vertical
             if near_pad_rtls and altitude < float(cfg.booster_late_entry_bias_ref_altitude_m)
@@ -636,10 +637,11 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
         anti_drift = -v_horiz_site / max(v_horiz_site_mag, 1e-9)
         site_dist_for_throttle = site_dist
         if near_pad_rtls:
-            g_local = C.MU_EARTH / max(float(np.linalg.norm(ctx.r)) ** 2, 1.0)
-            impact = _ballistic_impact(ctx)
+            g_local = C.MU_EARTH / max(float(vec_norm(ctx.r)) ** 2, 1.0)
+            if impact is None:
+                impact = _ballistic_impact(ctx)
             impact_miss = impact.miss_vector_m
-            impact_miss_mag = max(float(np.linalg.norm(impact_miss)), 0.0)
+            impact_miss_mag = max(float(vec_norm(impact_miss)), 0.0)
             predicted_landing_error = impact_miss_mag
             grid_fin_zero_effort_miss = impact_miss.copy()
             landing_target_lead_time = impact.time_to_impact_s
@@ -656,7 +658,7 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
                 (6.0 / (t_go_capture ** 2)) * impact_miss
                 + (2.0 / t_go_capture) * v_horiz_site
             )
-            a_divert_mag = float(np.linalg.norm(a_divert))
+            a_divert_mag = float(vec_norm(a_divert))
             if a_divert_mag > 1e-9:
                 max_divert_accel = (
                     float(cfg.booster_max_divert_accel_far_mps2)
@@ -678,7 +680,7 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
                 if a_divert_mag > max_divert_accel:
                     a_divert *= max_divert_accel / a_divert_mag
                 a_cmd_capture = a_vertical_capture * vertical + a_divert
-                capture_accel_cmd_mag = float(np.linalg.norm(a_cmd_capture))
+                capture_accel_cmd_mag = float(vec_norm(a_cmd_capture))
                 desired_dir = a_cmd_capture / max(capture_accel_cmd_mag, 1e-9)
             else:
                 desired_dir = vertical
@@ -694,7 +696,7 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
                 + 0.65 * anti_drift
                 + 0.25 * ctx.anti_wind
             )
-        desired_dir /= max(float(np.linalg.norm(desired_dir)), 1e-9)
+        desired_dir /= max(float(vec_norm(desired_dir)), 1e-9)
         if near_pad_rtls:
             if terminal_capture_coast:
                 max_capture_throttle = 0.10
@@ -761,9 +763,9 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
     v_vert_rel = float(np.dot(ctx.v_ground, vertical))
     v_descent = max(-v_vert_rel, 0.0)
     v_horiz_vec = _horizontal_component(ctx.v_ground, vertical)
-    v_horiz_mag = float(np.linalg.norm(v_horiz_vec))
+    v_horiz_mag = float(vec_norm(v_horiz_vec))
 
-    g_loc = float(C.MU_EARTH / (float(np.linalg.norm(ctx.r)) ** 2))
+    g_loc = float(C.MU_EARTH / (float(vec_norm(ctx.r)) ** 2))
     t_accel = float(C.LANDING_THRUST / max(ctx.m, 1.0))
     h = max(ctx.altitude, 0.5)
 
@@ -795,17 +797,17 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
     )
 
     touchdown_site = ctx.landing_site_now
-    site_vertical = touchdown_site / max(float(np.linalg.norm(touchdown_site)), 1.0)
+    site_vertical = touchdown_site / max(float(vec_norm(touchdown_site)), 1.0)
     r_err_horiz = _horizontal_component(touchdown_site - ctx.r, site_vertical)
     v_horiz_site = _horizontal_component(v_horiz_vec, site_vertical)
-    v_horiz_site_mag = float(np.linalg.norm(v_horiz_site))
+    v_horiz_site_mag = float(vec_norm(v_horiz_site))
 
     a_vert_for_budget = min(a_vert_needed, t_accel)
     a_avail_horiz = float(np.sqrt(
         max(t_accel ** 2 - a_vert_for_budget ** 2, 0.0)
     ))
     zem = r_err_horiz - v_horiz_site * t_go
-    pad_error_m = float(np.linalg.norm(r_err_horiz))
+    pad_error_m = float(vec_norm(r_err_horiz))
     pad_tolerance = float(cfg.booster_pad_tolerance_m)
     terminal_inside_pad_capture = pad_error_m <= pad_tolerance and h < 150.0
     terminal_horizontal_capture = (
@@ -904,7 +906,7 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
     else:
         a_divert = a_divert_zem_zev if pad_reachable else a_divert_zev
 
-    a_divert_mag = float(np.linalg.norm(a_divert))
+    a_divert_mag = float(vec_norm(a_divert))
     if a_divert_mag > a_horiz_budget and a_divert_mag > 1e-6:
         a_divert = a_divert * (a_horiz_budget / a_divert_mag)
 
@@ -917,7 +919,7 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
             a_cmd = g_loc * vertical - v_terminal / max(t_stop, 1e-6)
         else:
             a_cmd = a_vert_needed * vertical + a_divert
-        a_cmd_mag = float(np.linalg.norm(a_cmd))
+        a_cmd_mag = float(vec_norm(a_cmd))
         desired_dir = a_cmd / max(a_cmd_mag, 1e-6)
         throttle = float(np.clip(a_cmd_mag / max(t_accel, 1e-6), 0.0, 1.0))
     if h < 10.0 and v_descent < landing_target_descent_rate:
@@ -968,10 +970,10 @@ def compute_booster_guidance(
         config = create_default_config()
     cfg = config
 
-    altitude = float(np.linalg.norm(r) - C.R_EARTH)
+    altitude = float(vec_norm(r) - C.R_EARTH)
     wind_offset = float(cfg.runtime_wind_offset_mps)
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset)
-    v_rel_norm = float(np.linalg.norm(v_rel))
+    v_rel_norm = float(vec_norm(v_rel))
     vertical = compute_local_vertical(r)
     prograde = v_rel / v_rel_norm if v_rel_norm > 1e-6 else vertical
     retrograde = -prograde
@@ -988,7 +990,7 @@ def compute_booster_guidance(
     if abs(wind_offset) > 1e-9:
         from .utils import _wind_vector
         wind_drift_velocity = _wind_vector(r, wind_offset_mps=wind_offset)
-        wind_drift_norm = float(np.linalg.norm(wind_drift_velocity))
+        wind_drift_norm = float(vec_norm(wind_drift_velocity))
         if wind_drift_norm > 1e-9:
             anti_wind = -wind_drift_velocity / wind_drift_norm
 
@@ -1075,7 +1077,7 @@ def compute_booster_guidance(
         )
 
     v_vert = float(np.dot(v_rel, vertical))
-    v_horiz = float(np.linalg.norm(v_rel - v_vert * vertical))
+    v_horiz = float(vec_norm(v_rel - v_vert * vertical))
 
     if v_rel_norm > 1.0:
         gamma_deg = float(np.degrees(np.arctan2(v_vert, max(v_horiz, 1e-6))))
@@ -1096,7 +1098,7 @@ def compute_booster_guidance(
         'velocity_tilt_deg': float(np.degrees(np.arctan2(v_horiz, abs(v_vert)))) if v_rel_norm > 1.0 else 0.0,
         'blend_alpha': 1.0,
         'altitude': altitude,
-        'velocity': float(np.linalg.norm(v)),
+        'velocity': float(vec_norm(v)),
         'local_vertical': vertical,
         'local_horizontal': compute_local_horizontal(r, v),
         'prograde': prograde,

@@ -8,11 +8,12 @@ from . import constants as C
 from .frames import quaternion_to_rotation_matrix
 from .recovery import estimate_suicide_burn
 from .state import State
+from .utils import cross3, vec_norm
 
 
 def compute_radial_velocity(state: State) -> float:
     """Compute radial velocity: r_dot = (r . v) / |r|."""
-    r_norm = np.linalg.norm(state.r)
+    r_norm = vec_norm(state.r)
     if r_norm > 1.0:
         return float(np.dot(state.r, state.v) / r_norm)
     return 0.0
@@ -20,10 +21,10 @@ def compute_radial_velocity(state: State) -> float:
 
 def compute_horizontal_velocity(state: State) -> float:
     """Compute horizontal speed perpendicular to the local radial direction."""
-    r_hat = state.r / max(np.linalg.norm(state.r), 1.0)
+    r_hat = state.r / max(vec_norm(state.r), 1.0)
     v_radial = np.dot(state.v, r_hat) * r_hat
     v_horiz = state.v - v_radial
-    return float(np.linalg.norm(v_horiz))
+    return float(vec_norm(v_horiz))
 
 
 def check_attitude_aligned(
@@ -34,7 +35,7 @@ def check_attitude_aligned(
     """Check whether body +Z is aligned with the target direction."""
     rotation = quaternion_to_rotation_matrix(state.q)
     body_z_inertial = rotation[:, 2]
-    target_norm = np.linalg.norm(target_dir)
+    target_norm = vec_norm(target_dir)
     if target_norm < 1e-6:
         return False
     target_hat = target_dir / target_norm
@@ -45,8 +46,8 @@ def check_attitude_aligned(
 
 def compute_downrange_distance(state: State, launch_site: np.ndarray) -> float:
     """Compute great-circle distance from the launch site."""
-    r_hat = state.r / max(np.linalg.norm(state.r), 1.0)
-    r0_hat = launch_site / max(np.linalg.norm(launch_site), 1.0)
+    r_hat = state.r / max(vec_norm(state.r), 1.0)
+    r0_hat = launch_site / max(vec_norm(launch_site), 1.0)
     cos_angle = np.clip(np.dot(r_hat, r0_hat), -1.0, 1.0)
     return float(C.R_EARTH * np.arccos(cos_angle))
 
@@ -65,8 +66,8 @@ def compute_suicide_burn_altitude(state: State, safety_factor: float) -> float:
 
 def compute_orbit_metrics(state: State) -> dict:
     """Return derived orbital metrics for phase transition checks."""
-    r_mag = np.linalg.norm(state.r)
-    v_mag = np.linalg.norm(state.v)
+    r_mag = vec_norm(state.r)
+    v_mag = vec_norm(state.v)
     energy = 0.5 * v_mag ** 2 - C.MU_EARTH / r_mag
 
     if abs(energy) > 1.0:
@@ -74,8 +75,8 @@ def compute_orbit_metrics(state: State) -> dict:
     else:
         a_sma = r_mag
 
-    h_vec = np.cross(state.r, state.v)
-    h_mag = np.linalg.norm(h_vec)
+    h_vec = cross3(state.r, state.v)
+    h_mag = vec_norm(h_vec)
     if a_sma > 0 and C.MU_EARTH * a_sma > 0:
         ecc_sq = max(0.0, 1.0 - h_mag ** 2 / (C.MU_EARTH * a_sma))
         ecc = float(np.sqrt(ecc_sq))

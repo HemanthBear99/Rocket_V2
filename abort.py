@@ -11,7 +11,7 @@ import numpy as np
 
 from . import constants as C
 from .forces import compute_atmosphere_properties
-from .utils import axisymmetric_angle_of_attack, compute_relative_velocity
+from .utils import axisymmetric_angle_of_attack, compute_relative_velocity, vec_norm
 
 
 class AbortMonitor:
@@ -96,12 +96,12 @@ class AbortMonitor:
                 'mode': self.abort_mode,
                 'reason': self.abort_reason,
                 'q_alpha': 0.0,
-                'omega_mag': float(np.linalg.norm(omega)),
+                'omega_mag': float(vec_norm(omega)),
             }
 
-        altitude = float(np.linalg.norm(r) - C.R_EARTH)
+        altitude = float(vec_norm(r) - C.R_EARTH)
         v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset_mps)
-        v_rel_mag = float(np.linalg.norm(v_rel))
+        v_rel_mag = float(vec_norm(v_rel))
         _, _, rho, _ = compute_atmosphere_properties(altitude, enable_upper_atm=enable_upper_atmosphere)
         rho *= float(atmosphere_density_scale)
 
@@ -118,7 +118,7 @@ class AbortMonitor:
         q_alpha = q_dyn * aoa
 
                      
-        omega_mag = float(np.linalg.norm(omega))
+        omega_mag = float(vec_norm(omega))
 
         abort = False
         reason = None

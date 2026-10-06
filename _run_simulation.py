@@ -36,6 +36,7 @@ from .physics_checks import (
     validate_state,
 )
 from .state import State
+from .utils import vec_norm
 
 logger = logging.getLogger(__name__)
 
@@ -249,8 +250,8 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
             if config.enable_separation_dynamics:
                 logger.info(
                     f"Applied separation dynamics: "
-                    f"|dv|={np.linalg.norm(orbiter_dv):.3f} m/s, "
-                    f"|domega|={np.linalg.norm(orbiter_domega):.4f} rad/s"
+                    f"|dv|={vec_norm(orbiter_dv):.3f} m/s, "
+                    f"|domega|={vec_norm(orbiter_domega):.4f} rad/s"
                 )
             if verbose:
                 print(f"  *** STAGE SEPARATION: {mass_before:.0f} -> {state.m:.0f} kg | "

@@ -36,7 +36,12 @@ from .high_fidelity_atmosphere import (
     compute_gram_atmosphere,
     eci_to_geodetic,
 )
-from .utils import compute_ground_relative_velocity, compute_relative_velocity
+from .utils import (
+    compute_ground_relative_velocity,
+    compute_relative_velocity,
+    cross3,
+    vec_norm,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -337,7 +342,7 @@ def compute_egm96_gravity_accel(r: np.ndarray, max_deg: int = _EGM96_MAX_DEG) ->
     Returns:
         Gravitational acceleration vector (m/s^2)
     """
-    r_norm = np.linalg.norm(r)
+    r_norm = vec_norm(r)
     if r_norm < C.ZERO_TOLERANCE:
         return np.zeros(3)
 
@@ -458,7 +463,7 @@ def compute_gravity_force(r: np.ndarray, m: float, enable_j2: bool = False,
     Returns:
         Gravitational force vector (N) in ECI frame
     """
-    r_norm = np.linalg.norm(r)
+    r_norm = vec_norm(r)
     if r_norm < C.ZERO_TOLERANCE:
         return np.zeros(3)
 
@@ -526,7 +531,7 @@ def apply_engine_transient(throttle_cmd: float, throttle_prev: float, dt: float,
 
 def altitude_above_configured_surface(r: np.ndarray, config=None) -> float:
     """Altitude above the spherical Earth surface (m)."""
-    return float(np.linalg.norm(r)) - C.R_EARTH
+    return float(vec_norm(r)) - C.R_EARTH
 
 
 def _altitude_from_r(r: np.ndarray, config=None) -> float:
@@ -580,11 +585,11 @@ def compute_drag_force(
         return np.zeros(3)
 
     v_ground = compute_ground_relative_velocity(r, v)
-    if np.linalg.norm(v) < C.SMALL_VELOCITY_TOL or np.linalg.norm(v_ground) < C.SMALL_VELOCITY_TOL:
+    if vec_norm(v) < C.SMALL_VELOCITY_TOL or vec_norm(v_ground) < C.SMALL_VELOCITY_TOL:
         v_rel = np.zeros(3)
     else:
         v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset_mps)
-    v_rel_norm = np.linalg.norm(v_rel)
+    v_rel_norm = vec_norm(v_rel)
 
     if v_rel_norm < C.SMALL_VELOCITY_TOL:
         return np.zeros(3)
@@ -621,11 +626,11 @@ def compute_lift_force(
         return np.zeros(3)
 
     v_ground = compute_ground_relative_velocity(r, v)
-    if np.linalg.norm(v) < C.SMALL_VELOCITY_TOL or np.linalg.norm(v_ground) < C.SMALL_VELOCITY_TOL:
+    if vec_norm(v) < C.SMALL_VELOCITY_TOL or vec_norm(v_ground) < C.SMALL_VELOCITY_TOL:
         return np.zeros(3)
 
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset_mps)
-    v_rel_norm = np.linalg.norm(v_rel)
+    v_rel_norm = vec_norm(v_rel)
     if v_rel_norm < C.SMALL_VELOCITY_TOL:
         return np.zeros(3)
 
@@ -657,14 +662,14 @@ def compute_lift_force(
     lift_mag = q_dyn * cl * C.REFERENCE_AREA
 
     body_z_inertial = R[:, 2]                                             
-    cross_intermediate = np.cross(v_rel, body_z_inertial)
-    cross_norm = float(np.linalg.norm(cross_intermediate))
-    v_rel_mag = float(np.linalg.norm(v_rel))
+    cross_intermediate = cross3(v_rel, body_z_inertial)
+    cross_norm = float(vec_norm(cross_intermediate))
+    v_rel_mag = float(vec_norm(v_rel))
                                                                           
     if cross_norm < 1e-4 * v_rel_mag:
         return np.zeros(3)
-    lift_dir = np.cross(cross_intermediate, v_rel)
-    norm = float(np.linalg.norm(lift_dir))
+    lift_dir = cross3(cross_intermediate, v_rel)
+    norm = float(vec_norm(lift_dir))
     if norm < 1e-9:
         return np.zeros(3)
     lift_dir /= norm
@@ -742,7 +747,7 @@ def _gimbaled_thrust_body_vector(
         return np.array([0.0, 0.0, thrust_magnitude])
 
     torque_xy = np.asarray(control_torque_xy, dtype=float)[:2]
-    torque_xy_mag = float(np.linalg.norm(torque_xy))
+    torque_xy_mag = float(vec_norm(torque_xy))
     if torque_xy_mag < 1e-9:
         return np.array([0.0, 0.0, thrust_magnitude])
 
@@ -807,7 +812,7 @@ def compute_thrust_force(q: np.ndarray, r: np.ndarray, thrust_on: bool = True, t
         return np.zeros(3)
 
                         
-    altitude = np.linalg.norm(r) - C.R_EARTH
+    altitude = vec_norm(r) - C.R_EARTH
     _, P_amb, _, _ = compute_configured_atmosphere_properties(altitude, config)
     P0 = C.ATM_P0
 
@@ -877,11 +882,11 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         return np.zeros(3)
 
     v_ground = compute_ground_relative_velocity(r, v)
-    if np.linalg.norm(v) < C.SMALL_VELOCITY_TOL or np.linalg.norm(v_ground) < C.SMALL_VELOCITY_TOL:
+    if vec_norm(v) < C.SMALL_VELOCITY_TOL or vec_norm(v_ground) < C.SMALL_VELOCITY_TOL:
         return np.zeros(3)
 
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset_mps)
-    v_rel_norm = np.linalg.norm(v_rel)
+    v_rel_norm = vec_norm(v_rel)
     
     if v_rel_norm < C.SMALL_VELOCITY_TOL:
         return np.zeros(3)
@@ -923,8 +928,8 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         # Multiplying u_trans itself put the deck torque INSIDE the AoA plane,
         # turning a pure pitching input into spurious roll/yaw, and degenerated
         # to an arbitrary constant axis when v_transverse -> 0.
-        cm_axis = np.cross(np.array([0.0, 0.0, 1.0]), u_trans)
-        cm_axis_norm = float(np.linalg.norm(cm_axis))
+        cm_axis = cross3(np.array([0.0, 0.0, 1.0]), u_trans)
+        cm_axis_norm = float(vec_norm(cm_axis))
         if cm_axis_norm < 1e-9:
             cm_axis = np.array([0.0, 0.0, 1.0])
         else:
@@ -962,7 +967,7 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
             
         arm_z = cp_effective - cg_pos_z
         r_arm = np.array([0.0, 0.0, arm_z])
-        torque_aero = np.cross(r_arm, F_normal_body)
+        torque_aero = cross3(r_arm, F_normal_body)
 
     if omega is not None:
         damp_coeff = (
@@ -1123,7 +1128,7 @@ def _compute_force_breakdown(
         _deck_fin_deg = 0.0
         if getattr(config, 'aero_deck_path', None):
             _R = quaternion_to_rotation_matrix(q)
-            _v_body = _R.T @ (v - np.cross(np.array([0.0, 0.0, C.EARTH_ROTATION_RATE]), r))
+            _v_body = _R.T @ (v - cross3(np.array([0.0, 0.0, C.EARTH_ROTATION_RATE]), r))
             _v_t = float(np.hypot(_v_body[0], _v_body[1]))
             _deck_alpha_deg = float(
                 np.degrees(np.arctan2(_v_t, max(abs(_v_body[2]), 1e-9)))
@@ -1178,11 +1183,11 @@ def _compute_force_breakdown(
         'lift': F_lift,
         'grid_fin': F_grid_fin,
         'total': total,
-        'gravity_magnitude': np.linalg.norm(F_grav),
-        'thrust_magnitude': np.linalg.norm(F_thrust),
-        'drag_magnitude': np.linalg.norm(F_drag),
-        'lift_magnitude': np.linalg.norm(F_lift),
-        'grid_fin_magnitude': np.linalg.norm(F_grid_fin),
+        'gravity_magnitude': vec_norm(F_grav),
+        'thrust_magnitude': vec_norm(F_thrust),
+        'drag_magnitude': vec_norm(F_drag),
+        'lift_magnitude': vec_norm(F_lift),
+        'grid_fin_magnitude': vec_norm(F_grid_fin),
     }
 
 

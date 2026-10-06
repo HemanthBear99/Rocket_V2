@@ -42,7 +42,7 @@ from .recovery import (
     target_landing_site_eci,
 )
 from .state import State
-from .utils import compute_ground_relative_velocity
+from .utils import compute_ground_relative_velocity, vec_norm
 
 logger = logging.getLogger(__name__)
 
@@ -437,7 +437,7 @@ class MissionManager:
 
 
         if self.current_phase == MissionPhase.BOOSTER_FLIP:
-            v_norm = np.linalg.norm(state.v)
+            v_norm = vec_norm(state.v)
             if v_norm > 1.0:
                 retrograde = -state.v / v_norm
                 aligned = self._check_attitude_aligned(state, retrograde, 15.0)
@@ -505,9 +505,9 @@ class MissionManager:
 
     def _update_boostback(self, state: State, radial_velocity: float) -> None:
         """End boostback once the return trajectory is on target or fuel-limited."""
-        r_hat = state.r / max(np.linalg.norm(state.r), 1.0)
+        r_hat = state.r / max(vec_norm(state.r), 1.0)
         v_horiz = state.v - np.dot(state.v, r_hat) * r_hat
-        v_horiz_mag = float(np.linalg.norm(v_horiz))
+        v_horiz_mag = float(vec_norm(v_horiz))
 
 
 
@@ -559,7 +559,7 @@ class MissionManager:
         )
         r_to_pad_now = landing_site_now - state.r
         r_to_pad_now_horiz = r_to_pad_now - np.dot(r_to_pad_now, r_hat) * r_hat
-        pad_dist_now = float(np.linalg.norm(r_to_pad_now_horiz))
+        pad_dist_now = float(vec_norm(r_to_pad_now_horiz))
         if pad_dist_now > 100.0:
             toward_pad_now = r_to_pad_now_horiz / pad_dist_now
             v_ground = compute_ground_relative_velocity(

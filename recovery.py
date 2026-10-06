@@ -17,7 +17,7 @@ import numpy as np
 
 from . import constants as C
 from .config_definition import SimulationConfig
-from .utils import compute_ground_relative_velocity
+from .utils import compute_ground_relative_velocity, cross3, vec_norm
 
 NEAR_PAD_ENTRY_SPEED_GATE_MPS = 250.0
 
@@ -130,10 +130,10 @@ def target_landing_site_eci(
         )
 
     launch = rotating_launch_site_eci(t, config=config)
-    launch_hat = launch / max(np.linalg.norm(launch), 1e-9)
+    launch_hat = launch / max(vec_norm(launch), 1e-9)
     k_axis = np.array([0.0, 0.0, 1.0], dtype=float)
-    east = np.cross(k_axis, launch_hat)
-    east_norm = float(np.linalg.norm(east))
+    east = cross3(k_axis, launch_hat)
+    east_norm = float(vec_norm(east))
     if east_norm < 1e-9:
         east = np.array([0.0, 1.0, 0.0], dtype=float)
         east_norm = 1.0
@@ -141,7 +141,7 @@ def target_landing_site_eci(
 
     theta = float(downrange_km) * 1000.0 / C.R_EARTH
     target_hat = np.cos(theta) * launch_hat + np.sin(theta) * east
-    target_hat = target_hat / max(np.linalg.norm(target_hat), 1e-9)
+    target_hat = target_hat / max(vec_norm(target_hat), 1e-9)
     return C.R_EARTH * target_hat
 
 
@@ -189,13 +189,13 @@ def movable_target_downrange_km(
     t_sample = 0.0
     r_sample = rotating_launch_site_eci(t_sample, config=config)
     altitude_m = 20000.0
-    probe = r_sample + altitude_m * (r_sample / max(float(np.linalg.norm(r_sample)), 1e-9))
+    probe = r_sample + altitude_m * (r_sample / max(float(vec_norm(r_sample)), 1e-9))
     wind = _wind_vector(probe, wind_offset_mps=wind_offset)
 
-    r_hat = r_sample / max(float(np.linalg.norm(r_sample)), 1e-9)
+    r_hat = r_sample / max(float(vec_norm(r_sample)), 1e-9)
     k_axis = np.array([0.0, 0.0, 1.0], dtype=float)
-    east = np.cross(k_axis, r_hat)
-    east_norm = float(np.linalg.norm(east))
+    east = cross3(k_axis, r_hat)
+    east_norm = float(vec_norm(east))
     if east_norm < 1e-9:
         return base
     east = east / east_norm
@@ -266,8 +266,8 @@ def great_circle_distance_m(r_a: np.ndarray, r_b: np.ndarray) -> float:
     """Great-circle surface distance between two geocentric position vectors."""
     a_hat = np.asarray(r_a, dtype=float)
     b_hat = np.asarray(r_b, dtype=float)
-    a_hat = a_hat / max(np.linalg.norm(a_hat), 1e-9)
-    b_hat = b_hat / max(np.linalg.norm(b_hat), 1e-9)
+    a_hat = a_hat / max(vec_norm(a_hat), 1e-9)
+    b_hat = b_hat / max(vec_norm(b_hat), 1e-9)
     angle = float(np.arccos(np.clip(np.dot(a_hat, b_hat), -1.0, 1.0)))
     return C.R_EARTH * angle
 
@@ -328,7 +328,7 @@ def _propagate_2body_to_surface(
 
     for _ in range(max_steps):
         def accel(pos: np.ndarray, velocity: np.ndarray) -> np.ndarray:
-            rn = max(float(np.linalg.norm(pos)), 1.0)
+            rn = max(float(vec_norm(pos)), 1.0)
             acceleration = -mu / (rn ** 3) * pos
             if include_drag:
                 wind_offset = float(
@@ -360,8 +360,8 @@ def _propagate_2body_to_surface(
         r_new = r_cur + (dt / 6.0) * (v_cur + 2.0 * v2 + 2.0 * v3 + v4)
         v_new = v_cur + (dt / 6.0) * (a1 + 2.0 * a2 + 2.0 * a3 + a4)
 
-        r_prev_norm = float(np.linalg.norm(r_cur))
-        r_new_norm = float(np.linalg.norm(r_new))
+        r_prev_norm = float(vec_norm(r_cur))
+        r_new_norm = float(vec_norm(r_new))
         elapsed += dt
 
         if r_new_norm <= R:
@@ -370,7 +370,7 @@ def _propagate_2body_to_surface(
             f = (R - r_new_norm) / max(r_prev_norm - r_new_norm, 1e-12)
             f = float(np.clip(f, 0.0, 1.0))
             r_surface = r_new + f * (r_cur - r_new)
-            r_surface = R * r_surface / max(float(np.linalg.norm(r_surface)), 1.0)
+            r_surface = R * r_surface / max(float(vec_norm(r_surface)), 1.0)
             return r_surface, elapsed - dt * (1.0 - f)
 
         r_cur, v_cur = r_new, v_new
@@ -401,7 +401,7 @@ def estimate_ballistic_impact_to_pad(
     """
     r_arr = np.asarray(r, dtype=float)
     v_arr = np.asarray(v, dtype=float)
-    r_norm = max(float(np.linalg.norm(r_arr)), 1.0)
+    r_norm = max(float(vec_norm(r_arr)), 1.0)
     vertical = r_arr / r_norm
     altitude = max(r_norm - C.R_EARTH, 0.0)
     g_local = C.MU_EARTH / max(r_norm ** 2, 1.0)
@@ -426,7 +426,7 @@ def estimate_ballistic_impact_to_pad(
                                                                               
         v_horiz = v_arr - v_vert * vertical
         impact_vec = r_arr + v_horiz * time_to_impact_est
-        impact_hat = impact_vec / max(float(np.linalg.norm(impact_vec)), 1.0)
+        impact_hat = impact_vec / max(float(vec_norm(impact_vec)), 1.0)
         impact_site = C.R_EARTH * impact_hat
         time_to_impact = time_to_impact_est
 
@@ -435,7 +435,7 @@ def estimate_ballistic_impact_to_pad(
         target_downrange_km,
         config=config,
     )
-    target_vertical = target_site / max(float(np.linalg.norm(target_site)), 1.0)
+    target_vertical = target_site / max(float(vec_norm(target_site)), 1.0)
     miss_vec = target_site - impact_site
     miss_horiz = miss_vec - float(np.dot(miss_vec, target_vertical)) * target_vertical
 
@@ -444,7 +444,7 @@ def estimate_ballistic_impact_to_pad(
         impact_site_eci=impact_site,
         target_site_eci=target_site,
         miss_vector_m=miss_horiz,
-        miss_distance_m=float(np.linalg.norm(miss_horiz)),
+        miss_distance_m=float(vec_norm(miss_horiz)),
     )
 
 
@@ -466,10 +466,10 @@ def estimate_recovery_targeting(
     """Estimate the future rotating landing-site intercept for booster RTLS."""
     r = np.asarray(r, dtype=float)
     v = np.asarray(v, dtype=float)
-    vertical = r / max(float(np.linalg.norm(r)), 1.0)
-    altitude = float(np.linalg.norm(r) - C.R_EARTH)
+    vertical = r / max(float(vec_norm(r)), 1.0)
+    altitude = float(vec_norm(r) - C.R_EARTH)
     radial_velocity = float(np.dot(v, vertical))
-    g_local = C.MU_EARTH / max(float(np.linalg.norm(r)) ** 2, 1.0)
+    g_local = C.MU_EARTH / max(float(vec_norm(r)) ** 2, 1.0)
     h_apogee_pred = estimate_ballistic_apogee(altitude, radial_velocity, g_local)
     t_to_apogee = max(radial_velocity, 0.0) / max(g_local, 1e-6)
                                                                          
@@ -495,7 +495,7 @@ def estimate_recovery_targeting(
 
     r_to_site = landing_site - r
     r_to_site_horiz = r_to_site - float(np.dot(r_to_site, vertical)) * vertical
-    site_dist = float(np.linalg.norm(r_to_site_horiz))
+    site_dist = float(vec_norm(r_to_site_horiz))
     if site_dist > 1e-6:
         toward_site = r_to_site_horiz / site_dist
     else:
@@ -527,7 +527,7 @@ def compute_powered_descent_lead_time(
     """Estimate duration of powered descent phases (entry burn + TC + landing)."""
     r_arr = np.asarray(r, dtype=float)
     v_arr = np.asarray(v, dtype=float)
-    r_norm = float(np.linalg.norm(r_arr))
+    r_norm = float(vec_norm(r_arr))
     if r_norm < 1.0:
         return float(config.booster_powered_descent_lead_time_s)
 
@@ -591,7 +591,7 @@ def estimate_suicide_burn(
     Returns dict with keys: ignite, throttle, burn_altitude, v_descent,
     v_horizontal, v_effective, a_brake.
     """
-    r_norm = float(np.linalg.norm(r))
+    r_norm = float(vec_norm(r))
     if r_norm < 1.0:
         return {
             'ignite': False,
@@ -613,7 +613,7 @@ def estimate_suicide_burn(
     v_ground = compute_ground_relative_velocity(r, v)
     v_descent = -float(np.dot(v_ground, vertical))
     v_horiz_vec = v_ground - np.dot(v_ground, vertical) * vertical
-    v_horiz = float(np.linalg.norm(v_horiz_vec))
+    v_horiz = float(vec_norm(v_horiz_vec))
     v_effective = float(np.sqrt(
         v_descent ** 2 + horizontal_weight * (v_horiz ** 2)
     ))
@@ -748,7 +748,7 @@ def estimate_booster_touchdown_time(
     """
     r = np.asarray(r, dtype=float)
     v = np.asarray(v, dtype=float)
-    r_norm = float(np.linalg.norm(r))
+    r_norm = float(vec_norm(r))
     if r_norm < 1.0:
         return 0.0
 
