@@ -30,6 +30,10 @@ uv run python -m rlv_sim.cli --mission full      # one full mission, CLI
 uv run uvicorn rlv_sim.server:app --port 8000    # web app at localhost:8000
 ```
 
+Optional speed-up: `uv sync --extra fast` installs Numba, which compiles the
+EGM96 gravity model and the booster impact predictor (~1.6x faster full
+missions, identical outcomes). Without it the pure-Python paths are used.
+
 ### Desktop build (Windows)
 
 ```bash

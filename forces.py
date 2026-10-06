@@ -28,6 +28,7 @@ import logging
 
 import numpy as np
 
+from . import _numba_kernels
 from . import constants as C
 from ._types import ForceBreakdown
 from .aero_database import AeroDatabase
@@ -347,6 +348,9 @@ def _egm96_terms() -> tuple:
             for m in range(n + 1)
             if not (_EGM96_C.get((n, m), 0.0) == 0.0 and _EGM96_S.get((n, m), 0.0) == 0.0)
         )
+        _EGM96_TERMS_CACHE["array"] = np.array(
+            _EGM96_TERMS_CACHE["terms"], dtype=float
+        ).reshape(-1, 4)
         _EGM96_TERMS_CACHE["source"] = source
     return _EGM96_TERMS_CACHE["terms"]
 
@@ -398,6 +402,20 @@ def _egm96_legendre(n_max: int, sin_phi: float, cos_phi: float):
     return P, dP, Q
 
 
+# Array forms of the recurrence tables for the compiled kernel.
+_EGM96_SECTORAL_ARR = np.array(
+    [0.0] + [_EGM96_SECTORAL_FACTOR[m] for m in range(1, _EGM96_MAX_DEG + 1)]
+)
+_EGM96_SUBDIAG_ARR = np.array(
+    [_EGM96_SUBDIAG_FACTOR[m] for m in range(_EGM96_MAX_DEG)] + [0.0]
+)
+_EGM96_REC_A = np.zeros((_EGM96_MAX_DEG + 1, _EGM96_MAX_DEG + 1))
+_EGM96_REC_B = np.zeros((_EGM96_MAX_DEG + 1, _EGM96_MAX_DEG + 1))
+for (_n, _m), (_a_n, _b_n) in _EGM96_RECURRENCE.items():
+    _EGM96_REC_A[_n, _m] = _a_n
+    _EGM96_REC_B[_n, _m] = _b_n
+
+
 def compute_egm96_gravity_accel(r: np.ndarray, max_deg: int = _EGM96_MAX_DEG) -> np.ndarray:
     """Spherical-harmonic (EGM96 truncated) gravitational acceleration.
 
@@ -418,6 +436,14 @@ def compute_egm96_gravity_accel(r: np.ndarray, max_deg: int = _EGM96_MAX_DEG) ->
 
     mu = C.MU_EARTH
     a_e = C.R_EARTH_EQUATORIAL_WGS84
+    if _numba_kernels.AVAILABLE:
+        _egm96_terms()
+        return _numba_kernels.egm96_accel(
+            float(r[0]), float(r[1]), float(r[2]),
+            min(int(max_deg), _EGM96_MAX_DEG), mu, a_e,
+            _EGM96_TERMS_CACHE["array"], _EGM96_SECTORAL_ARR, _EGM96_SUBDIAG_ARR,
+            _EGM96_REC_A, _EGM96_REC_B,
+        )
     x, y, z = r
     # Spherical coordinates (geocentric).
     r_sph = r_norm

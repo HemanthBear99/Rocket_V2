@@ -25,6 +25,8 @@ test = ["pytest>=8.0", "pytest-playwright>=0.5"]
 # without being declared anywhere in pyproject.toml, so `pip install -e .`
 # alone would not provide it.
 desktop = ["pywebview>=5.0", "PySide6>=6.7", "PyInstaller>=6.0"]
+# Optional: compiles the gravity model and landing predictor (~1.6x faster runs).
+fast = ["numba>=0.60"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from . import _numba_kernels
 from . import constants as C
 from .config_definition import SimulationConfig
 from .utils import compute_ground_relative_velocity, cross3, vec_norm
@@ -295,6 +296,55 @@ def compute_entry_energy_speed_gate(config: SimulationConfig) -> float:
     return configured_gate
 
 
+def _predictor_kernel_supported(include_drag: bool, config) -> bool:
+    """The compiled predictor models the analytic Cd(Mach) drag path only."""
+    if not include_drag:
+        return True
+    from .forces import _get_aero_db
+
+    path = getattr(config, "aero_deck_path", None) if config else None
+    aero_db = _get_aero_db(path)
+    return not (aero_db and aero_db.is_loaded)
+
+
+def _predictor_params(config) -> np.ndarray:
+    """Scalar drag/wind/atmosphere parameters for the compiled predictor."""
+    from .utils import _WIND_COS_AZ, _WIND_SIN_AZ
+
+    enable_atm = True if config is None else bool(getattr(config, "enable_atmosphere", True))
+    return np.array([
+        C.R_EARTH,
+        C.EARTH_ROTATION_RATE,
+        float(getattr(config, "runtime_wind_offset_mps", 0.0)),
+        C.WIND_REF_SPEED,
+        C.WIND_REF_ALT,
+        C.WIND_EXPONENT,
+        _WIND_COS_AZ,
+        _WIND_SIN_AZ,
+        C.ZERO_TOLERANCE,
+        C.SMALL_VELOCITY_TOL,
+        C.DENSITY_FLOOR,
+        float(getattr(config, "runtime_atmosphere_density_scale", 1.0)),
+        1.0 if bool(getattr(config, "enable_upper_atmosphere", False)) else 0.0,
+        1.0 if enable_atm else 0.0,
+        C.G0,
+        C.R_GAS,
+        C.GAMMA,
+        C.ATM_SPEED_OF_SOUND_FALLBACK,
+        C.REFERENCE_AREA,
+    ], dtype=float)
+
+
+def _predictor_tables():
+    from .forces import _US76_H, _US76_L, _build_us76_tables
+
+    tb, pb = _build_us76_tables()
+    return (
+        _US76_H, _US76_L, tb, pb,
+        np.asarray(C.MACH_BREAKPOINTS, dtype=float), np.asarray(C.CD_VALUES, dtype=float),
+    )
+
+
 def _propagate_2body_to_surface(
     r: np.ndarray,
     v: np.ndarray,
@@ -325,6 +375,14 @@ def _propagate_2body_to_surface(
             aero_mode,
             config=config,
         )
+
+    if _numba_kernels.AVAILABLE and _predictor_kernel_supported(include_drag, config):
+        hit, r_surface, flight_time = _numba_kernels.propagate_to_surface(
+            r_cur, v_cur, int(max_steps), float(dt), bool(include_drag),
+            float(drag_scale), float(mass_kg) if include_drag else 1.0,
+            mu, _predictor_params(config), *_predictor_tables(),
+        )
+        return (r_surface, float(flight_time)) if hit else None
 
     for _ in range(max_steps):
         def accel(pos: np.ndarray, velocity: np.ndarray) -> np.ndarray:
