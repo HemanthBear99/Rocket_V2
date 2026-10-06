@@ -33,6 +33,8 @@ def vec_norm(x) -> np.float64:
 
 _K_AXIS = np.array([0.0, 0.0, 1.0])
 _OMEGA_EARTH = np.array([0.0, 0.0, C.EARTH_ROTATION_RATE])
+_WIND_COS_AZ = np.cos(C.WIND_DIRECTION_AZIMUTH)
+_WIND_SIN_AZ = np.sin(C.WIND_DIRECTION_AZIMUTH)
 
 
 def _wind_vector(r: np.ndarray, wind_offset_mps: float = 0.0) -> np.ndarray:
@@ -59,7 +61,7 @@ def _wind_vector(r: np.ndarray, wind_offset_mps: float = 0.0) -> np.ndarray:
     east = east / east_norm
     north = cross3(up, east)
     north = north / max(vec_norm(north), 1e-9)
-    dir_vec = np.cos(C.WIND_DIRECTION_AZIMUTH) * north + np.sin(C.WIND_DIRECTION_AZIMUTH) * east
+    dir_vec = _WIND_COS_AZ * north + _WIND_SIN_AZ * east
     return speed * dir_vec
 
 

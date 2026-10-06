@@ -328,6 +328,76 @@ def compute_aerodynamic_heating(rho: float, v_rel_mag: float, nose_radius: float
               
                                                                                
 
+# Position-independent EGM96 tables: the non-zero (n, m, C_nm, S_nm) terms
+# and the Legendre recurrence coefficients. Values are computed exactly as the per-call code used to.
+_EGM96_TERMS_CACHE: dict = {"source": None, "terms": ()}
+
+
+def _egm96_terms() -> tuple:
+    """Non-zero (n, m, C_nm, S_nm) terms in summation order.
+
+    Rebuilt whenever the coefficient dicts are replaced (tests patch them).
+    """
+    source = (_EGM96_C, _EGM96_S)
+    cached = _EGM96_TERMS_CACHE["source"]
+    if cached is None or cached[0] is not source[0] or cached[1] is not source[1]:
+        _EGM96_TERMS_CACHE["terms"] = tuple(
+            (n, m, _EGM96_C.get((n, m), 0.0), _EGM96_S.get((n, m), 0.0))
+            for n in range(2, _EGM96_MAX_DEG + 1)
+            for m in range(n + 1)
+            if not (_EGM96_C.get((n, m), 0.0) == 0.0 and _EGM96_S.get((n, m), 0.0) == 0.0)
+        )
+        _EGM96_TERMS_CACHE["source"] = source
+    return _EGM96_TERMS_CACHE["terms"]
+
+
+_EGM96_SECTORAL_FACTOR = {
+    m: (np.sqrt(3.0) if m == 1 else np.sqrt((2.0 * m + 1.0) / (2.0 * m)))
+    for m in range(1, _EGM96_MAX_DEG + 1)
+}
+_EGM96_SUBDIAG_FACTOR = {m: np.sqrt(2.0 * m + 3.0) for m in range(_EGM96_MAX_DEG)}
+_EGM96_RECURRENCE = {
+    (n, m): (
+        np.sqrt((2.0 * n + 1.0) * (2.0 * n - 1.0) / ((n - m) * (n + m))),
+        np.sqrt((2.0 * n + 1.0) * (n + m - 1.0) * (n - m - 1.0)
+                / ((2.0 * n - 3.0) * (n - m) * (n + m))),
+    )
+    for m in range(_EGM96_MAX_DEG + 1)
+    for n in range(m + 2, _EGM96_MAX_DEG + 1)
+}
+
+
+def _egm96_legendre(n_max: int, sin_phi: float, cos_phi: float):
+    """Fully normalized P_nm(sin(latitude)) and latitude derivatives.
+
+    No Condon-Shortley sign. Q stores P_nm / cos(latitude) for m > 0, avoiding
+    division by zero at the poles.
+    """
+    P = {(0, 0): 1.0}
+    dP = {(0, 0): 0.0}
+    Q = {}
+    for m in range(n_max + 1):
+        if m > 0:
+            factor = _EGM96_SECTORAL_FACTOR[m]
+            previous = P[(m - 1, m - 1)]
+            P[(m, m)] = factor * cos_phi * previous
+            dP[(m, m)] = factor * (-sin_phi * previous + cos_phi * dP[(m - 1, m - 1)])
+            Q[(m, m)] = factor * previous
+        if m < n_max:
+            factor = _EGM96_SUBDIAG_FACTOR[m]
+            P[(m + 1, m)] = factor * sin_phi * P[(m, m)]
+            dP[(m + 1, m)] = factor * (cos_phi * P[(m, m)] + sin_phi * dP[(m, m)])
+            if m > 0:
+                Q[(m + 1, m)] = factor * sin_phi * Q[(m, m)]
+        for n in range(m + 2, n_max + 1):
+            a_n, b_n = _EGM96_RECURRENCE[(n, m)]
+            P[(n, m)] = a_n * sin_phi * P[(n - 1, m)] - b_n * P[(n - 2, m)]
+            dP[(n, m)] = a_n * (cos_phi * P[(n - 1, m)] + sin_phi * dP[(n - 1, m)]) - b_n * dP[(n - 2, m)]
+            if m > 0:
+                Q[(n, m)] = a_n * sin_phi * Q[(n - 1, m)] - b_n * Q[(n - 2, m)]
+    return P, dP, Q
+
+
 def compute_egm96_gravity_accel(r: np.ndarray, max_deg: int = _EGM96_MAX_DEG) -> np.ndarray:
     """Spherical-harmonic (EGM96 truncated) gravitational acceleration.
 
@@ -361,34 +431,7 @@ def compute_egm96_gravity_accel(r: np.ndarray, max_deg: int = _EGM96_MAX_DEG) ->
     cos_lam = np.cos(lam)
 
     n_max = min(int(max_deg), _EGM96_MAX_DEG)
-
-    # Fully normalized P_nm(sin(latitude)), without the Condon-Shortley sign.
-    # Differentiate the same recurrence with respect to latitude. Q stores
-    # P_nm / cos(latitude) for m > 0, avoiding division by zero at the poles.
-    P = {(0, 0): 1.0}
-    dP = {(0, 0): 0.0}
-    Q = {}
-    for m in range(n_max + 1):
-        if m > 0:
-            factor = np.sqrt(3.0) if m == 1 else np.sqrt((2.0 * m + 1.0) / (2.0 * m))
-            previous = P[(m - 1, m - 1)]
-            P[(m, m)] = factor * cos_phi * previous
-            dP[(m, m)] = factor * (-sin_phi * previous + cos_phi * dP[(m - 1, m - 1)])
-            Q[(m, m)] = factor * previous
-        if m < n_max:
-            factor = np.sqrt(2.0 * m + 3.0)
-            P[(m + 1, m)] = factor * sin_phi * P[(m, m)]
-            dP[(m + 1, m)] = factor * (cos_phi * P[(m, m)] + sin_phi * dP[(m, m)])
-            if m > 0:
-                Q[(m + 1, m)] = factor * sin_phi * Q[(m, m)]
-        for n in range(m + 2, n_max + 1):
-            a_n = np.sqrt((2.0 * n + 1.0) * (2.0 * n - 1.0) / ((n - m) * (n + m)))
-            b_n = np.sqrt((2.0 * n + 1.0) * (n + m - 1.0) * (n - m - 1.0)
-                          / ((2.0 * n - 3.0) * (n - m) * (n + m)))
-            P[(n, m)] = a_n * sin_phi * P[(n - 1, m)] - b_n * P[(n - 2, m)]
-            dP[(n, m)] = a_n * (cos_phi * P[(n - 1, m)] + sin_phi * dP[(n - 1, m)]) - b_n * dP[(n - 2, m)]
-            if m > 0:
-                Q[(n, m)] = a_n * sin_phi * Q[(n - 1, m)] - b_n * Q[(n - 2, m)]
+    P, dP, Q = _egm96_legendre(n_max, sin_phi, cos_phi)
 
     # Accumulate acceleration via the standard Cartesian gradient of
     #   U = mu/r * sum_{n,m} (a_e/r)^n * P_nm(sin phi) * (C_nm cos m lam + S_nm sin m lam)
@@ -400,29 +443,27 @@ def compute_egm96_gravity_accel(r: np.ndarray, max_deg: int = _EGM96_MAX_DEG) ->
     r_hat = np.array([cos_phi * cos_lam, cos_phi * sin_lam, sin_phi])
     lam_hat = np.array([-sin_lam, cos_lam, 0.0])
 
+    ratio_n = {n: (a_e / r_sph) ** n for n in range(2, n_max + 1)}
+    trig_m = {m: (np.cos(m * lam), np.sin(m * lam)) for m in range(1, n_max + 1)}
     dU_dr = 0.0
     dU_dphi = 0.0
     dU_dlam = 0.0
-    for n in range(2, n_max + 1):
-        for m in range(n + 1):
-            c = _EGM96_C.get((n, m), 0.0)
-            if c == 0.0 and _EGM96_S.get((n, m), 0.0) == 0.0:
-                continue
-            s = _EGM96_S.get((n, m), 0.0)
-            p = P[(n, m)]
-            dp = dP[(n, m)]
-            ratio = (a_e / r_sph) ** n
-            if m == 0:
-                cos_mlam = 1.0
-                sin_mlam = 0.0
-            else:
-                cos_mlam = np.cos(m * lam)
-                sin_mlam = np.sin(m * lam)
-            Y = c * cos_mlam + s * sin_mlam
-            dU_dr += -(n + 1) * ratio * p * Y
-            dU_dphi += ratio * dp * Y
-            if m != 0:
-                dU_dlam += ratio * Q[(n, m)] * m * (-c * sin_mlam + s * cos_mlam)
+    for n, m, c, s in _egm96_terms():
+        if n > n_max:
+            continue
+        p = P[(n, m)]
+        dp = dP[(n, m)]
+        ratio = ratio_n[n]
+        if m == 0:
+            cos_mlam = 1.0
+            sin_mlam = 0.0
+        else:
+            cos_mlam, sin_mlam = trig_m[m]
+        Y = c * cos_mlam + s * sin_mlam
+        dU_dr += -(n + 1) * ratio * p * Y
+        dU_dphi += ratio * dp * Y
+        if m != 0:
+            dU_dlam += ratio * Q[(n, m)] * m * (-c * sin_mlam + s * cos_mlam)
 
     # Gradient of the positive geopotential U. The longitude sum already
     # includes division by cos(latitude) through Q, including its polar limit.
