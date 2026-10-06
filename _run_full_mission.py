@@ -101,6 +101,78 @@ def _step_vehicle(state, actuator, mgr, gs, log, abort_monitor, config, max_time
     return new_state, new_actuator, new_gs, False, "", step_dt, guid
 
 
+def _make_wind_applier(config: SimulationConfig) -> Callable[[SimulationConfig], SimulationConfig]:
+    """Return a per-step function that adds seeded turbulence/gusts to a config."""
+    if not config.enable_stochastic_wind:
+        return lambda cfg: cfg
+    if config.wind_seed is not None:
+        wind_seed = int(config.wind_seed)
+    elif config.gps_seed is not None:
+        # Offset from gps_seed by 3, matching the existing IMU (+1) /
+        # landing altimeter (+2) derived-seed pattern, so wind noise is
+        # not simply identical to the raw GPS noise seed by coincidence.
+        wind_seed = int(config.gps_seed) + 3
+    else:
+        wind_seed = 0
+    wind_rng = np.random.default_rng(wind_seed)
+
+    def apply_wind(cfg: SimulationConfig) -> SimulationConfig:
+        turbulence = float(wind_rng.normal(0.0, cfg.wind_turbulence_intensity))
+        gust = float(cfg.wind_gust_magnitude) * float(wind_rng.binomial(1, 0.01))
+        return dataclasses.replace(
+            cfg,
+            runtime_wind_offset_mps=cfg.runtime_wind_offset_mps + turbulence + gust,
+        )
+
+    return apply_wind
+
+
+def _make_abort_monitor(config: SimulationConfig) -> AbortMonitor | None:
+    if not config.enable_abort_modes:
+        return None
+    return AbortMonitor(
+        q_alpha_threshold=config.abort_q_alpha_threshold,
+        attitude_threshold_deg=config.abort_attitude_threshold,
+    )
+
+
+def _separation_time(mission_mgr: MissionManager, state) -> float:
+    if mission_mgr.separation_time is not None:
+        return mission_mgr.separation_time
+    return state.t
+
+
+def _print_dual_status(orbiter_state, orbiter_done, orbiter_reason, orb_guid,
+                       booster_state, booster_done, booster_reason, bst_guid) -> None:
+    orb_alt = orbiter_state.altitude / 1000 if not orbiter_done else -1
+    orb_vel = orbiter_state.speed if not orbiter_done else -1
+    bst_alt = booster_state.altitude / 1000 if not booster_done else -1
+    bst_vel = booster_state.speed if not booster_done else -1
+    orb_phase = orb_guid.get('phase', '?') if not orbiter_done else orbiter_reason[:18]
+    bst_phase = bst_guid.get('phase', '?') if not booster_done else booster_reason[:18]
+    t_now = max(
+        orbiter_state.t if not orbiter_done else 0,
+        booster_state.t if not booster_done else 0
+    )
+    print(f"{t_now:10.1f} | {orb_alt:10.1f} | {orb_vel:10.1f} | "
+          f"{bst_alt:10.1f} | {bst_vel:10.1f} | {orb_phase:^18} | {bst_phase:^18}")
+
+
+def _print_mission_summary(separation_time, orbiter_state, orbiter_reason,
+                           booster_state, booster_reason, config, step_count, elapsed) -> None:
+    print("\n" + "=" * 90)
+    print("FULL MISSION SUMMARY")
+    print("=" * 90)
+    print(f"Separation:    t={separation_time:.2f}s")
+    print(f"Orbiter:       {orbiter_reason}")
+    print(f"  Final Alt:   {orbiter_state.altitude/1000:.1f} km | V={orbiter_state.speed:.0f} m/s")
+    print(f"Booster:       {booster_reason}")
+    booster_v_display = surface_relative_speed(booster_state, config)
+    print(f"  Final Alt:   {booster_state.altitude/1000:.1f} km | V={booster_v_display:.0f} m/s (surface-relative)")
+    print(f"Total Steps:   {step_count:,} | Wall Time: {elapsed:.2f}s")
+    print("=" * 90)
+
+
 def run_full_mission(dt: float = None, max_time: float = None,
                      verbose: bool = True,
                      config: SimulationConfig = None,
@@ -158,31 +230,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
         if progress_callback is not None:
             progress_callback(progress)
 
-                                                      
-    if config.wind_seed is not None:
-        _wind_seed = int(config.wind_seed)
-    elif config.gps_seed is not None:
-        # Offset from gps_seed by 3, matching the existing IMU (+1) /
-        # landing altimeter (+2) derived-seed pattern, so wind noise is
-        # not simply identical to the raw GPS noise seed by coincidence.
-        _wind_seed = int(config.gps_seed) + 3
-    else:
-        _wind_seed = 0
-    _wind_rng = (
-        np.random.default_rng(_wind_seed)
-        if config.enable_stochastic_wind
-        else None
-    )
-
-    def _apply_wind(cfg: SimulationConfig) -> SimulationConfig:
-        if _wind_rng is None:
-            return cfg
-        turbulence = float(_wind_rng.normal(0.0, cfg.wind_turbulence_intensity))
-        gust = float(cfg.wind_gust_magnitude) * float(_wind_rng.binomial(1, 0.01))
-        return dataclasses.replace(
-            cfg,
-            runtime_wind_offset_mps=cfg.runtime_wind_offset_mps + turbulence + gust,
-        )
+    _apply_wind = _make_wind_applier(config)
 
                                                                              
                                         
@@ -200,14 +248,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
     ascent_log = SimulationLog()
     actuator = ActuatorState(thrust_dir=compute_local_vertical(state.r))
     mission_mgr = MissionManager(vehicle_type="ascent", initial_mass=state.m, config=config)
-    ascent_abort_monitor = (
-        AbortMonitor(
-            q_alpha_threshold=config.abort_q_alpha_threshold,
-            attitude_threshold_deg=config.abort_attitude_threshold,
-        )
-        if config.enable_abort_modes
-        else None
-    )
+    ascent_abort_monitor = _make_abort_monitor(config)
     ascent_energy_tracker = _EnergyValidationTracker()
 
     current_stage = 1
@@ -266,11 +307,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
             and phase_after == MissionPhase.STAGE_SEPARATION
             and phase_before == MissionPhase.COAST
         ):
-            separation_time = (
-                mission_mgr.separation_time
-                if mission_mgr.separation_time is not None
-                else state.t
-            )
+            separation_time = _separation_time(mission_mgr, state)
             if verbose:
                 print(f"\n  *** STAGE SEPARATION at t={separation_time:.2f}s "
                       f"| Alt={state.altitude/1000:.1f}km "
@@ -278,11 +315,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
 
         if phase_after in s2_phases:
             if separation_time is None:
-                separation_time = (
-                    mission_mgr.separation_time
-                    if mission_mgr.separation_time is not None
-                    else state.t
-                )
+                separation_time = _separation_time(mission_mgr, state)
             break
 
                                 
@@ -294,11 +327,12 @@ def run_full_mission(dt: float = None, max_time: float = None,
             break
 
                           
+        step_config = _apply_wind(config)
         state, guid_out, ctrl_out, actuator, gs_ascent = simulation_step(
             state, actuator, mission_mgr, step_dt,
             dry_mass=current_dry_mass, stage=current_stage,
             vehicle_model="stacked", gs=gs_ascent,
-            config=_apply_wind(config)
+            config=step_config,
         )
         ascent_log.append(state, guid_out, ctrl_out)
         _emit(MissionProgress(
@@ -312,7 +346,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
             state,
             guid_out,
             ctrl_out,
-            config,
+            step_config,
             ascent_abort_monitor,
             current_phase=mission_mgr.get_phase(),
         )
@@ -401,22 +435,8 @@ def run_full_mission(dt: float = None, max_time: float = None,
 
     orbiter_log = SimulationLog()
     booster_log = SimulationLog()
-    orbiter_abort_monitor = (
-        AbortMonitor(
-            q_alpha_threshold=config.abort_q_alpha_threshold,
-            attitude_threshold_deg=config.abort_attitude_threshold,
-        )
-        if config.enable_abort_modes
-        else None
-    )
-    booster_abort_monitor = (
-        AbortMonitor(
-            q_alpha_threshold=config.abort_q_alpha_threshold,
-            attitude_threshold_deg=config.abort_attitude_threshold,
-        )
-        if config.enable_abort_modes
-        else None
-    )
+    orbiter_abort_monitor = _make_abort_monitor(config)
+    booster_abort_monitor = _make_abort_monitor(config)
 
     orbiter_done = False
     booster_done = False
@@ -510,33 +530,18 @@ def run_full_mission(dt: float = None, max_time: float = None,
 
                          
         if verbose and dual_step % 2000 == 0:
-            orb_alt = orbiter_state.altitude / 1000 if not orbiter_done else -1
-            orb_vel = orbiter_state.speed if not orbiter_done else -1
-            bst_alt = booster_state.altitude / 1000 if not booster_done else -1
-            bst_vel = booster_state.speed if not booster_done else -1
-            orb_phase = orb_guid.get('phase', '?') if not orbiter_done else orbiter_reason[:18]
-            bst_phase = bst_guid.get('phase', '?') if not booster_done else booster_reason[:18]
-            t_now = max(
-                orbiter_state.t if not orbiter_done else 0,
-                booster_state.t if not booster_done else 0
+            _print_dual_status(
+                orbiter_state, orbiter_done, orbiter_reason, orb_guid,
+                booster_state, booster_done, booster_reason, bst_guid,
             )
-            print(f"{t_now:10.1f} | {orb_alt:10.1f} | {orb_vel:10.1f} | "
-                  f"{bst_alt:10.1f} | {bst_vel:10.1f} | {orb_phase:^18} | {bst_phase:^18}")
 
     elapsed = time.time() - start_wall
 
     if verbose:
-        print("\n" + "=" * 90)
-        print("FULL MISSION SUMMARY")
-        print("=" * 90)
-        print(f"Separation:    t={separation_time:.2f}s")
-        print(f"Orbiter:       {orbiter_reason}")
-        print(f"  Final Alt:   {orbiter_state.altitude/1000:.1f} km | V={orbiter_state.speed:.0f} m/s")
-        print(f"Booster:       {booster_reason}")
-        booster_v_display = surface_relative_speed(booster_state, config)
-        print(f"  Final Alt:   {booster_state.altitude/1000:.1f} km | V={booster_v_display:.0f} m/s (surface-relative)")
-        print(f"Total Steps:   {step_count:,} | Wall Time: {elapsed:.2f}s")
-        print("=" * 90)
+        _print_mission_summary(
+            separation_time, orbiter_state, orbiter_reason,
+            booster_state, booster_reason, config, step_count, elapsed,
+        )
 
     return FullMissionResult(
         ascent_log=ascent_log,

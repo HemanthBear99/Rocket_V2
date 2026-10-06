@@ -103,6 +103,25 @@ def _validate_aero_deck_path(deck_path: str) -> str | None:
     return None
 
 
+
+_FIELD_RULES = {
+    # kind: (predicate that flags an INVALID value, message phrase)
+    "positive": (lambda value: value <= 0, "must be positive"),
+    "nonneg": (lambda value: value < 0, "must be >= 0"),
+    "at_least_1": (lambda value: value < 1.0, "must be >= 1.0"),
+}
+
+
+def _field_errors(config, rules) -> list[str]:
+    """Return messages for ``(field_name, kind)`` rules that the config violates."""
+    errors = []
+    for name, kind in rules:
+        is_invalid, phrase = _FIELD_RULES[kind]
+        value = getattr(config, name)
+        if is_invalid(value):
+            errors.append(f"{name} {phrase}, got {value}")
+    return errors
+
 @dataclass(frozen=True)
 class SimulationConfig:
     """
@@ -402,12 +421,11 @@ class SimulationConfig:
                 errors.append(deck_error)
 
                                                                             
-        if self.kp_attitude < 0:
-            errors.append(f"kp_attitude must be >= 0, got {self.kp_attitude}")
-        if self.kd_attitude < 0:
-            errors.append(f"kd_attitude must be >= 0, got {self.kd_attitude}")
-        if self.ki_attitude < 0:
-            errors.append(f"ki_attitude must be >= 0, got {self.ki_attitude}")
+        errors += _field_errors(self, (
+            ("kp_attitude", "nonneg"),
+            ("kd_attitude", "nonneg"),
+            ("ki_attitude", "nonneg"),
+        ))
         if self.attitude_controller not in ("pd", "pid"):
             errors.append(f"attitude_controller must be 'pd' or 'pid', got {self.attitude_controller!r}")
         if self.recovery_attitude_controller not in ("pd", "pid", "auto"):
@@ -419,23 +437,16 @@ class SimulationConfig:
             errors.append(
                 f"attitude_integral_windup_fraction must be in (0, 1], got {self.attitude_integral_windup_fraction}"
             )
-        if self.max_torque <= 0:
-            errors.append(f"max_torque must be positive, got {self.max_torque}")
-
-        if self.stage1_dry_mass <= 0:
-            errors.append(f"stage1_dry_mass must be positive, got {self.stage1_dry_mass}")
-        if self.stage1_prop_mass <= 0:
-            errors.append(f"stage1_prop_mass must be positive, got {self.stage1_prop_mass}")
-        if self.stage2_dry_mass <= 0:
-            errors.append(f"stage2_dry_mass must be positive, got {self.stage2_dry_mass}")
-        if self.stage2_prop_mass <= 0:
-            errors.append(f"stage2_prop_mass must be positive, got {self.stage2_prop_mass}")
-        if self.payload_mass < 0:
-            errors.append(f"payload_mass must be >= 0, got {self.payload_mass}")
-        if self.stage2_thrust_vac <= 0:
-            errors.append(f"stage2_thrust_vac must be positive, got {self.stage2_thrust_vac}")
-        if self.stage2_isp_vac <= 0:
-            errors.append(f"stage2_isp_vac must be positive, got {self.stage2_isp_vac}")
+        errors += _field_errors(self, (
+            ("max_torque", "positive"),
+            ("stage1_dry_mass", "positive"),
+            ("stage1_prop_mass", "positive"),
+            ("stage2_dry_mass", "positive"),
+            ("stage2_prop_mass", "positive"),
+            ("payload_mass", "nonneg"),
+            ("stage2_thrust_vac", "positive"),
+            ("stage2_isp_vac", "positive"),
+        ))
         if not (0.0 <= self.max_gimbal_angle_deg <= 30.0):
             errors.append(f"max_gimbal_angle_deg must be in [0, 30], got {self.max_gimbal_angle_deg}")
         if not (0.0 < self.min_engine_throttle_fraction <= 1.0):
@@ -457,109 +468,58 @@ class SimulationConfig:
             errors.append(f"launch_site_lat_deg must be in [-90, 90], got {self.launch_site_lat_deg}")
         if not (-180.0 <= self.launch_site_lon_deg <= 180.0):
             errors.append(f"launch_site_lon_deg must be in [-180, 180], got {self.launch_site_lon_deg}")
-        if self.stage1_landing_fuel_reserve_kg < 0:
-            errors.append(f"stage1_landing_fuel_reserve_kg must be >= 0, got {self.stage1_landing_fuel_reserve_kg}")
-        if self.orbit_target_altitude_m <= 0:
-            errors.append(f"orbit_target_altitude_m must be positive, got {self.orbit_target_altitude_m}")
-        if self.orbit_altitude_tolerance_m < 0:
-            errors.append(f"orbit_altitude_tolerance_m must be >= 0, got {self.orbit_altitude_tolerance_m}")
+        errors += _field_errors(self, (
+            ("stage1_landing_fuel_reserve_kg", "nonneg"),
+            ("orbit_target_altitude_m", "positive"),
+            ("orbit_altitude_tolerance_m", "nonneg"),
+        ))
         if not (0.0 < self.orbit_ecc_max < 1.0):
             errors.append(f"orbit_ecc_max must be in (0, 1), got {self.orbit_ecc_max}")
-        if self.orbit_insertion_start_altitude_m <= 0:
-            errors.append(f"orbit_insertion_start_altitude_m must be positive, got {self.orbit_insertion_start_altitude_m}")
-        if self.orbit_insertion_timeout_s <= 0:
-            errors.append(f"orbit_insertion_timeout_s must be positive, got {self.orbit_insertion_timeout_s}")
-        if self.s2_orbit_hold_time_s < 0:
-            errors.append(f"s2_orbit_hold_time_s must be >= 0, got {self.s2_orbit_hold_time_s}")
-        if self.s2_entry_interface_altitude_m <= 0:
-            errors.append(f"s2_entry_interface_altitude_m must be positive, got {self.s2_entry_interface_altitude_m}")
-        if self.s2_landing_start_altitude_m <= 0:
-            errors.append(f"s2_landing_start_altitude_m must be positive, got {self.s2_landing_start_altitude_m}")
-        if self.s2_entry_drag_scale < 1.0:
-            errors.append(f"s2_entry_drag_scale must be >= 1.0, got {self.s2_entry_drag_scale}")
+        errors += _field_errors(self, (
+            ("orbit_insertion_start_altitude_m", "positive"),
+            ("orbit_insertion_timeout_s", "positive"),
+            ("s2_orbit_hold_time_s", "nonneg"),
+            ("s2_entry_interface_altitude_m", "positive"),
+            ("s2_landing_start_altitude_m", "positive"),
+            ("s2_entry_drag_scale", "at_least_1"),
+        ))
         if self.s2_deorbit_target_perigee_m >= self.s2_entry_interface_altitude_m:
             errors.append(
                 "s2_deorbit_target_perigee_m must be below s2_entry_interface_altitude_m, "
                 f"got {self.s2_deorbit_target_perigee_m}"
             )
-        if self.s2_touchdown_speed_limit_mps <= 0:
-            errors.append(f"s2_touchdown_speed_limit_mps must be positive, got {self.s2_touchdown_speed_limit_mps}")
-        if self.s2_landing_propellant_reserve_kg < 0:
-            errors.append(
-                "s2_landing_propellant_reserve_kg must be >= 0, got "
-                f"{self.s2_landing_propellant_reserve_kg}"
-            )
-
-                                                                            
-        if self.booster_landing_reserve_kg < 0:
-            errors.append(f"booster_landing_reserve_kg must be >= 0, got {self.booster_landing_reserve_kg}")
-        if self.booster_flip_min_time_s < 0:
-            errors.append(f"booster_flip_min_time_s must be >= 0, got {self.booster_flip_min_time_s}")
-        if self.booster_landing_ignition_safety_factor < 1.0:
-            errors.append(
-                f"booster_landing_ignition_safety_factor must be >= 1.0, got {self.booster_landing_ignition_safety_factor}"
-            )
-        if self.booster_landing_ignition_ceiling_m <= 0:
-            errors.append(f"booster_landing_ignition_ceiling_m must be positive, got {self.booster_landing_ignition_ceiling_m}")
-        if self.booster_recovery_max_q_pa <= 0:
-            errors.append(f"booster_recovery_max_q_pa must be positive, got {self.booster_recovery_max_q_pa}")
-        if self.booster_recovery_max_q_alpha_pa_rad <= 0:
-            errors.append(
-                f"booster_recovery_max_q_alpha_pa_rad must be positive, got {self.booster_recovery_max_q_alpha_pa_rad}"
-            )
-        if self.booster_terminal_attitude_error_max_deg < 0:
-            errors.append(
-                f"booster_terminal_attitude_error_max_deg must be >= 0, got {self.booster_terminal_attitude_error_max_deg}"
-            )
-        if self.booster_landing_propellant_margin_kg < 0:
-            errors.append(
-                f"booster_landing_propellant_margin_kg must be >= 0, got {self.booster_landing_propellant_margin_kg}"
-            )
+        errors += _field_errors(self, (
+            ("s2_touchdown_speed_limit_mps", "positive"),
+            ("s2_landing_propellant_reserve_kg", "nonneg"),
+            ("booster_landing_reserve_kg", "nonneg"),
+            ("booster_flip_min_time_s", "nonneg"),
+            ("booster_landing_ignition_safety_factor", "at_least_1"),
+            ("booster_landing_ignition_ceiling_m", "positive"),
+            ("booster_recovery_max_q_pa", "positive"),
+            ("booster_recovery_max_q_alpha_pa_rad", "positive"),
+            ("booster_terminal_attitude_error_max_deg", "nonneg"),
+            ("booster_landing_propellant_margin_kg", "nonneg"),
+        ))
         if self.tvc_lever_arm_m is not None and self.tvc_lever_arm_m <= 0:
             errors.append(f"tvc_lever_arm_m must be positive, got {self.tvc_lever_arm_m}")
-        if self.booster_pad_tolerance_m <= 0:
-            errors.append(f"booster_pad_tolerance_m must be positive, got {self.booster_pad_tolerance_m}")
-        if self.landing_target_wind_exposure_s < 0:
-            errors.append(
-                f"landing_target_wind_exposure_s must be >= 0, got {self.landing_target_wind_exposure_s}"
-            )
-        if self.landing_target_wind_gain < 0:
-            errors.append(
-                f"landing_target_wind_gain must be >= 0, got {self.landing_target_wind_gain}"
-            )
-        if self.landing_target_max_downrange_offset_km <= 0:
-            errors.append(
-                f"landing_target_max_downrange_offset_km must be positive, "
-                f"got {self.landing_target_max_downrange_offset_km}"
-            )
-        if self.grid_fin_deploy_altitude_m < 0:
-            errors.append(f"grid_fin_deploy_altitude_m must be >= 0, got {self.grid_fin_deploy_altitude_m}")
-        if self.grid_fin_max_deflection_deg <= 0:
-            errors.append(f"grid_fin_max_deflection_deg must be positive, got {self.grid_fin_max_deflection_deg}")
-        if self.grid_fin_area_m2 <= 0:
-            errors.append(f"grid_fin_area_m2 must be positive, got {self.grid_fin_area_m2}")
-        if self.grid_fin_drag_area_m2 <= 0:
-            errors.append(f"grid_fin_drag_area_m2 must be positive, got {self.grid_fin_drag_area_m2}")
-        if self.grid_fin_cl_max <= 0:
-            errors.append(f"grid_fin_cl_max must be positive, got {self.grid_fin_cl_max}")
-        if self.grid_fin_cd_increment < 0:
-            errors.append(f"grid_fin_cd_increment must be >= 0, got {self.grid_fin_cd_increment}")
-        if self.landing_leg_deploy_altitude_m < 0:
-            errors.append(f"landing_leg_deploy_altitude_m must be >= 0, got {self.landing_leg_deploy_altitude_m}")
-        if self.landing_leg_deploy_time_s <= 0:
-            errors.append(f"landing_leg_deploy_time_s must be positive, got {self.landing_leg_deploy_time_s}")
-        if self.landing_leg_max_touchdown_speed_mps <= 0:
-            errors.append(
-                f"landing_leg_max_touchdown_speed_mps must be positive, got {self.landing_leg_max_touchdown_speed_mps}"
-            )
-        if self.landing_leg_max_tilt_deg < 0:
-            errors.append(f"landing_leg_max_tilt_deg must be >= 0, got {self.landing_leg_max_tilt_deg}")
-        if self.landing_leg_footprint_radius_m <= 0:
-            errors.append(f"landing_leg_footprint_radius_m must be positive, got {self.landing_leg_footprint_radius_m}")
-        if self.booster_powered_descent_lead_time_s < 0:
-            errors.append(
-                f"booster_powered_descent_lead_time_s must be >= 0, got {self.booster_powered_descent_lead_time_s}"
-            )
+        errors += _field_errors(self, (
+            ("booster_pad_tolerance_m", "positive"),
+            ("landing_target_wind_exposure_s", "nonneg"),
+            ("landing_target_wind_gain", "nonneg"),
+            ("landing_target_max_downrange_offset_km", "positive"),
+            ("grid_fin_deploy_altitude_m", "nonneg"),
+            ("grid_fin_max_deflection_deg", "positive"),
+            ("grid_fin_area_m2", "positive"),
+            ("grid_fin_drag_area_m2", "positive"),
+            ("grid_fin_cl_max", "positive"),
+            ("grid_fin_cd_increment", "nonneg"),
+            ("landing_leg_deploy_altitude_m", "nonneg"),
+            ("landing_leg_deploy_time_s", "positive"),
+            ("landing_leg_max_touchdown_speed_mps", "positive"),
+            ("landing_leg_max_tilt_deg", "nonneg"),
+            ("landing_leg_footprint_radius_m", "positive"),
+            ("booster_powered_descent_lead_time_s", "nonneg"),
+        ))
         has_explicit_lat = self.booster_landing_site_lat_deg is not None
         has_explicit_lon = self.booster_landing_site_lon_deg is not None
         if has_explicit_lat != has_explicit_lon:
@@ -591,56 +551,26 @@ class SimulationConfig:
                 "demo_coast_max_dt must be >= dt "
                 f"({self.demo_coast_max_dt} < {self.dt})"
             )
-        if self.max_time <= 0:
-            errors.append(f"max_time must be positive, got {self.max_time}")
-        if self.separation_delta_v < 0:
-            errors.append(f"separation_delta_v must be >= 0, got {self.separation_delta_v}")
-        if self.separation_tumble_rate < 0:
-            errors.append(f"separation_tumble_rate must be >= 0, got {self.separation_tumble_rate}")
-        if self.q_alpha_max < 0:
-            errors.append(f"q_alpha_max must be >= 0, got {self.q_alpha_max}")
-
-                                                                            
-        if self.gps_position_sigma_m < 0:
-            errors.append(f"gps_position_sigma_m must be >= 0, got {self.gps_position_sigma_m}")
-        if self.gps_velocity_sigma_mps < 0:
-            errors.append(f"gps_velocity_sigma_mps must be >= 0, got {self.gps_velocity_sigma_mps}")
-        if self.gps_update_period_s <= 0:
-            errors.append(f"gps_update_period_s must be positive, got {self.gps_update_period_s}")
-        if self.imu_accel_bias < 0:
-            errors.append(f"imu_accel_bias must be >= 0, got {self.imu_accel_bias}")
-        if self.imu_accel_noise < 0:
-            errors.append(f"imu_accel_noise must be >= 0, got {self.imu_accel_noise}")
-        if self.imu_gyro_bias < 0:
-            errors.append(f"imu_gyro_bias must be >= 0, got {self.imu_gyro_bias}")
-        if self.imu_gyro_noise < 0:
-            errors.append(f"imu_gyro_noise must be >= 0, got {self.imu_gyro_noise}")
-        if self.landing_altimeter_max_altitude_m <= 0:
-            errors.append(
-                f"landing_altimeter_max_altitude_m must be positive, got {self.landing_altimeter_max_altitude_m}"
-            )
-        if self.landing_altimeter_altitude_sigma_m < 0:
-            errors.append(
-                f"landing_altimeter_altitude_sigma_m must be >= 0, got {self.landing_altimeter_altitude_sigma_m}"
-            )
-        if self.landing_altimeter_velocity_sigma_mps < 0:
-            errors.append(
-                f"landing_altimeter_velocity_sigma_mps must be >= 0, got {self.landing_altimeter_velocity_sigma_mps}"
-            )
-        if self.abort_q_alpha_threshold < 0:
-            errors.append(f"abort_q_alpha_threshold must be >= 0, got {self.abort_q_alpha_threshold}")
-        if self.abort_attitude_threshold < 0:
-            errors.append(f"abort_attitude_threshold must be >= 0, got {self.abort_attitude_threshold}")
-
-                                                                            
-        if self.runtime_thrust_scale <= 0:
-            errors.append(f"runtime_thrust_scale must be positive, got {self.runtime_thrust_scale}")
-        if self.runtime_isp_scale <= 0:
-            errors.append(f"runtime_isp_scale must be positive, got {self.runtime_isp_scale}")
-        if not (0.0 < self.min_engine_throttle_fraction <= 1.0):
-            errors.append(
-                f"min_engine_throttle_fraction must be in (0, 1], got {self.min_engine_throttle_fraction}"
-            )
+        errors += _field_errors(self, (
+            ("max_time", "positive"),
+            ("separation_delta_v", "nonneg"),
+            ("separation_tumble_rate", "nonneg"),
+            ("q_alpha_max", "nonneg"),
+            ("gps_position_sigma_m", "nonneg"),
+            ("gps_velocity_sigma_mps", "nonneg"),
+            ("gps_update_period_s", "positive"),
+            ("imu_accel_bias", "nonneg"),
+            ("imu_accel_noise", "nonneg"),
+            ("imu_gyro_bias", "nonneg"),
+            ("imu_gyro_noise", "nonneg"),
+            ("landing_altimeter_max_altitude_m", "positive"),
+            ("landing_altimeter_altitude_sigma_m", "nonneg"),
+            ("landing_altimeter_velocity_sigma_mps", "nonneg"),
+            ("abort_q_alpha_threshold", "nonneg"),
+            ("abort_attitude_threshold", "nonneg"),
+            ("runtime_thrust_scale", "positive"),
+            ("runtime_isp_scale", "positive"),
+        ))
 
                                                                     
         if C.INITIAL_MASS + self.runtime_initial_mass_offset_kg <= C.DRY_MASS + self.stage1_landing_fuel_reserve_kg:
