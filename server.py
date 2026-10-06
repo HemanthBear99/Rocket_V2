@@ -145,6 +145,12 @@ async def protect_and_measure_requests(request: Request, call_next):
     request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
     started = time.monotonic()
     max_body_bytes = int(os.getenv("RLV_MAX_REQUEST_BYTES", "65536"))
+    if request.url.path == "/api/config/validate":
+        # Config uploads have their own, larger limit; allow multipart overhead.
+        max_body_bytes = max(
+            max_body_bytes,
+            int(os.getenv("RLV_MAX_CONFIG_UPLOAD_BYTES", "262144")) + 16384,
+        )
     content_length = request.headers.get("content-length")
     if content_length:
         try:
@@ -518,8 +524,8 @@ async def validate_config_upload(file: UploadFile = File(...)) -> dict[str, Any]
     """Parse and validate an uploaded configuration JSON file without starting a run."""
     if file.filename and not file.filename.lower().endswith(".json"):
         raise HTTPException(status_code=422, detail="Configuration file must be JSON")
-    raw = await file.read()
     max_bytes = int(os.getenv("RLV_MAX_CONFIG_UPLOAD_BYTES", "262144"))
+    raw = await file.read(max_bytes + 1)
     if len(raw) > max_bytes:
         raise HTTPException(status_code=413, detail="Configuration file is too large")
     try:

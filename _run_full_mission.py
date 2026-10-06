@@ -93,7 +93,7 @@ def _step_vehicle(state, actuator, mgr, gs, log, abort_monitor, config, max_time
     )
     log.append(new_state, guid, ctrl)
     safety_reason = _check_runtime_safety_limits(
-        new_state, guid, ctrl, config,
+        new_state, guid, ctrl, wind_cfg,
         abort_monitor, current_phase=mgr.get_phase(),
     )
     if safety_reason is not None:

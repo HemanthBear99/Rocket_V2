@@ -41,7 +41,11 @@ from .frames import rotate_vector_by_quaternion
 from .integrators import integrate
 from .mass import compute_inertia_tensor
 from .mission_manager import MissionManager, MissionPhase
-from .mission_summary import classify_landing, format_orbit_failure_reason
+from .mission_summary import (
+    classify_landing,
+    format_orbit_failure_reason,
+    hard_landing_speed_limit,
+)
 from .navigation import update_navigation_estimate
 from .rcs import RCSState, rcs_available_torque, update_rcs_propellant
 from .recovery import (
@@ -458,7 +462,7 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
                 config=cfg,
             )
             site_error_m = great_circle_distance_m(state.r, target_site)
-            propellant_remaining = max(0.0, state.m - C.STAGE1_DRY_MASS)
+            propellant_remaining = max(0.0, state.m - cfg.stage1_dry_mass)
             body_z = rotate_vector_by_quaternion(C.BODY_Z_AXIS, state.q)
             terminal_attitude_error = float(
                 np.degrees(
@@ -484,9 +488,13 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
                 return True, landing.reason
                                                                          
                                                                          
-            _CRASH_SPEED_MPS = 10.0
-            if v_touchdown_rel > _CRASH_SPEED_MPS:
+            if v_touchdown_rel > hard_landing_speed_limit(cfg):
                 site_error_km = site_error_m / 1000.0
+                if site_error_m <= cfg.booster_pad_tolerance_m:
+                    return True, (
+                        f"CRASH - Impact at {v_touchdown_rel:.2f} m/s "
+                        f"(site error {site_error_m:.1f} m)"
+                    )
                 return True, (
                     f"OFFSITE CRASH - Missed pad by {site_error_km:.2f} km "
                     f"at {v_touchdown_rel:.2f} m/s"
@@ -850,6 +858,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
         vehicle_model=vehicle_model, booster_aero_mode=booster_aero_mode,
         thrust_magnitude_override=thrust_magnitude_override,
         enable_j2=config.enable_j2, j2_coefficient=config.j2_coefficient,
+        gravity_model=config.gravity_model,
         thrust_scale=config.runtime_thrust_scale,
         wind_offset_mps=config.runtime_wind_offset_mps,
         grid_fin_command=grid_fin_command, config=config,

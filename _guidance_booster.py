@@ -460,6 +460,9 @@ def compute_booster_guidance(
     gs = _resolve_guidance_state(gs)
 
     altitude = float(np.linalg.norm(r) - C.R_EARTH)
+    if config is None:
+        from .config_factory import create_default_config
+        config = create_default_config()
     cfg = config
     wind_offset = float(cfg.runtime_wind_offset_mps)
 

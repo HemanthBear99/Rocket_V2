@@ -277,8 +277,9 @@ def extract_landing_metrics(reason: str) -> tuple[float | None, float | None]:
     if not reason:
         return None, None
 
-    speed_match = re.search(r"(?:at|Impact at)\s+([0-9]+(?:\.[0-9]+)?)\s*m/s", reason)
-    speed = float(speed_match.group(1)) if speed_match else None
+    # Last "at N m/s" wins: the touchdown speed is the final speed quoted.
+    speed_matches = re.findall(r"\bat\s+([0-9]+(?:\.[0-9]+)?)\s*m/s", reason)
+    speed = float(speed_matches[-1]) if speed_matches else None
 
     site_error_m = None
     patterns = [
