@@ -446,6 +446,511 @@ def _compute_boostback_direction(
     return thrust_dir
 
 
+@dataclass(frozen=True)
+class _BoosterContext:
+    """Per-call quantities shared by the booster phase guidance helpers."""
+
+    r: np.ndarray
+    v: np.ndarray
+    t: float
+    m: float
+    phase: str
+    cfg: SimulationConfig
+    altitude: float
+    vertical: np.ndarray
+    retrograde: np.ndarray
+    v_ground: np.ndarray
+    v_rel_norm: float
+    anti_wind: np.ndarray
+    propellant_remaining: float
+    landing_reserve: float
+    landing_margin: float
+    protected_landing_propellant: float
+    burn_prediction: dict
+    target_downrange_km: float
+    near_pad_rtls: bool
+    landing_site_now: np.ndarray
+
+
+def _horizontal_component(vec: np.ndarray, axis: np.ndarray) -> np.ndarray:
+    return vec - float(np.dot(vec, axis)) * axis
+
+
+def _ballistic_impact(ctx: _BoosterContext):
+    return estimate_ballistic_impact_to_pad(
+        ctx.r,
+        ctx.v,
+        ctx.t,
+        ctx.target_downrange_km,
+        ctx.cfg,
+        lead_time_s=0.0,
+        mass_kg=ctx.m,
+        aero_mode=ctx.phase,
+    )
+
+
+def _entry_guidance(ctx: _BoosterContext) -> dict:
+    """BOOSTER_ENTRY: retrograde entry burn plus terminal pad capture."""
+    cfg = ctx.cfg
+    altitude = ctx.altitude
+    vertical = ctx.vertical
+    retrograde = ctx.retrograde
+    near_pad_rtls = ctx.near_pad_rtls
+    entry_min_alt = cfg.booster_entry_burn_min_altitude_m
+    entry_interface = cfg.booster_entry_interface_altitude_m
+
+    v_vert_rel = float(np.dot(ctx.v_ground, vertical))
+    landing_target_lead_time = 0.0
+    grid_fin_zero_effort_miss = None
+    capture_accel_cmd_mag = None
+    thrust_on = False
+    throttle = 0.0
+
+    predicted_site = ctx.landing_site_now
+    site_vertical = predicted_site / max(float(np.linalg.norm(predicted_site)), 1.0)
+    r_to_site_horiz = _horizontal_component(predicted_site - ctx.r, site_vertical)
+    site_dist = float(np.linalg.norm(r_to_site_horiz))
+    predicted_landing_error = site_dist
+    v_horiz_site = _horizontal_component(ctx.v_ground, site_vertical)
+    v_horiz_site_mag = float(np.linalg.norm(v_horiz_site))
+    target_entry_descent_rate = 150.0
+    # Time-to-go for the entry-descent lateral guidance must reflect the
+    # vehicle's ACTUAL remaining flight time, not altitude/assumed-descent-rate.
+    # The previous estimate (1.2*altitude/150 m/s, clipped to 180 s) gave
+    # ~57 s at entry interface while ~170 s of flight remained, so the ZEM/ZEV
+    # gain 6/t_go^2 was 5-9x too high: the grid fins demanded far more lateral
+    # acceleration than the trajectory could absorb, saturated at full
+    # deflection for most of the descent, and mis-steer -- leaving a residual
+    # ~1.1 km pad miss after the corrected lift model. Use the ballistic
+    # time-to-impact from the impact predictor (which integrates the real
+    # drag-affected descent) and fall back to the old estimate only if that
+    # predictor is unavailable. The estimate is floored so t_go can never
+    # collapse to the 2 s clip in command_grid_fins_to_target.
+    landing_guidance_time_to_go_s = float(np.clip(
+        1.2 * altitude / target_entry_descent_rate,
+        15.0,
+        180.0,
+    ))
+    impact_miss_for_capture = site_dist
+    if site_dist > 500.0:
+        toward_site = r_to_site_horiz / site_dist
+        anti_drift = -v_horiz_site / max(v_horiz_site_mag, 1e-9)
+        if near_pad_rtls:
+            impact = _ballistic_impact(ctx)
+            impact_miss_for_capture = float(impact.miss_distance_m)
+            predicted_landing_error = impact_miss_for_capture
+            grid_fin_zero_effort_miss = impact.miss_vector_m.copy()
+            # Real ballistic time-to-impact drives the lateral guidance
+            # time-to-go for the whole entry descent (see note above).
+            landing_guidance_time_to_go_s = float(np.clip(
+                impact.time_to_impact_s,
+                15.0,
+                180.0,
+            ))
+            if impact.miss_distance_m > 500.0:
+                impact_toward = impact.miss_vector_m / max(impact.miss_distance_m, 1e-9)
+                impact_toward = _horizontal_component(impact_toward, site_vertical)
+                impact_toward_norm = float(np.linalg.norm(impact_toward))
+                if impact_toward_norm > 1e-9:
+                    impact_toward /= impact_toward_norm
+                    predictor_weight = float(np.clip(impact.miss_distance_m / 10000.0, 0.15, 0.55))
+                    toward_site = (1.0 - predictor_weight) * toward_site + predictor_weight * impact_toward
+                    toward_site /= max(float(np.linalg.norm(toward_site)), 1e-9)
+                    landing_target_lead_time = impact.time_to_impact_s
+
+        alt_factor = float(np.clip(
+            (altitude - entry_min_alt) / max(entry_interface - entry_min_alt, 1.0),
+            0.0, 1.0
+        ))
+        max_site_bias = 0.55
+        if near_pad_rtls:
+            max_site_bias = 0.90
+            site_bias = float(np.clip(
+                float(site_dist) / 7000.0,
+                0.0, 0.95,
+            )) * (0.7 + 0.3 * alt_factor)
+        else:
+            site_bias = float(np.clip(site_dist / 30000.0, 0.0, max_site_bias)) * (0.6 + 0.4 * alt_factor)
+        site_bias = float(np.clip(site_bias, 0.0, max_site_bias))
+        approach_v = float(np.dot(v_horiz_site, toward_site)) if v_horiz_site_mag > 1e-9 else 0.0
+        a_brake_entry = 24.0
+        stop_dist_total = v_horiz_site_mag ** 2 / (2.0 * a_brake_entry)
+        usable_site_dist = max(site_dist - float(cfg.booster_pad_tolerance_m), 0.0)
+        needs_horizontal_brake = (
+            approach_v > 0.0 and
+            stop_dist_total >= (0.85 if near_pad_rtls else 0.40) * usable_site_dist
+        )
+        lateral_dir = anti_drift if needs_horizontal_brake else toward_site
+        desired_dir = (1.0 - site_bias) * retrograde + site_bias * lateral_dir
+        desired_dir /= max(float(np.linalg.norm(desired_dir)), 1e-9)
+        cone_reference = (
+            vertical
+            if near_pad_rtls and altitude < float(cfg.booster_late_entry_bias_ref_altitude_m)
+            else retrograde
+        )
+        desired_dir = _limit_direction_cone(
+            desired_dir,
+            cone_reference,
+            np.radians(30.0),
+        )
+    else:
+        desired_dir = retrograde
+
+    entry_burn_on = (
+        altitude > entry_min_alt and
+        ctx.v_rel_norm > compute_entry_energy_speed_gate(cfg) and
+        ctx.propellant_remaining > ctx.protected_landing_propellant
+    )
+
+    if near_pad_rtls:
+        terminal_capture_floor = max(
+            float(cfg.booster_terminal_capture_floor_kg),
+            ctx.landing_margin
+            + float(cfg.booster_terminal_capture_landing_reserve_fraction)
+            * ctx.landing_reserve,
+        )
+    else:
+        terminal_capture_floor = max(
+            ctx.protected_landing_propellant, 0.52 * ctx.landing_reserve
+        )
+    terminal_capture_on = (
+        altitude < 70000.0 and
+        site_dist < (60000.0 if near_pad_rtls else 25000.0) and
+        (
+            impact_miss_for_capture < 80000.0
+            if near_pad_rtls
+            else True
+        ) and
+        (
+            (v_horiz_site_mag > 1.0 or site_dist > 150.0)
+            if near_pad_rtls
+            else (v_horiz_site_mag > 5.0)
+        ) and
+        ctx.propellant_remaining > terminal_capture_floor
+    )
+
+    if terminal_capture_on:
+        thrust_on = True
+        terminal_capture_coast = False
+        toward_site = r_to_site_horiz / max(site_dist, 1e-9)
+        anti_drift = -v_horiz_site / max(v_horiz_site_mag, 1e-9)
+        site_dist_for_throttle = site_dist
+        if near_pad_rtls:
+            g_local = C.MU_EARTH / max(float(np.linalg.norm(ctx.r)) ** 2, 1.0)
+            impact = _ballistic_impact(ctx)
+            impact_miss = impact.miss_vector_m
+            impact_miss_mag = max(float(np.linalg.norm(impact_miss)), 0.0)
+            predicted_landing_error = impact_miss_mag
+            grid_fin_zero_effort_miss = impact_miss.copy()
+            landing_target_lead_time = impact.time_to_impact_s
+            site_dist_for_throttle = min(site_dist, impact_miss_mag)
+            t_go_capture = float(np.clip(
+                max(
+                    impact.time_to_impact_s,
+                    landing_guidance_time_to_go_s,
+                ),
+                8.0,
+                180.0,
+            ))
+            a_divert = (
+                (6.0 / (t_go_capture ** 2)) * impact_miss
+                + (2.0 / t_go_capture) * v_horiz_site
+            )
+            a_divert_mag = float(np.linalg.norm(a_divert))
+            if a_divert_mag > 1e-9:
+                max_divert_accel = (
+                    float(cfg.booster_max_divert_accel_far_mps2)
+                    if impact_miss_mag > float(cfg.booster_divert_accel_miss_threshold_m)
+                    else float(cfg.booster_max_divert_accel_near_mps2)
+                )
+                net_vertical_braking = (
+                    max(-v_vert_rel, 0.0) ** 2
+                    - target_entry_descent_rate ** 2
+                ) / (2.0 * max(altitude, 1.0))
+                a_vertical_capture = max(
+                    g_local + net_vertical_braking,
+                    0.0,
+                )
+                max_divert_accel = min(
+                    max_divert_accel,
+                    a_vertical_capture * np.tan(np.radians(30.0)),
+                )
+                if a_divert_mag > max_divert_accel:
+                    a_divert *= max_divert_accel / a_divert_mag
+                a_cmd_capture = a_vertical_capture * vertical + a_divert
+                capture_accel_cmd_mag = float(np.linalg.norm(a_cmd_capture))
+                desired_dir = a_cmd_capture / max(capture_accel_cmd_mag, 1e-9)
+            else:
+                desired_dir = vertical
+                terminal_capture_coast = True
+        else:
+            # Anti-wind term trims the commanded lateral direction against the
+            # wind drift that the low-altitude lateral authority cannot fully
+            # null. Weight is modest: this supplements the ZEM/ZEV miss
+            # correction rather than replacing it, and is a no-op at zero wind.
+            desired_dir = (
+                0.50 * vertical
+                + 0.62 * toward_site
+                + 0.65 * anti_drift
+                + 0.25 * ctx.anti_wind
+            )
+        desired_dir /= max(float(np.linalg.norm(desired_dir)), 1e-9)
+        if near_pad_rtls:
+            if terminal_capture_coast:
+                max_capture_throttle = 0.10
+            elif altitude > 500.0 and ctx.propellant_remaining >= terminal_capture_floor + 1200.0:
+                max_capture_throttle = 0.85
+            elif ctx.propellant_remaining < terminal_capture_floor + 1200.0:
+                max_capture_throttle = 0.55
+            else:
+                max_capture_throttle = 0.65
+            if capture_accel_cmd_mag is not None:
+                throttle_request = capture_accel_cmd_mag / max(
+                    C.ENTRY_THRUST / max(ctx.m, 1.0),
+                    1e-9,
+                )
+            else:
+                throttle_request = max(
+                    v_horiz_site_mag / 120.0,
+                    site_dist_for_throttle / 8000.0,
+                )
+            throttle = float(np.clip(
+                throttle_request,
+                0.05,
+                max_capture_throttle,
+            ))
+        else:
+            throttle = float(np.clip(
+                max(v_horiz_site_mag / 300.0, site_dist / 80000.0),
+                0.04,
+                0.24,
+            ))
+    elif entry_burn_on:
+        thrust_on = True
+        throttle = 0.45
+
+    return {
+        'desired_dir': desired_dir,
+        'thrust_on': thrust_on,
+        'throttle': throttle,
+        'landing_target_lead_time': landing_target_lead_time,
+        'landing_guidance_time_to_go_s': landing_guidance_time_to_go_s,
+        'predicted_landing_error': predicted_landing_error,
+        'grid_fin_zero_effort_miss': grid_fin_zero_effort_miss,
+    }
+
+
+def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
+    """BOOSTER_LANDING: latched suicide burn with budgeted ZEM/ZEV divert."""
+    cfg = ctx.cfg
+    vertical = ctx.vertical
+    burn_params = ctx.burn_prediction
+    near_pad_rtls = ctx.near_pad_rtls
+    landing_reserve = ctx.landing_reserve
+    landing_margin = ctx.landing_margin
+
+    ignition_corridor_top = min(
+        cfg.booster_landing_ignition_ceiling_m,
+        float(burn_params.get('burn_altitude', 0.0)) * cfg.booster_landing_ignition_safety_factor,
+    )
+    if ctx.altitude <= ignition_corridor_top:
+        gs.booster_landing_burn_started = True
+    if not gs.booster_landing_burn_started:
+        return {'desired_dir': ctx.retrograde, 'thrust_on': False, 'throttle': 0.0}
+
+    v_vert_rel = float(np.dot(ctx.v_ground, vertical))
+    v_descent = max(-v_vert_rel, 0.0)
+    v_horiz_vec = _horizontal_component(ctx.v_ground, vertical)
+    v_horiz_mag = float(np.linalg.norm(v_horiz_vec))
+
+    g_loc = float(C.MU_EARTH / (float(np.linalg.norm(ctx.r)) ** 2))
+    t_accel = float(C.LANDING_THRUST / max(ctx.m, 1.0))
+    h = max(ctx.altitude, 0.5)
+
+    target_descent_ceiling = 4.2 if near_pad_rtls else 3.0
+    landing_target_descent_rate = min(
+        target_descent_ceiling,
+        0.85 * float(cfg.landing_leg_max_touchdown_speed_mps),
+    )
+
+    if h < 10.0 and v_descent < landing_target_descent_rate:
+        a_vert_raw = 0.0
+    else:
+        a_vert_raw = (
+            g_loc
+            + (v_descent ** 2 - landing_target_descent_rate ** 2)
+            / (2.0 * h)
+        )
+    a_vert_needed = float(np.clip(a_vert_raw, 0.0, t_accel))
+
+    t_go = max(
+        estimate_booster_touchdown_time(
+            ctx.r,
+            ctx.v,
+            ctx.m,
+            C.LANDING_THRUST,
+            safety_factor=1.0,
+        ),
+        1.0,
+    )
+
+    touchdown_site = ctx.landing_site_now
+    site_vertical = touchdown_site / max(float(np.linalg.norm(touchdown_site)), 1.0)
+    r_err_horiz = _horizontal_component(touchdown_site - ctx.r, site_vertical)
+    v_horiz_site = _horizontal_component(v_horiz_vec, site_vertical)
+    v_horiz_site_mag = float(np.linalg.norm(v_horiz_site))
+
+    a_vert_for_budget = min(a_vert_needed, t_accel)
+    a_avail_horiz = float(np.sqrt(
+        max(t_accel ** 2 - a_vert_for_budget ** 2, 0.0)
+    ))
+    zem = r_err_horiz - v_horiz_site * t_go
+    pad_error_m = float(np.linalg.norm(r_err_horiz))
+    pad_tolerance = float(cfg.booster_pad_tolerance_m)
+    terminal_inside_pad_capture = pad_error_m <= pad_tolerance and h < 150.0
+    terminal_horizontal_capture = (
+        near_pad_rtls
+        and terminal_inside_pad_capture
+        and v_horiz_site_mag > 3.0
+    )
+    a_divert_zev = -(2.0 / t_go) * v_horiz_site
+    a_divert_zem_zev = (6.0 / (t_go ** 2)) * zem + (2.0 / t_go) * v_horiz_site
+    base_divert_fraction = divert_fraction_by_altitude(h, cfg)
+
+    fuel_margin_ratio = max(ctx.propellant_remaining - landing_margin, 0.0) / max(landing_reserve, 1.0)
+    vertical_load_ratio = a_vert_needed / max(t_accel, 1e-6)
+    terminal_vertical_risk = (
+        vertical_load_ratio > float(cfg.booster_vertical_load_risk_ratio)
+        or (
+            h < 15.0
+            and v_descent > float(cfg.booster_terminal_descent_overspeed_factor) * landing_target_descent_rate
+        )
+    )
+    altitude_margin_low = (
+        h < max(250.0, 0.55 * burn_params['burn_altitude'])
+        and terminal_vertical_risk
+    )
+    fuel_critical_for_vertical = (
+        fuel_margin_ratio < float(cfg.booster_fuel_critical_ratio)
+        and (h > 30.0 or terminal_vertical_risk)
+    )
+    landing_vertical_priority = (
+        fuel_critical_for_vertical
+        or vertical_load_ratio > 0.85
+        or altitude_margin_low
+    )
+    if terminal_inside_pad_capture and not landing_vertical_priority:
+        base_divert_fraction = max(
+            base_divert_fraction,
+            float(cfg.booster_divert_fraction_high),
+        )
+    if landing_vertical_priority:
+        base_divert_fraction *= 0.25 if (fuel_critical_for_vertical or h < 500.0) else 0.60
+
+    if vertical_load_ratio > 0.90 and h < 100.0:
+        a_horiz_budget = 0.0
+    else:
+        a_horiz_budget = min(a_avail_horiz, max(a_vert_for_budget, g_loc) * base_divert_fraction)
+
+    full_throttle_mdot = -compute_mass_flow_rate(
+        thrust_on=True,
+        throttle=1.0,
+        stage=1,
+        thrust_magnitude_override=C.LANDING_THRUST,
+        thrust_scale=cfg.runtime_thrust_scale,
+        isp_scale=cfg.runtime_isp_scale,
+        r=ctx.r,
+    )
+    (
+        landing_reserve_authority,
+        landing_vertical_propellant_requirement,
+    ) = compute_landing_reserve_authority(
+        ctx.propellant_remaining,
+        full_throttle_mdot,
+        vertical_load_ratio,
+        t_go,
+        landing_reserve,
+        landing_margin,
+        cfg.booster_landing_vertical_propellant_safety_factor,
+    )
+    a_horiz_budget *= landing_reserve_authority
+    if landing_reserve_authority <= 0.0:
+        landing_vertical_priority = True
+
+    if terminal_horizontal_capture and not terminal_vertical_risk:
+        a_horiz_budget = min(
+            a_avail_horiz,
+            max(a_horiz_budget, min(35.0, 0.75 * t_accel)),
+        )
+        a_horiz_budget *= landing_reserve_authority
+    reachable_distance = v_horiz_mag * t_go + 0.5 * a_horiz_budget * (t_go ** 2)
+    pad_reachable = pad_error_m <= max(350.0, reachable_distance)
+
+    if not pad_reachable and not terminal_inside_pad_capture:
+        divert_fraction = divert_fraction_by_altitude(h, cfg)
+        if landing_vertical_priority:
+            divert_fraction *= 0.25
+        a_horiz_budget = min(a_avail_horiz, max(a_vert_for_budget, g_loc) * divert_fraction)
+
+    t_stop = float(np.clip(
+        t_go,
+        float(cfg.booster_terminal_hcapture_tstop_min_s),
+        float(cfg.booster_terminal_hcapture_tstop_max_s),
+    ))
+    if terminal_horizontal_capture:
+        a_divert = -v_horiz_site / max(t_stop, 1e-6)
+    elif terminal_inside_pad_capture:
+        a_divert = a_divert_zev
+    else:
+        a_divert = a_divert_zem_zev if pad_reachable else a_divert_zev
+
+    a_divert_mag = float(np.linalg.norm(a_divert))
+    if a_divert_mag > a_horiz_budget and a_divert_mag > 1e-6:
+        a_divert = a_divert * (a_horiz_budget / a_divert_mag)
+
+    if v_descent < 1.0 and v_horiz_mag < 1.0:
+        throttle = 0.0
+        desired_dir = vertical
+    else:
+        if terminal_horizontal_capture:
+            v_terminal = v_vert_rel * vertical + v_horiz_site
+            a_cmd = g_loc * vertical - v_terminal / max(t_stop, 1e-6)
+        else:
+            a_cmd = a_vert_needed * vertical + a_divert
+        a_cmd_mag = float(np.linalg.norm(a_cmd))
+        desired_dir = a_cmd / max(a_cmd_mag, 1e-6)
+        throttle = float(np.clip(a_cmd_mag / max(t_accel, 1e-6), 0.0, 1.0))
+    if h < 10.0 and v_descent < landing_target_descent_rate:
+        desired_dir = vertical
+        throttle = 0.0
+
+    # Landing-leg stability is a hard vehicle constraint.  Keep the
+    # commanded thrust axis inside the configured touchdown cone while
+    # retaining the ZEM/ZEV lateral direction within that cone.
+    touchdown_cone_deg = min(
+        float(cfg.booster_terminal_attitude_error_max_deg),
+        float(cfg.landing_leg_max_tilt_deg),
+    )
+    desired_dir = _limit_direction_cone(
+        desired_dir,
+        vertical,
+        np.radians(touchdown_cone_deg),
+    )
+
+    return {
+        'desired_dir': desired_dir,
+        'thrust_on': True,
+        'throttle': throttle,
+        'landing_vertical_priority': landing_vertical_priority,
+        'landing_a_vert_needed': a_vert_needed,
+        'landing_a_horiz_budget': a_horiz_budget,
+        'landing_target_descent_rate': landing_target_descent_rate,
+        'predicted_landing_error': pad_error_m,
+        'landing_reserve_authority': landing_reserve_authority,
+        'landing_vertical_propellant_requirement': landing_vertical_propellant_requirement,
+    }
+
+
 def compute_booster_guidance(
     r: np.ndarray, v: np.ndarray, t: float, m: float, phase: str,
     gs: GuidanceState | None = None,
@@ -458,23 +963,18 @@ def compute_booster_guidance(
     FLIP, BOOSTBACK, COAST, ENTRY, LANDING.
     """
     gs = _resolve_guidance_state(gs)
-
-    altitude = float(np.linalg.norm(r) - C.R_EARTH)
     if config is None:
         from .config_factory import create_default_config
         config = create_default_config()
     cfg = config
+
+    altitude = float(np.linalg.norm(r) - C.R_EARTH)
     wind_offset = float(cfg.runtime_wind_offset_mps)
-
-    thrust_on = False
-    throttle = 0.0
-    desired_dir = compute_local_vertical(r)
-
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset)
     v_rel_norm = float(np.linalg.norm(v_rel))
-    v_ground = compute_ground_relative_velocity(r, v)
-
-    prograde = v_rel / v_rel_norm if v_rel_norm > 1e-6 else compute_local_vertical(r)
+    vertical = compute_local_vertical(r)
+    prograde = v_rel / v_rel_norm if v_rel_norm > 1e-6 else vertical
+    retrograde = -prograde
 
     # Wind feed-forward for lateral guidance.
     # The zero-effort-miss predictor already sees the wind (it propagates with
@@ -484,735 +984,85 @@ def compute_booster_guidance(
     # dominated by wind drift that the thruster/fin authority can only partly
     # null at low dynamic pressure. Exposing the wind-drift velocity explicitly
     # lets the entry/landing blend trim against it instead of reacting late.
-    wind_drift_velocity = np.zeros(3, dtype=float)
+    anti_wind = np.zeros(3, dtype=float)
     if abs(wind_offset) > 1e-9:
         from .utils import _wind_vector
         wind_drift_velocity = _wind_vector(r, wind_offset_mps=wind_offset)
-    anti_wind = (
-        -wind_drift_velocity / max(float(np.linalg.norm(wind_drift_velocity)), 1e-9)
-        if float(np.linalg.norm(wind_drift_velocity)) > 1e-9
-        else np.zeros(3, dtype=float)
-    )
-    retrograde = -prograde
-    vertical = compute_local_vertical(r)
-    propellant_remaining = booster_propellant_remaining(m, cfg)
+        wind_drift_norm = float(np.linalg.norm(wind_drift_velocity))
+        if wind_drift_norm > 1e-9:
+            anti_wind = -wind_drift_velocity / wind_drift_norm
+
     landing_reserve = cfg.booster_landing_reserve_kg
     landing_margin = cfg.booster_landing_propellant_margin_kg
-    protected_landing_propellant = landing_reserve + landing_margin
-    entry_min_alt = cfg.booster_entry_burn_min_altitude_m
-    entry_interface = cfg.booster_entry_interface_altitude_m
-    apogee_target_m = cfg.booster_apogee_target_km * 1000.0
-    ignite_safety = cfg.booster_landing_ignition_safety_factor
-    ignition_ceiling_m = cfg.booster_landing_ignition_ceiling_m
-    burn_prediction = estimate_suicide_burn(
-        r, v, m, C.LANDING_THRUST, safety_factor=ignite_safety
-    )
-    landing_vertical_priority = False
-    landing_a_vert_needed = None
-    landing_a_horiz_budget = None
-    landing_target_descent_rate = 0.0
-    landing_target_lead_time = 0.0
-    predicted_landing_error = 0.0
-    planner_score = 0.0
-    planner_miss = 0.0
-    planner_speed = 0.0
-    planner_propellant = 0.0
-    planner_max_q = 0.0
-    planner_reachable = False
-    planner_required_lateral_accel = 0.0
-    planner_available_lateral_accel = 0.0
-    planner_time_to_go = 0.0
-    capture_accel_cmd_mag = None
-    landing_guidance_time_to_go_s = 0.0
-    landing_reserve_authority = 1.0
-    landing_vertical_propellant_requirement = 0.0
-    grid_fin_zero_effort_miss = None
-
     target_downrange_km = cfg.booster_landing_target_downrange_km
-    near_pad_rtls = is_near_pad_target(cfg)
+    burn_prediction = estimate_suicide_burn(
+        r, v, m, C.LANDING_THRUST,
+        safety_factor=cfg.booster_landing_ignition_safety_factor,
+    )
+    ctx = _BoosterContext(
+        r=r,
+        v=v,
+        t=t,
+        m=m,
+        phase=phase,
+        cfg=cfg,
+        altitude=altitude,
+        vertical=vertical,
+        retrograde=retrograde,
+        v_ground=compute_ground_relative_velocity(r, v),
+        v_rel_norm=v_rel_norm,
+        anti_wind=anti_wind,
+        propellant_remaining=booster_propellant_remaining(m, cfg),
+        landing_reserve=landing_reserve,
+        landing_margin=landing_margin,
+        protected_landing_propellant=landing_reserve + landing_margin,
+        burn_prediction=burn_prediction,
+        target_downrange_km=target_downrange_km,
+        near_pad_rtls=is_near_pad_target(cfg),
+        landing_site_now=target_landing_site_eci(t, target_downrange_km, config=cfg),
+    )
 
-    landing_site_now = target_landing_site_eci(t, target_downrange_km, config=cfg)
-    entry_speed_gate = compute_entry_energy_speed_gate(cfg)
-
-    if phase == "BOOSTER_FLIP":
-        desired_dir = retrograde
-        thrust_on = False
-
+    cmd = {
+        'desired_dir': vertical,
+        'thrust_on': False,
+        'throttle': 0.0,
+        'landing_vertical_priority': False,
+        'landing_a_vert_needed': 0.0,
+        'landing_a_horiz_budget': 0.0,
+        'landing_target_descent_rate': 0.0,
+        'landing_target_lead_time': 0.0,
+        'landing_guidance_time_to_go_s': 0.0,
+        'predicted_landing_error': 0.0,
+        'landing_reserve_authority': 1.0,
+        'landing_vertical_propellant_requirement': 0.0,
+        'grid_fin_zero_effort_miss': None,
+    }
+    if phase in ("BOOSTER_FLIP", "BOOSTER_COAST"):
+        cmd['desired_dir'] = retrograde
     elif phase == "BOOSTER_BOOSTBACK":
-        desired_dir = _compute_boostback_direction(
+        cmd['desired_dir'] = _compute_boostback_direction(
             r,
             v,
             t,
             target_downrange_km,
             m,
-            apogee_target_m=apogee_target_m,
+            apogee_target_m=cfg.booster_apogee_target_km * 1000.0,
             config=cfg,
         )
-        thrust_on = True
-        throttle = 0.90
-
-    elif phase == "BOOSTER_COAST":
-        desired_dir = retrograde
-        thrust_on = False
-
+        cmd['thrust_on'] = True
+        cmd['throttle'] = 0.90
     elif phase == "BOOSTER_ENTRY":
-                                                                            
-                                                                             
-                                                                          
-                                                                              
-                                                                              
-        v_vert_rel = float(np.dot(v_ground, vertical))
-                                                                           
-                                                                      
-                                    
-                                                                         
-                                                                          
-        landing_target_lead_time = 0.0
-        predicted_site = landing_site_now
-
-                                                                               
-                                                                  
-                                                                      
-                                                                              
-                                                                       
-                                                                               
-        site_vertical = predicted_site / max(float(np.linalg.norm(predicted_site)), 1.0)
-        r_to_site = predicted_site - r
-        r_to_site_horiz = r_to_site - float(np.dot(r_to_site, site_vertical)) * site_vertical
-        site_dist = float(np.linalg.norm(r_to_site_horiz))
-        predicted_landing_error = site_dist
-        v_horiz_site = v_ground - float(np.dot(v_ground, site_vertical)) * site_vertical
-        v_horiz_site_mag = float(np.linalg.norm(v_horiz_site))
-        target_entry_descent_rate = 150.0
-        # Time-to-go for the entry-descent lateral guidance must reflect the
-        # vehicle's ACTUAL remaining flight time, not altitude/assumed-descent-rate.
-        # The previous estimate (1.2*altitude/150 m/s, clipped to 180 s) gave
-        # ~57 s at entry interface while ~170 s of flight remained, so the ZEM/ZEV
-        # gain 6/t_go^2 was 5-9x too high: the grid fins demanded far more lateral
-        # acceleration than the trajectory could absorb, saturated at full
-        # deflection for most of the descent, and mis-steer -- leaving a residual
-        # ~1.1 km pad miss after the corrected lift model. Use the ballistic
-        # time-to-impact from the impact predictor (which integrates the real
-        # drag-affected descent) and fall back to the old estimate only if that
-        # predictor is unavailable. The estimate is floored so t_go can never
-        # collapse to the 2 s clip in command_grid_fins_to_target.
-        _entry_t_go_estimate = float(np.clip(
-            1.2 * altitude / target_entry_descent_rate,
-            15.0,
-            180.0,
-        ))
-        # Default to the geometric estimate; refined to the true ballistic
-        # time-to-impact below whenever the impact predictor runs, and on the
-        # non-near-pad path. Guarantees the value is always defined for the fin
-        # guidance (which reads it via 'landing_guidance_time_to_go_s').
-        landing_guidance_time_to_go_s = _entry_t_go_estimate
-        impact_miss_for_capture = site_dist
-        if site_dist > 500.0:
-            toward_site = r_to_site_horiz / site_dist
-            anti_drift = -v_horiz_site / max(v_horiz_site_mag, 1e-9)
-            if near_pad_rtls:
-                impact = estimate_ballistic_impact_to_pad(
-                    r,
-                    v,
-                    t,
-                    target_downrange_km,
-                    cfg,
-                    lead_time_s=0.0,
-                    mass_kg=m,
-                    aero_mode=phase,
-                )
-                impact_miss_for_capture = float(impact.miss_distance_m)
-                predicted_landing_error = impact_miss_for_capture
-                grid_fin_zero_effort_miss = impact.miss_vector_m.copy()
-                # Real ballistic time-to-impact drives the lateral guidance
-                # time-to-go for the whole entry descent (see note above).
-                landing_guidance_time_to_go_s = float(np.clip(
-                    impact.time_to_impact_s,
-                    15.0,
-                    180.0,
-                ))
-                if impact.miss_distance_m > 500.0:
-                    impact_toward = impact.miss_vector_m / max(impact.miss_distance_m, 1e-9)
-                    impact_toward = impact_toward - float(np.dot(impact_toward, site_vertical)) * site_vertical
-                    impact_toward_norm = float(np.linalg.norm(impact_toward))
-                    if impact_toward_norm > 1e-9:
-                        impact_toward /= impact_toward_norm
-                        predictor_weight = float(np.clip(impact.miss_distance_m / 10000.0, 0.15, 0.55))
-                        toward_site = (1.0 - predictor_weight) * toward_site + predictor_weight * impact_toward
-                        toward_site /= max(float(np.linalg.norm(toward_site)), 1e-9)
-                        landing_target_lead_time = impact.time_to_impact_s
-                                                                           
-                                                                            
-            alt_factor = float(np.clip(
-                (altitude - entry_min_alt) / max(entry_interface - entry_min_alt, 1.0),
-                0.0, 1.0
-            ))
-            max_site_bias = 0.55
-            if near_pad_rtls:
-                max_site_bias = 0.90
-                site_bias = float(np.clip(
-                    float(site_dist) / 7000.0,
-                    0.0, 0.95,
-                )) * (0.7 + 0.3 * alt_factor)
-            else:
-                site_bias = float(np.clip(site_dist / 30000.0, 0.0, max_site_bias)) * (0.6 + 0.4 * alt_factor)
-            site_bias = float(np.clip(site_bias, 0.0, max_site_bias))
-            approach_v = float(np.dot(v_horiz_site, toward_site)) if v_horiz_site_mag > 1e-9 else 0.0
-                                                                               
-                                                                                
-                                                                                
-                                                                                 
-                                                                                
-            a_brake_entry = 24.0
-            stop_dist_total = v_horiz_site_mag ** 2 / (2.0 * a_brake_entry)
-            pad_tolerance = float(cfg.booster_pad_tolerance_m)
-            usable_site_dist = max(site_dist - pad_tolerance, 0.0)
-            needs_horizontal_brake = (
-                approach_v > 0.0 and
-                stop_dist_total >= (0.85 if near_pad_rtls else 0.40) * usable_site_dist
-            )
-            lateral_dir = anti_drift if needs_horizontal_brake else toward_site
-            desired_dir = (1.0 - site_bias) * retrograde + site_bias * lateral_dir
-            desired_dir /= max(float(np.linalg.norm(desired_dir)), 1e-9)
-                                                                           
-                                                                              
-                                                                            
-            late_entry_reference_altitude = float(
-                cfg.booster_late_entry_bias_ref_altitude_m
-            )
-            cone_reference = (
-                vertical
-                if near_pad_rtls and altitude < late_entry_reference_altitude
-                else retrograde
-            )
-            desired_dir = _limit_direction_cone(
-                desired_dir,
-                cone_reference,
-                np.radians(30.0),
-            )
-        else:
-            desired_dir = retrograde
-
-        entry_burn_on = (
-            altitude > entry_min_alt and
-            v_rel_norm > entry_speed_gate and
-            propellant_remaining > protected_landing_propellant
-        )
-
-                                                                              
-                                                                           
-                                                              
-        if near_pad_rtls:
-            floor_kg = float(cfg.booster_terminal_capture_floor_kg)
-            capture_landing_floor = (
-                landing_margin
-                + float(cfg.booster_terminal_capture_landing_reserve_fraction)
-                * landing_reserve
-            )
-            terminal_capture_floor = max(
-                floor_kg,
-                capture_landing_floor,
-            )
-        else:
-            terminal_capture_floor = max(
-                protected_landing_propellant, 0.52 * landing_reserve
-            )
-                                                              
-                                                                          
-                                                                            
-                                                                           
-                                                                        
-                                                                            
-        terminal_capture_on = (
-            altitude < 70000.0 and
-            site_dist < (60000.0 if near_pad_rtls else 25000.0) and
-            (
-                impact_miss_for_capture < 80000.0
-                if near_pad_rtls
-                else True
-            ) and
-            (
-                (v_horiz_site_mag > 1.0 or site_dist > 150.0)
-                if near_pad_rtls
-                else (v_horiz_site_mag > 5.0)
-            ) and
-            propellant_remaining > terminal_capture_floor
-        )
-
-        if terminal_capture_on:
-            terminal_capture_coast = False
-            toward_site = r_to_site_horiz / max(site_dist, 1e-9)
-            anti_drift = -v_horiz_site / max(v_horiz_site_mag, 1e-9)
-            site_dist_for_throttle = site_dist
-            if near_pad_rtls:
-                r_norm_temp = float(np.linalg.norm(r))
-                g_local_temp = C.MU_EARTH / max(r_norm_temp ** 2, 1.0)
-                impact = estimate_ballistic_impact_to_pad(
-                    r,
-                    v,
-                    t,
-                    target_downrange_km,
-                    cfg,
-                    lead_time_s=0.0,
-                    mass_kg=m,
-                    aero_mode=phase,
-                )
-                impact_miss = impact.miss_vector_m
-                impact_miss_mag = max(float(np.linalg.norm(impact_miss)), 0.0)
-                predicted_landing_error = impact_miss_mag
-                grid_fin_zero_effort_miss = impact_miss.copy()
-                impact_toward = (
-                    impact_miss / impact_miss_mag
-                    if impact_miss_mag > 1e-9
-                    else toward_site
-                )
-                landing_target_lead_time = impact.time_to_impact_s
-                site_dist_for_throttle = min(site_dist, impact_miss_mag)
-                t_go_capture = float(np.clip(
-                    max(
-                        impact.time_to_impact_s,
-                        landing_guidance_time_to_go_s,
-                    ),
-                    8.0,
-                    180.0,
-                ))
-                                                                            
-                                                                             
-                                                 
-                zem = impact_miss
-                a_divert = (
-                    (6.0 / (t_go_capture ** 2)) * zem
-                    + (2.0 / t_go_capture) * v_horiz_site
-                )
-                a_divert_mag = float(np.linalg.norm(a_divert))
-                if a_divert_mag > 1e-9:
-                    max_far = float(cfg.booster_max_divert_accel_far_mps2)
-                    threshold = float(cfg.booster_divert_accel_miss_threshold_m)
-                    max_near = float(cfg.booster_max_divert_accel_near_mps2)
-                    max_divert_accel = (
-                        max_far
-                        if impact_miss_mag > threshold
-                        else max_near
-                    )
-                                                                             
-                                                                            
-                                                                           
-                                                           
-                    net_vertical_braking = (
-                        max(-v_vert_rel, 0.0) ** 2
-                        - target_entry_descent_rate ** 2
-                    ) / (2.0 * max(altitude, 1.0))
-                    a_vertical_capture = max(
-                        g_local_temp + net_vertical_braking,
-                        0.0,
-                    )
-                    max_divert_accel = min(
-                        max_divert_accel,
-                        a_vertical_capture * np.tan(np.radians(30.0)),
-                    )
-                    if a_divert_mag > max_divert_accel:
-                        a_divert *= max_divert_accel / a_divert_mag
-                        a_divert_mag = max_divert_accel
-                    a_cmd_capture = a_vertical_capture * vertical + a_divert
-                    capture_accel_cmd_mag = float(np.linalg.norm(a_cmd_capture))
-                    desired_dir = a_cmd_capture / max(float(np.linalg.norm(a_cmd_capture)), 1e-9)
-                else:
-                    desired_dir = vertical
-                    terminal_capture_coast = True
-            else:
-                # Anti-wind term trims the commanded lateral direction against the
-                # wind drift that the low-altitude lateral authority cannot fully
-                # null. Weight is modest: this supplements the ZEM/ZEV miss
-                # correction rather than replacing it, and is a no-op at zero wind.
-                desired_dir = (
-                    0.50 * vertical
-                    + 0.62 * toward_site
-                    + 0.65 * anti_drift
-                    + 0.25 * anti_wind
-                )
-            desired_dir /= max(float(np.linalg.norm(desired_dir)), 1e-9)
-            if near_pad_rtls:
-                                                                              
-                                                                            
-                                                                           
-                 
-                                                                           
-                                                                          
-                                                                          
-                                                                          
-                               
-                thrust_on = True
-                throttle = 0.0                                              
-            else:
-                thrust_on = True
-            if near_pad_rtls:
-                if terminal_capture_coast:
-                    max_capture_throttle = 0.10
-                elif altitude > 500.0 and propellant_remaining >= terminal_capture_floor + 1200.0:
-                    max_capture_throttle = 0.85
-                elif propellant_remaining < terminal_capture_floor + 1200.0:
-                    max_capture_throttle = 0.55
-                else:
-                    max_capture_throttle = 0.65
-                if capture_accel_cmd_mag is not None:
-                    throttle_request = capture_accel_cmd_mag / max(
-                        C.ENTRY_THRUST / max(m, 1.0),
-                        1e-9,
-                    )
-                else:
-                    throttle_request = max(
-                        v_horiz_site_mag / 120.0,
-                        site_dist_for_throttle / 8000.0,
-                    )
-                throttle = float(np.clip(
-                    throttle_request,
-                    0.05,
-                    max_capture_throttle,
-                ))
-            else:
-                throttle = float(np.clip(
-                    max(v_horiz_site_mag / 300.0, site_dist / 80000.0),
-                    0.04,
-                    0.24,
-                ))
-        elif entry_burn_on:
-            thrust_on = True
-            throttle = 0.45
-        else:
-            thrust_on = False
-
+        cmd.update(_entry_guidance(ctx))
     elif phase == "BOOSTER_LANDING":
-        burn_params = burn_prediction
+        cmd.update(_landing_guidance(ctx, gs))
+    desired_dir = cmd['desired_dir']
+    throttle = cmd['throttle']
 
-        v_vert_rel = float(np.dot(v_ground, vertical))
-        v_descent = max(-v_vert_rel, 0.0)
-        v_horiz_vec = v_ground - np.dot(v_ground, vertical) * vertical
-        v_horiz_mag = float(np.linalg.norm(v_horiz_vec))
-
-                                                
-                                                                          
-                                                                            
-                                                                           
-                                                                               
-                                             
-        burn_latched = gs.booster_landing_burn_started
-                                                                              
-                                                                          
-                                                                   
-                                                                             
-                                                                               
-                                                                          
-        ignition_corridor_top_g = min(
-            ignition_ceiling_m,
-            float(burn_params.get('burn_altitude', 0.0)) * ignite_safety,
-        )
-        guidance_ignite = altitude <= ignition_corridor_top_g
-        if guidance_ignite or burn_latched:
-            burn_latched = True
-            gs.booster_landing_burn_started = True
-
-        if burn_latched:
-            gs.booster_landing_burn_started = True
-            thrust_on = True
-
-            g_loc = float(C.MU_EARTH / (float(np.linalg.norm(r)) ** 2))
-            t_accel = float(C.LANDING_THRUST / max(m, 1.0))
-            h = max(altitude, 0.5)
-
-                                                                              
-                                                            
-             
-                                                           
-             
-                                                                            
-                                                                       
-                                                                         
-                                                                            
-                                                                 
-                                                                              
-            target_descent_ceiling = 4.2 if near_pad_rtls else 3.0
-            landing_target_descent_rate = min(
-                target_descent_ceiling,
-                0.85 * float(cfg.landing_leg_max_touchdown_speed_mps),
-            )
-
-            a_vert_raw = (
-                g_loc
-                + (v_descent ** 2 - landing_target_descent_rate ** 2)
-                / (2.0 * h)
-            )
-            if h < 10.0 and v_descent < landing_target_descent_rate:
-                a_vert_raw = 0.0
-            elif v_descent < landing_target_descent_rate and h >= 10.0:
-                                                                                
-                                                                   
-                                                                             
-                                                                               
-                                                               
-                a_vert_raw = (
-                    g_loc
-                    + (v_descent ** 2 - landing_target_descent_rate ** 2)
-                    / (2.0 * h)
-                )
-            a_vert_needed = float(np.clip(a_vert_raw, 0.0, t_accel))
-            landing_a_vert_needed = a_vert_needed
-
-                                                                            
-                                                                                
-                                                                            
-                                                     
-                                                                               
-                                                           
-                                                                                
-             
-                                                                               
-                                                                    
-            t_go = max(
-                estimate_booster_touchdown_time(
-                    r,
-                    v,
-                    m,
-                    C.LANDING_THRUST,
-                    safety_factor=1.0,                                        
-                ),
-                1.0,
-            )
-
-                                                                       
-                                                                               
-                                                                             
-                                                                               
-            landing_target_lead_time = 0.0
-            touchdown_site = landing_site_now
-            site_vertical = touchdown_site / max(float(np.linalg.norm(touchdown_site)), 1.0)
-
-                                                                          
-            r_to_pad = touchdown_site - r
-            r_err_horiz = r_to_pad - float(np.dot(r_to_pad, site_vertical)) * site_vertical
-
-                                                                       
-            v_horiz_site = v_horiz_vec - float(np.dot(v_horiz_vec, site_vertical)) * site_vertical
-            v_horiz_site_mag = float(np.linalg.norm(v_horiz_site))
-
-                                                                               
-                                                                                 
-                                                                                 
-            a_vert_for_budget = min(a_vert_needed, t_accel)
-            a_avail_horiz = float(np.sqrt(
-                max(t_accel ** 2 - a_vert_for_budget ** 2, 0.0)
-            ))
-                                                                             
-                                                                             
-                                                                                
-                                                                                   
-                                                                        
-                                                                           
-                                                                           
-                                                                        
-                                                                    
-            zem = r_err_horiz - v_horiz_site * t_go
-            pad_error_m = float(np.linalg.norm(r_err_horiz))
-            predicted_landing_error = pad_error_m
-            terminal_inside_pad_capture = (
-                pad_error_m <= float(cfg.booster_pad_tolerance_m)
-                and h < 150.0
-            )
-            terminal_horizontal_capture = (
-                near_pad_rtls
-                and h < 150.0
-                and pad_error_m <= float(cfg.booster_pad_tolerance_m)
-                and v_horiz_site_mag > 3.0
-            )
-            a_divert_zev = -(2.0 / t_go) * v_horiz_site
-                                                                        
-                                                                           
-                                                                             
-                                                                             
-            a_divert_zem_zev = (6.0 / (t_go ** 2)) * zem + (2.0 / t_go) * v_horiz_site
-                                                                              
-                                                                           
-                                                                           
-                                                                          
-                                                                             
-            base_divert_fraction = divert_fraction_by_altitude(h, cfg)
-
-            fuel_margin_ratio = max(propellant_remaining - landing_margin, 0.0) / max(landing_reserve, 1.0)
-            vertical_load_ratio = a_vert_needed / max(t_accel, 1e-6)
-            load_risk = float(cfg.booster_vertical_load_risk_ratio)
-            overspeed = float(cfg.booster_terminal_descent_overspeed_factor)
-            terminal_vertical_risk = (
-                vertical_load_ratio > load_risk
-                or (h < 15.0 and v_descent > overspeed * landing_target_descent_rate)
-            )
-            altitude_margin_low = (
-                h < max(250.0, 0.55 * burn_params['burn_altitude'])
-                and terminal_vertical_risk
-            )
-            fuel_crit = float(cfg.booster_fuel_critical_ratio)
-            fuel_critical_for_vertical = (
-                fuel_margin_ratio < fuel_crit
-                and (h > 30.0 or terminal_vertical_risk)
-            )
-            landing_vertical_priority = (
-                fuel_critical_for_vertical
-                or vertical_load_ratio > 0.85
-                or altitude_margin_low
-            )
-            if terminal_inside_pad_capture and not landing_vertical_priority:
-                base_divert_fraction = max(
-                    base_divert_fraction,
-                    float(cfg.booster_divert_fraction_high),
-                )
-            if landing_vertical_priority:
-                if fuel_critical_for_vertical or h < 500.0:
-                                                                              
-                                                                            
-                                                                               
-                                                                           
-                    base_divert_fraction *= 0.25
-                else:
-                                                                              
-                                                                           
-                                                         
-                    base_divert_fraction *= 0.60
-
-                                                                              
-                                                                            
-                                                                              
-            if vertical_load_ratio > 0.90 and h < 100.0:
-                a_horiz_budget = 0.0
-            else:
-                                                                              
-                                                                             
-                                                                                
-                                                                               
-                a_horiz_budget = min(a_avail_horiz, max(a_vert_for_budget, g_loc) * base_divert_fraction)
-
-            full_throttle_mdot = -compute_mass_flow_rate(
-                thrust_on=True,
-                throttle=1.0,
-                stage=1,
-                thrust_magnitude_override=C.LANDING_THRUST,
-                thrust_scale=cfg.runtime_thrust_scale,
-                isp_scale=cfg.runtime_isp_scale,
-                r=r,
-            )
-            vertical_throttle_fraction = a_vert_needed / max(t_accel, 1e-6)
-            (
-                landing_reserve_authority,
-                landing_vertical_propellant_requirement,
-            ) = compute_landing_reserve_authority(
-                propellant_remaining,
-                full_throttle_mdot,
-                vertical_throttle_fraction,
-                t_go,
-                landing_reserve,
-                landing_margin,
-                cfg.booster_landing_vertical_propellant_safety_factor,
-            )
-            a_horiz_budget *= landing_reserve_authority
-            if landing_reserve_authority <= 0.0:
-                landing_vertical_priority = True
-
-            if terminal_horizontal_capture and not terminal_vertical_risk:
-                a_horiz_budget = min(
-                    a_avail_horiz,
-                    max(a_horiz_budget, min(35.0, 0.75 * t_accel)),
-                )
-                a_horiz_budget *= landing_reserve_authority
-            reachable_distance = v_horiz_mag * t_go + 0.5 * a_horiz_budget * (t_go ** 2)
-                                                                               
-                                                                         
-                                                                           
-                                                                        
-            pad_reachable = pad_error_m <= max(350.0, reachable_distance)
-
-            if not pad_reachable and not terminal_inside_pad_capture:
-                                                                           
-                                                                          
-                                                                
-                divert_fraction = divert_fraction_by_altitude(h, cfg)
-                if landing_vertical_priority:
-                    divert_fraction *= 0.25
-                a_horiz_budget = min(a_avail_horiz, max(a_vert_for_budget, g_loc) * divert_fraction)
-            landing_a_horiz_budget = a_horiz_budget
-
-                                                                            
-                                                                           
-                                                                        
-                                                                         
-                                         
-            if terminal_horizontal_capture:
-                                                                              
-                                                                               
-                                                                             
-                                                        
-                t_min = float(cfg.booster_terminal_hcapture_tstop_min_s)
-                t_max = float(cfg.booster_terminal_hcapture_tstop_max_s)
-                t_stop_h = float(np.clip(
-                    t_go, t_min, t_max
-                ))
-                a_divert = -v_horiz_site / max(t_stop_h, 1e-6)
-            elif terminal_inside_pad_capture:
-                a_divert = a_divert_zev
-            else:
-                a_divert = a_divert_zem_zev if pad_reachable else a_divert_zev
-
-            a_divert_mag = float(np.linalg.norm(a_divert))
-            if a_divert_mag > a_horiz_budget and a_divert_mag > 1e-6:
-                a_divert = a_divert * (a_horiz_budget / a_divert_mag)
-
-                                                                               
-            if v_descent < 1.0 and v_horiz_mag < 1.0:
-                                                    
-                throttle = 0.0
-                desired_dir = vertical
-            elif terminal_horizontal_capture:
-                                                                             
-                                                                            
-                                                                               
-                         
-                t_min = float(cfg.booster_terminal_hcapture_tstop_min_s)
-                t_max = float(cfg.booster_terminal_hcapture_tstop_max_s)
-                t_stop = float(np.clip(
-                    t_go, t_min, t_max
-                ))
-                v_terminal = v_vert_rel * vertical + v_horiz_site
-                a_cmd = g_loc * vertical - v_terminal / max(t_stop, 1e-6)
-                a_cmd_mag = float(np.linalg.norm(a_cmd))
-                desired_dir = a_cmd / max(a_cmd_mag, 1e-6)
-                throttle = float(np.clip(a_cmd_mag / max(t_accel, 1e-6), 0.0, 1.0))
-            else:
-                a_cmd = a_vert_needed * vertical + a_divert
-                a_cmd_mag = float(np.linalg.norm(a_cmd))
-                desired_dir = a_cmd / max(a_cmd_mag, 1e-6)
-                throttle = float(np.clip(a_cmd_mag / max(t_accel, 1e-6), 0.0, 1.0))
-            if h < 10.0 and v_descent < landing_target_descent_rate:
-                desired_dir = vertical
-                throttle = 0.0
-
-            # Landing-leg stability is a hard vehicle constraint.  Keep the
-            # commanded thrust axis inside the configured touchdown cone while
-            # retaining the ZEM/ZEV lateral direction within that cone.
-            touchdown_cone_deg = min(
-                float(cfg.booster_terminal_attitude_error_max_deg),
-                float(cfg.landing_leg_max_tilt_deg),
-            )
-            desired_dir = _limit_direction_cone(
-                desired_dir,
-                vertical,
-                np.radians(touchdown_cone_deg),
-            )
-        else:
-            desired_dir = retrograde
-            thrust_on = False
-
-    planner_due = (
-        cfg is not None
-        and phase in ("BOOSTER_BOOSTBACK", "BOOSTER_ENTRY")
-        and abs((t / 1.0) - round(t / 1.0)) < 0.51 * float(cfg.dt)
-    )
-    if planner_due:
+    plan = None
+    if (
+        phase in ("BOOSTER_BOOSTBACK", "BOOSTER_ENTRY")
+        and abs(t - round(t)) < 0.51 * float(cfg.dt)
+    ):
         plan = score_recovery_candidates(
             r,
             v,
@@ -1223,20 +1073,9 @@ def compute_booster_guidance(
             current_direction=desired_dir,
             current_throttle=throttle,
         )
-        planner_score = plan.score
-        planner_miss = plan.miss_m
-        planner_speed = plan.speed_mps
-        planner_propellant = plan.propellant_kg
-        planner_max_q = plan.max_q_pa
-        planner_reachable = plan.reachable
-        planner_required_lateral_accel = plan.required_lateral_accel_mps2
-        planner_available_lateral_accel = plan.available_lateral_accel_mps2
-        planner_time_to_go = plan.time_to_go_s
 
-                                          
     v_vert = float(np.dot(v_rel, vertical))
-    v_horiz_vec = v_rel - v_vert * vertical
-    v_horiz = float(np.linalg.norm(v_horiz_vec))
+    v_horiz = float(np.linalg.norm(v_rel - v_vert * vertical))
 
     if v_rel_norm > 1.0:
         gamma_deg = float(np.degrees(np.arctan2(v_vert, max(v_horiz, 1e-6))))
@@ -1249,7 +1088,7 @@ def compute_booster_guidance(
     output = {
         'thrust_direction': desired_dir,
         'phase': phase,
-        'thrust_on': thrust_on,
+        'thrust_on': cmd['thrust_on'],
         'pitch_angle': pitch_angle,
         'gamma_angle': np.radians(gamma_deg),
         'gamma_command_deg': gamma_deg,
@@ -1264,28 +1103,28 @@ def compute_booster_guidance(
         'throttle': throttle,
         'v_rel': v_rel,
         'v_rel_mag': v_rel_norm,
-        'propellant_remaining_kg': propellant_remaining,
+        'propellant_remaining_kg': ctx.propellant_remaining,
         'ignition_altitude_prediction_m': burn_prediction['burn_altitude'],
-        'landing_vertical_priority': landing_vertical_priority,
-        'landing_a_vert_needed_mps2': float(landing_a_vert_needed) if landing_a_vert_needed is not None else 0.0,
-        'landing_a_horiz_budget_mps2': float(landing_a_horiz_budget) if landing_a_horiz_budget is not None else 0.0,
-        'landing_target_descent_rate_mps': float(landing_target_descent_rate),
-        'landing_target_lead_time_s': float(landing_target_lead_time),
-        'landing_guidance_time_to_go_s': float(landing_guidance_time_to_go_s),
-        'landing_reserve_authority': float(landing_reserve_authority),
+        'landing_vertical_priority': cmd['landing_vertical_priority'],
+        'landing_a_vert_needed_mps2': float(cmd['landing_a_vert_needed']),
+        'landing_a_horiz_budget_mps2': float(cmd['landing_a_horiz_budget']),
+        'landing_target_descent_rate_mps': float(cmd['landing_target_descent_rate']),
+        'landing_target_lead_time_s': float(cmd['landing_target_lead_time']),
+        'landing_guidance_time_to_go_s': float(cmd['landing_guidance_time_to_go_s']),
+        'landing_reserve_authority': float(cmd['landing_reserve_authority']),
         'landing_vertical_propellant_requirement_kg': float(
-            landing_vertical_propellant_requirement
+            cmd['landing_vertical_propellant_requirement']
         ),
-        'grid_fin_zero_effort_miss': grid_fin_zero_effort_miss,
-        'predicted_landing_error_m': float(predicted_landing_error),
-        'planner_score': float(planner_score),
-        'planner_best_miss_m': float(planner_miss),
-        'planner_best_speed_mps': float(planner_speed),
-        'planner_best_propellant_kg': float(planner_propellant),
-        'planner_best_max_q_pa': float(planner_max_q),
-        'planner_reachable': bool(planner_reachable),
-        'planner_required_lateral_accel_mps2': float(planner_required_lateral_accel),
-        'planner_available_lateral_accel_mps2': float(planner_available_lateral_accel),
-        'planner_time_to_go_s': float(planner_time_to_go),
+        'grid_fin_zero_effort_miss': cmd['grid_fin_zero_effort_miss'],
+        'predicted_landing_error_m': float(cmd['predicted_landing_error']),
+        'planner_score': float(plan.score) if plan else 0.0,
+        'planner_best_miss_m': float(plan.miss_m) if plan else 0.0,
+        'planner_best_speed_mps': float(plan.speed_mps) if plan else 0.0,
+        'planner_best_propellant_kg': float(plan.propellant_kg) if plan else 0.0,
+        'planner_best_max_q_pa': float(plan.max_q_pa) if plan else 0.0,
+        'planner_reachable': bool(plan.reachable) if plan else False,
+        'planner_required_lateral_accel_mps2': float(plan.required_lateral_accel_mps2) if plan else 0.0,
+        'planner_available_lateral_accel_mps2': float(plan.available_lateral_accel_mps2) if plan else 0.0,
+        'planner_time_to_go_s': float(plan.time_to_go_s) if plan else 0.0,
     }
     return output, gs
