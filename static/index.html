@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Boostback</title>
+<link rel="stylesheet" href="/static/css/style.css?v=0.3.2" />
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+
+<div class="app-shell">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2 L15 12 L12 22 L9 12 Z" fill="#04131c"/></svg>
+      </div>
+      <div class="brand-text">
+        <div class="t1">BOOSTBACK</div>
+        <div class="t2">Reusable Launch Vehicle Simulator</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-item active" data-view="config">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/><circle cx="12" cy="12" r="3.5"/></svg>
+        Mission Setup
+      </div>
+      <div class="nav-item" data-view="telemetry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+        Live Telemetry
+        <span class="nav-badge" id="nav-live-badge">idle</span>
+      </div>
+      <div class="nav-item" data-view="report">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 17V9M15 17v-4M12 17V5"/><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
+        Mission Report
+      </div>
+      <div class="nav-item" data-view="campaign">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        Monte Carlo Campaigns
+      </div>
+      <div class="nav-item" data-view="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .35 1.9l.05.05a2 2 0 1 1-2.85 2.85l-.05-.05a1.7 1.7 0 0 0-1.9-.35 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.55 1.7 1.7 0 0 0-1.9.35l-.05.05a2 2 0 1 1-2.85-2.85l.05-.05a1.7 1.7 0 0 0 .35-1.9 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.65 9.4a1.7 1.7 0 0 0-.35-1.9l-.05-.05a2 2 0 1 1 2.85-2.85l.05.05a1.7 1.7 0 0 0 1.9.35H9.2A1.7 1.7 0 0 0 10.2 3.5V3a2 2 0 1 1 4 0v.1c0 .66.39 1.25 1 1.55.62.26 1.34.14 1.9-.35l.05-.05a2 2 0 1 1 2.85 2.85l-.05.05c-.49.56-.61 1.28-.35 1.9v.1c.3.61.89 1 1.55 1H21a2 2 0 1 1 0 4h-.1c-.66 0-1.25.39-1.5 1z"/></svg>
+        Settings
+      </div>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="conn-row"><span class="dot" id="backend-dot"></span><span id="backend-label">connecting…</span></div>
+      <div>Boostback v0.2.0 &middot; local runtime</div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <h1 id="topbar-title">Mission Setup</h1>
+        <div class="sub" id="topbar-sub">Configure the vehicle, mission profile, and physics model before launch.</div>
+      </div>
+      <div class="topbar-spacer"></div>
+      <div class="mission-clock"><span class="lbl">T+</span><span id="mission-clock">000:00.0</span></div>
+      <div class="status-pill idle" id="status-pill"><span class="pulse"></span><span id="status-text">IDLE</span></div>
+    </div>
+
+    <!-- ---------------- CONFIG VIEW ---------------- -->
+    <section class="view" id="view-config">
+      <div class="section-title">Configuration Source</div>
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Import Configuration File</div></div>
+          <div class="dropzone" id="dropzone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/></svg>
+            <div>Drop a mission config <b>.json</b> file here, or click to browse</div>
+            <div class="help-text">Validated against the full runtime schema before it's applied.</div>
+          </div>
+          <input type="file" id="file-input" accept=".json" style="display:none" />
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Presets</div></div>
+          <div class="toggle-row">
+            <div><div class="lbl">Load validated defaults</div><div class="desc">Reset all fields to the reference vehicle baseline</div></div>
+            <button class="btn btn-sm" id="btn-load-defaults">Load</button>
+          </div>
+          <div class="toggle-row">
+            <div><div class="lbl">Demo mode</div><div class="desc">Fast coarse-step run for quick previews</div></div>
+            <label class="switch"><input type="checkbox" id="toggle-demo"/><span class="track"><span class="thumb"></span></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="lbl">Stage-2 recovery <span class="badge bad" style="font-size:10px;vertical-align:middle;">EXPERIMENTAL</span></div><div class="desc">Attempt second-stage deorbit &amp; recovery modeling. Known issue: with the default propellant/thrust budget, this vehicle is propellant-starved for the S2 landing burn and the deorbit phase can fail to converge -- missions with this enabled frequently end in "S2 DRONE-SHIP CRASH" or a deorbit timeout rather than a successful landing. Booster (Stage-1) recovery is unaffected.</div></div>
+            <label class="switch"><input type="checkbox" id="toggle-s2"/><span class="track"><span class="thumb"></span></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="lbl">Real-time playback</div><div class="desc">Throttle simulation to ~2x wall-clock for live viewing</div></div>
+            <label class="switch"><input type="checkbox" id="toggle-realtime" checked/><span class="track"><span class="thumb"></span></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="lbl">Export current configuration</div><div class="desc">Download the form contents as a reusable JSON profile</div></div>
+            <button class="btn btn-sm" id="btn-export-config">Export</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Vehicle &amp; Mission Parameters</div>
+      <div class="tabs">
+        <div class="tab active" data-tab="vehicle">Vehicle</div>
+        <div class="tab" data-tab="mission">Mission Profile</div>
+        <div class="tab" data-tab="recovery">Booster Recovery</div>
+        <div class="tab" data-tab="physics">Physics Model</div>
+      </div>
+
+      <div class="tab-panel active" data-panel="vehicle">
+        <div class="grid grid-4" id="form-vehicle"></div>
+      </div>
+      <div class="tab-panel" data-panel="mission">
+        <div class="grid grid-4" id="form-mission"></div>
+      </div>
+      <div class="tab-panel" data-panel="recovery">
+        <div class="grid grid-4" id="form-recovery"></div>
+      </div>
+      <div class="tab-panel" data-panel="physics">
+        <div class="grid grid-4" id="form-physics"></div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:22px;">
+        <button class="btn btn-primary" id="btn-launch" style="padding:12px 26px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
+          Launch Simulation
+        </button>
+        <div id="launch-error" class="help-text" style="color:var(--red);"></div>
+      </div>
+    </section>
+
+    <!-- ---------------- TELEMETRY VIEW ---------------- -->
+    <section class="view hidden" id="view-telemetry">
+      <div class="empty-state" id="telemetry-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>
+        <h3>No active telemetry stream</h3>
+        <p>Launch a mission from Mission Setup to see live vehicle data here.</p>
+      </div>
+
+      <div id="telemetry-live" style="display:none;">
+        <div class="phase-strip">
+          <span style="color:var(--text-lo);">PHASE</span>
+          <span class="phase-chip now" id="phase-chip">—</span>
+          <div class="topbar-spacer"></div>
+          <div class="vehicle-toggle" id="vehicle-toggle" style="display:none;">
+            <button class="active" data-veh="primary">Orbiter</button>
+            <button data-veh="booster">Booster</button>
+          </div>
+          <button class="btn btn-amber btn-sm" id="btn-pause"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>Pause</button>
+          <button class="btn btn-primary btn-sm" id="btn-resume" style="display:none;"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"/></svg>Resume</button>
+          <button class="btn btn-danger btn-sm" id="btn-stop"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>Stop</button>
+        </div>
+
+        <div class="timeline-strip" id="timeline-strip"></div>
+
+        <div class="card" style="padding:14px 16px 10px;margin-bottom:14px;">
+          <div class="chart-head"><span class="name">FLIGHT VISUALIZATION</span><span class="now" id="viz-now" style="font-size:11px;color:var(--text-lo);">drag to rotate &middot; scroll to zoom &middot; double-click to reset</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="viz-pane">
+              <div class="viz-caption">ORBITER / ASCENT STACK</div>
+              <canvas id="viz-orbiter" style="width:100%;height:520px;border-radius:10px;background:#05070b;display:block;"></canvas>
+              <div class="viz-readout" id="viz-orbiter-readout"></div>
+            </div>
+            <div class="viz-pane">
+              <div class="viz-caption">BOOSTER RECOVERY</div>
+              <canvas id="viz-booster" style="width:100%;height:520px;border-radius:10px;background:#05070b;display:block;"></canvas>
+              <div class="viz-readout" id="viz-booster-readout"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="telemetry-grid">
+          <div class="stat-tile"><div class="k">Altitude</div><div class="v accent" id="stat-altitude">0<span class="unit">km</span></div></div>
+          <div class="stat-tile"><div class="k">Velocity</div><div class="v accent" id="stat-velocity">0<span class="unit">m/s</span></div></div>
+          <div class="stat-tile"><div class="k">Downrange</div><div class="v" id="stat-downrange">0<span class="unit">km</span></div></div>
+          <div class="stat-tile"><div class="k">Mass</div><div class="v" id="stat-mass">0<span class="unit">kg</span></div></div>
+          <div class="stat-tile"><div class="k">Throttle</div><div class="v amber" id="stat-throttle">0<span class="unit">%</span></div></div>
+          <div class="stat-tile"><div class="k">Dynamic Pressure</div><div class="v" id="stat-q">0<span class="unit">kPa</span></div></div>
+        </div>
+
+        <div class="grid grid-2">
+          <div class="card chart-card">
+            <div class="chart-head"><span class="name">ALTITUDE (km)</span><span class="now" id="ch-alt-now">0</span></div>
+            <canvas id="chart-altitude" height="140"></canvas>
+          </div>
+          <div class="card chart-card">
+            <div class="chart-head"><span class="name">VELOCITY (m/s)</span><span class="now" id="ch-vel-now">0</span></div>
+            <canvas id="chart-velocity" height="140"></canvas>
+          </div>
+          <div class="card chart-card">
+            <div class="chart-head"><span class="name">MASS (kg) &amp; THROTTLE (%)</span><span class="now" id="ch-mass-now">0</span></div>
+            <canvas id="chart-mass" height="140"></canvas>
+          </div>
+          <div class="card chart-card">
+            <div class="chart-head"><span class="name">DYNAMIC PRESSURE (kPa) &amp; HEAT FLUX (kW/m²)</span><span class="now" id="ch-q-now">0</span></div>
+            <canvas id="chart-q" height="140"></canvas>
+          </div>
+        </div>
+
+        <div class="card chart-card" style="margin-top:14px;">
+          <div class="chart-head"><span class="name">ALTITUDE vs DOWNRANGE — TRAJECTORY PROFILE</span></div>
+          <canvas id="chart-traj" height="220"></canvas>
+        </div>
+
+        <div class="hw-row" id="hw-row"></div>
+      </div>
+    </section>
+
+    <!-- ---------------- REPORT VIEW ---------------- -->
+    <section class="view hidden" id="view-report">
+      <div class="empty-state" id="report-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 17V9M15 17v-4M12 17V5"/></svg>
+        <h3>No mission report yet</h3>
+        <p>Run a mission to completion to see the pass/fail assessment and final metrics here.</p>
+      </div>
+      <div id="report-content" style="display:none;"></div>
+    </section>
+
+    <!-- ---------------- CAMPAIGN VIEW ---------------- -->
+    <section class="view hidden" id="view-campaign">
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Configure Campaign</div></div>
+          <div class="field">
+            <label>Mode</label>
+            <select id="camp-mode">
+              <option value="monte_carlo">Monte Carlo (randomized dispersions)</option>
+              <option value="sensitivity">Sensitivity (±1σ per parameter)</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Runs <span class="unit">count</span></label><input type="number" id="camp-runs" value="100" min="1" max="2000"/></div>
+            <div class="field"><label>Seed <span class="unit">int</span></label><input type="number" id="camp-seed" value="42" min="0"/></div>
+          </div>
+          <div class="field">
+            <label>Parallel workers <span class="unit">processes</span></label>
+            <input type="number" id="camp-workers" value="1" min="1" max="16"/>
+          </div>
+          <button class="btn btn-primary" id="btn-run-campaign" style="margin-top:8px;">Run Campaign</button>
+          <div class="help-text">Uses the vehicle/mission parameters currently set in Mission Setup as the campaign baseline.</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Progress</div></div>
+          <div id="camp-idle" class="help-text">No campaign running.</div>
+          <div id="camp-progress" style="display:none;">
+            <div class="progress-bar"><div class="fill" id="camp-fill"></div></div>
+            <div class="help-text" id="camp-progress-text" style="margin-top:8px;">0 / 0 cases complete</div>
+            <button class="btn btn-danger btn-sm" id="btn-cancel-campaign" style="margin-top:8px;">Cancel Campaign</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="camp-results" style="display:none;">
+        <div class="section-title">Results Summary</div>
+        <div class="metric-grid" id="camp-summary-grid"></div>
+        <div class="section-title">Failure Criteria Breakdown</div>
+        <div class="card"><div class="metric-grid" id="camp-failure-grid"></div></div>
+        <div class="section-title">Metric Distributions (median / p05 / p95)</div>
+        <div class="card" style="max-height:280px;overflow:auto;">
+          <table class="data-table" id="camp-metrics-table"><thead></thead><tbody></tbody></table>
+        </div>
+        <div class="section-title">Per-Case Results</div>
+        <div class="card" style="max-height:360px;overflow:auto;">
+          <table class="data-table" id="camp-table"><thead></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- SETTINGS VIEW ---------------- -->
+    <section class="view hidden" id="view-settings">
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Backend Connection</div></div>
+          <div class="field"><label>Server base URL</label><input type="text" id="set-base-url" value=""/></div>
+          <div class="field"><label>API key <span class="unit">optional</span></label><input type="text" id="set-api-key" placeholder="X-RLV-API-Key"/></div>
+          <button class="btn btn-primary btn-sm" id="btn-save-settings">Save &amp; Reconnect</button>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">About</div></div>
+          <p class="help-text">RLV Mission Control is a local desktop dashboard for the reusable launch vehicle flight simulator.
+          Simulations execute entirely on this machine — no telemetry leaves your computer unless you configure a remote backend URL above.</p>
+        </div>
+      </div>
+
+      <div class="section-title">Aerodynamic Model Validation</div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title">Tier 1 Physical-Sanity Checks</div>
+          <button class="btn btn-sm" id="btn-run-aero-validation">Run Checks</button>
+        </div>
+        <p class="help-text">
+          Checks the aerodynamic model against classical aerodynamic theory (drag rise shape,
+          lift-curve symmetry, published slender-body bounds, interpolation correctness) —
+          <b>not</b> against wind-tunnel, CFD, or real flight data for this specific vehicle.
+          See <code>aero_validation.py</code> for the full method and caveats.
+        </p>
+        <div id="aero-validation-empty" class="help-text">No checks run yet.</div>
+        <div id="aero-validation-results" style="display:none;">
+          <div class="metric-grid" id="aero-validation-summary" style="grid-template-columns:repeat(3,1fr);margin-top:10px;"></div>
+          <table class="data-table" id="aero-validation-table" style="margin-top:12px;"><thead></thead><tbody></tbody></table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-head">
+          <div class="card-title">Tier 2 Published-Literature Comparison</div>
+          <button class="btn btn-sm" id="btn-run-aero-tier2">Run Checks</button>
+        </div>
+        <p class="help-text">
+          Compares this model's transonic drag-rise <i>shape</i> (peak location, rise magnitude,
+          post-peak decay) against published external aerodynamic literature — a real, independently
+          citable source, but a general literature comparison, <b>not</b> a point-by-point match
+          against wind-tunnel or CFD data measured for this exact vehicle shape. Each check below
+          links its source.
+        </p>
+        <div id="aero-tier2-empty" class="help-text">No checks run yet.</div>
+        <div id="aero-tier2-results" style="display:none;">
+          <div class="metric-grid" id="aero-tier2-summary" style="grid-template-columns:repeat(3,1fr);margin-top:10px;"></div>
+          <table class="data-table" id="aero-tier2-table" style="margin-top:12px;"><thead></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="toast-stack" id="toast-stack"></div>
+
+<div class="modal-overlay hidden" id="confirm-overlay">
+  <div class="modal-box">
+    <div class="modal-title" id="confirm-title">Are you sure?</div>
+    <div class="modal-body" id="confirm-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-sm" id="confirm-cancel">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/vendor/three.min.js"></script>
+<script src="/static/js/charts.js?v=0.3.1"></script>
+<script src="/static/js/rocket_viz.js?v=0.3.2"></script>
+<script src="/static/js/app.js?v=0.3.5"></script>
+</body>
+</html>

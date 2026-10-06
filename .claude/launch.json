@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "rlv-sim-server",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set PYTHONPATH=D:\\ && .venv\\Scripts\\python.exe -m rlv_sim.server"],
+      "port": 8000
+    }
+  ]
+}

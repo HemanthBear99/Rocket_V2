@@ -1,0 +1,30 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+.venv/
+.venv2/
+.pytest_cache/
+*.bak
+
+# scratch/debug output
+mission_debug.log
+mission_debug_output/
+mission_output/
+mission_output2/
+mission_output3/
+mission_output4/
+mission_output_final/
+mission_output_ultimate/
+mission_output_ultimate2/
+mission_output_ultimate3/
+mission_output_ultimate4/
+scratch_run_full/
+scratch_run_full2/
+scratch_full_run.log
+scratch_full_run2.log
+
+# codegraph index
+.codegraph/

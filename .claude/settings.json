@@ -1,0 +1,16 @@
+{
+  "env": {
+    "CODEGRAPH_TELEMETRY": "0"
+  },
+  "enabledPlugins": {
+    "cartographer@cartographer-marketplace": true
+  },
+  "extraKnownMarketplaces": {
+    "cartographer-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "kingbootoshi/cartographer"
+      }
+    }
+  }
+}

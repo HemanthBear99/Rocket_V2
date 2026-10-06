@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rlv_sim"
+version = "0.2.0"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.21",
+    "matplotlib>=3.5",
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.20",
+    "pydantic>=2.0",
+    "python-multipart>=0.0.9",
+]
+
+[tool.setuptools.packages.find]
+include = ["rlv_sim*"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0", "pytest-playwright>=0.5"]
+# Only required to run desktop_app.py / build the PyInstaller desktop
+# shell. pywebview was previously imported directly by desktop_app.py
+# without being declared anywhere in pyproject.toml, so `pip install -e .`
+# alone would not provide it.
+desktop = ["pywebview>=5.0", "PySide6>=6.7", "PyInstaller>=6.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra"]
+
