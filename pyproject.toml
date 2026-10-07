@@ -30,5 +30,8 @@ fast = ["numba>=0.60"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["-ra"]
+addopts = ["-ra", "-m", "not slow"]
+markers = [
+    "slow: long-running end-to-end tests (run with `pytest -m slow`)",
+]
 
