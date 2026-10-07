@@ -173,65 +173,35 @@ def _print_mission_summary(separation_time, orbiter_state, orbiter_reason,
     print("=" * 90)
 
 
-def run_full_mission(dt: float | None = None, max_time: float | None = None,
-                     verbose: bool = True,
-                     config: SimulationConfig = None,
-                     *,
-                     progress_callback: ProgressCallback | None = None,
-                     control_callback: ControlCallback | None = None,
-                     realtime_factor: float | None = None) -> FullMissionResult:
-    """
-    Run a full integrated mission: S1 ascent → separation → dual tracking.
+@dataclasses.dataclass(frozen=True)
+class _MissionRuntime:
+    """Settings and callbacks shared by the ascent and dual-vehicle phases."""
 
-    After stage separation the simulation forks into two vehicles
-    (orbiter and booster) running in lockstep on the same clock.
-    Each vehicle has its own GuidanceState, MissionManager and telemetry log.
+    config: SimulationConfig
+    dt: float
+    max_time: float
+    verbose: bool
+    apply_wind: Callable[[SimulationConfig], SimulationConfig]
+    wait_for_control: Callable[[], str]
+    pace: Callable[[float], None]
+    emit: Callable[[MissionProgress], None]
 
-    Args:
-        dt: Timestep (overrides config.dt if given)
-        max_time: Maximum mission time (overrides config.max_time if given)
-        verbose: Print status updates
-        config: SimulationConfig (default created if None)
-        progress_callback: Optional observer called after each mission update
-        control_callback: Optional source of ``run``, ``paused``, or ``stop``
-        realtime_factor: Optional pacing factor; disabled for batch runs
 
-    Returns:
-        FullMissionResult with telemetry for ascent, orbiter and booster.
-    """
-    if config is None:
-        config = create_default_config()
-    if dt is None:
-        dt = config.dt
-    if max_time is None:
-        max_time = config.max_time
-    config.validate()
-    if dt <= 0:
-        raise ValueError(f"dt must be positive, got {dt}")
-    if max_time <= 0:
-        raise ValueError(f"max_time must be positive, got {max_time}")
-    if realtime_factor is not None and realtime_factor <= 0:
-        raise ValueError(f"realtime_factor must be positive when set, got {realtime_factor}")
+@dataclasses.dataclass
+class _AscentOutcome:
+    state: object
+    log: SimulationLog
+    reason: str
+    separation_time: float | None
+    actuator: ActuatorState
+    guidance_state: object
+    step_count: int
 
-    def _wait_for_control() -> str:
-        if control_callback is None:
-            return "run"
-        signal = control_callback()
-        while signal == "paused":
-            time.sleep(0.05)
-            signal = control_callback()
-        return signal
 
-    def _pace(step_size: float) -> None:
-        if realtime_factor is not None:
-            time.sleep(max(float(step_size), 0.0) / realtime_factor)
-
-    def _emit(progress: MissionProgress) -> None:
-        if progress_callback is not None:
-            progress_callback(progress)
-
-    _apply_wind = _make_wind_applier(config)
-
+def _run_ascent(rt: _MissionRuntime) -> _AscentOutcome:
+    """Phase A: fly the stacked vehicle until stage separation (or failure)."""
+    config, dt, max_time, verbose = rt.config, rt.dt, rt.max_time, rt.verbose
+    _apply_wind, _wait_for_control, _pace, _emit = rt.apply_wind, rt.wait_for_control, rt.pace, rt.emit
 
     if verbose:
         print("\n" + "=" * 90)
@@ -256,7 +226,6 @@ def run_full_mission(dt: float | None = None, max_time: float | None = None,
     separation_time = None
     ascent_reason = "Stage separation"
 
-    start_wall = time.time()
 
     while True:
         if _wait_for_control() == "stop":
@@ -354,22 +323,33 @@ def run_full_mission(dt: float | None = None, max_time: float | None = None,
             _print_status(state, guid_out.get('phase', '?') if isinstance(guid_out, dict) else '?')
             last_print_time = state.t
 
-    ascent_final = state.copy()
+    return _AscentOutcome(
+        state=state, log=ascent_log, reason=ascent_reason,
+        separation_time=separation_time, actuator=actuator,
+        guidance_state=gs_ascent, step_count=step_count,
+    )
 
-    if separation_time is None:
 
-        empty_log = SimulationLog()
-        return FullMissionResult(
-            ascent_log=ascent_log, ascent_final_state=ascent_final,
-            ascent_reason=ascent_reason, separation_time=None,
-            orbiter_log=empty_log, orbiter_final_state=ascent_final,
-            orbiter_reason="No separation",
-            booster_log=empty_log, booster_final_state=ascent_final,
-            booster_reason="No separation",
-            orbiter_success=False,
-            booster_landing_success=False,
-        )
+@dataclasses.dataclass
+class _VehicleOutcome:
+    state: object
+    log: SimulationLog
+    reason: str
+    mission_manager: MissionManager
 
+
+def _run_dual_vehicles(rt: _MissionRuntime, ascent: _AscentOutcome):
+    """Phase B: fork into orbiter and booster and fly both to termination.
+
+    Returns (orbiter outcome, booster outcome, total step count).
+    """
+    config, dt, max_time, verbose = rt.config, rt.dt, rt.max_time, rt.verbose
+    _apply_wind, _wait_for_control, _pace, _emit = rt.apply_wind, rt.wait_for_control, rt.pace, rt.emit
+
+    state = ascent.state
+    actuator = ascent.actuator
+    gs_ascent = ascent.guidance_state
+    step_count = ascent.step_count
 
     s2_wet_mass = float(config.stage2_dry_mass) + float(config.stage2_prop_mass) + float(config.payload_mass)
     s2_dry_mass = float(config.stage2_dry_mass) + float(config.payload_mass)
@@ -515,6 +495,101 @@ def run_full_mission(dt: float | None = None, max_time: float | None = None,
                 orbiter_state, orbiter_done, orbiter_reason, orb_guid,
                 booster_state, booster_done, booster_reason, bst_guid,
             )
+
+    return (
+        _VehicleOutcome(orbiter_state, orbiter_log, orbiter_reason, orbiter_mgr),
+        _VehicleOutcome(booster_state, booster_log, booster_reason, booster_mgr),
+        step_count,
+    )
+
+
+def run_full_mission(dt: float | None = None, max_time: float | None = None,
+                     verbose: bool = True,
+                     config: SimulationConfig = None,
+                     *,
+                     progress_callback: ProgressCallback | None = None,
+                     control_callback: ControlCallback | None = None,
+                     realtime_factor: float | None = None) -> FullMissionResult:
+    """
+    Run a full integrated mission: S1 ascent → separation → dual tracking.
+
+    After stage separation the simulation forks into two vehicles
+    (orbiter and booster) running in lockstep on the same clock.
+    Each vehicle has its own GuidanceState, MissionManager and telemetry log.
+
+    Args:
+        dt: Timestep (overrides config.dt if given)
+        max_time: Maximum mission time (overrides config.max_time if given)
+        verbose: Print status updates
+        config: SimulationConfig (default created if None)
+        progress_callback: Optional observer called after each mission update
+        control_callback: Optional source of ``run``, ``paused``, or ``stop``
+        realtime_factor: Optional pacing factor; disabled for batch runs
+
+    Returns:
+        FullMissionResult with telemetry for ascent, orbiter and booster.
+    """
+    if config is None:
+        config = create_default_config()
+    if dt is None:
+        dt = config.dt
+    if max_time is None:
+        max_time = config.max_time
+    config.validate()
+    if dt <= 0:
+        raise ValueError(f"dt must be positive, got {dt}")
+    if max_time <= 0:
+        raise ValueError(f"max_time must be positive, got {max_time}")
+    if realtime_factor is not None and realtime_factor <= 0:
+        raise ValueError(f"realtime_factor must be positive when set, got {realtime_factor}")
+
+    def _wait_for_control() -> str:
+        if control_callback is None:
+            return "run"
+        signal = control_callback()
+        while signal == "paused":
+            time.sleep(0.05)
+            signal = control_callback()
+        return signal
+
+    def _pace(step_size: float) -> None:
+        if realtime_factor is not None:
+            time.sleep(max(float(step_size), 0.0) / realtime_factor)
+
+    def _emit(progress: MissionProgress) -> None:
+        if progress_callback is not None:
+            progress_callback(progress)
+
+    rt = _MissionRuntime(
+        config=config, dt=dt, max_time=max_time, verbose=verbose,
+        apply_wind=_make_wind_applier(config),
+        wait_for_control=_wait_for_control, pace=_pace, emit=_emit,
+    )
+    start_wall = time.time()
+
+    ascent = _run_ascent(rt)
+    ascent_log, ascent_reason = ascent.log, ascent.reason
+    separation_time = ascent.separation_time
+    ascent_final = ascent.state.copy()
+
+    if separation_time is None:
+
+        empty_log = SimulationLog()
+        return FullMissionResult(
+            ascent_log=ascent_log, ascent_final_state=ascent_final,
+            ascent_reason=ascent_reason, separation_time=None,
+            orbiter_log=empty_log, orbiter_final_state=ascent_final,
+            orbiter_reason="No separation",
+            booster_log=empty_log, booster_final_state=ascent_final,
+            booster_reason="No separation",
+            orbiter_success=False,
+            booster_landing_success=False,
+        )
+
+    orbiter, booster, step_count = _run_dual_vehicles(rt, ascent)
+    orbiter_state, orbiter_log, orbiter_reason = orbiter.state, orbiter.log, orbiter.reason
+    booster_state, booster_log, booster_reason = booster.state, booster.log, booster.reason
+    orbiter_mgr = orbiter.mission_manager
 
     elapsed = time.time() - start_wall
 
