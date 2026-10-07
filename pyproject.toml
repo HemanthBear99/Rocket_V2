@@ -27,6 +27,8 @@ test = ["pytest>=8.0", "pytest-playwright>=0.5"]
 desktop = ["pywebview>=5.0", "PySide6>=6.7", "PyInstaller>=6.0"]
 # Optional: compiles the gravity model and landing predictor (~1.6x faster runs).
 fast = ["numba>=0.60"]
+# Optional: G-FOLD convex landing guidance (booster_landing_guidance="gfold").
+gfold = ["cvxpy>=1.5"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

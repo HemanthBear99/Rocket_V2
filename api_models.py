@@ -51,6 +51,8 @@ class RecoverySetup(BaseModel):
     grid_fins: bool
     landing_legs: bool
     suicide_burn: Literal[True] = True
+    # Landing-burn guidance: False = heuristic suicide burn, True = G-FOLD.
+    gfold_guidance: bool = False
 
 
 class PhysicsSetup(BaseModel):

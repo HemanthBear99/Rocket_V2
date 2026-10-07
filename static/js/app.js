@@ -52,6 +52,7 @@
     recovery: {
       grid_fins: { label: 'Grid Fins', desc: 'Enable aerodynamic grid fin control during descent' },
       landing_legs: { label: 'Landing Legs', desc: 'Deploy landing legs prior to touchdown' },
+      gfold_guidance: { label: 'G-FOLD Landing Guidance', desc: 'Convex minimum-fuel powered descent instead of the heuristic suicide burn (needs cvxpy)' },
     },
     physics: {
       j2: { label: 'J2 Perturbation', desc: 'Earth oblateness gravity term' },
@@ -200,6 +201,9 @@
     const rC = $('#form-recovery'); rC.innerHTML = '';
     ['landing_lat', 'landing_lon'].forEach((k) => buildNumberField(rC, 'recovery', k, defaults.recovery[k]));
     ['grid_fins', 'landing_legs'].forEach((k) => buildToggleField(rC, 'recovery', k, defaults.recovery[k]));
+    if (defaults.recovery.gfold_available) {
+      buildToggleField(rC, 'recovery', 'gfold_guidance', !!defaults.recovery.gfold_guidance);
+    }
     state.formValues.recovery.mode = 'RTLS';
     state.formValues.recovery.landing_burn_alt = 'auto';
     state.formValues.recovery.suicide_burn = true;
@@ -271,7 +275,7 @@
     'booster_landing_site_lat_deg', 'launch_site_lat_deg', 'booster_landing_site_lon_deg',
     'launch_site_lon_deg', 'enable_grid_fins', 'enable_landing_legs', 'enable_j2',
     'enable_atmosphere', 'enable_drag', 'enable_lift', 'enable_imu', 'enable_gps',
-    'enable_landing_altimeter', 'enable_s2_recovery',
+    'enable_landing_altimeter', 'enable_s2_recovery', 'booster_landing_guidance',
   ]);
 
   $('#btn-export-config').addEventListener('click', () => {
@@ -365,6 +369,7 @@
         landing_lat: cfg.booster_landing_site_lat_deg ?? cfg.launch_site_lat_deg,
         landing_lon: cfg.booster_landing_site_lon_deg ?? cfg.launch_site_lon_deg,
         grid_fins: cfg.enable_grid_fins, landing_legs: cfg.enable_landing_legs,
+        gfold_guidance: cfg.booster_landing_guidance === 'gfold',
       },
       physics: {
         j2: cfg.enable_j2, atmosphere: cfg.enable_atmosphere, drag: cfg.enable_drag,

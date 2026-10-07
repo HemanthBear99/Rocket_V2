@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from . import _gfold
 from . import constants as C
 from ._guidance_common import (
     GuidanceState,
@@ -736,6 +737,61 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
     }
 
 
+def _gfold_command(ctx: _BoosterContext, gs: GuidanceState, t_go: float,
+                   g_loc: float, full_throttle_mdot: float, gate_descent_rate: float):
+    """Thrust direction/throttle from the G-FOLD plan, re-solving when due.
+
+    Returns None when no plan is available (cvxpy missing or infeasible), in
+    which case the caller keeps the heuristic command.
+    """
+    if not _gfold.AVAILABLE:
+        return None
+    cfg = ctx.cfg
+    if ctx.altitude <= float(cfg.gfold_terminal_altitude_m):
+        return None  # below the terminal gate: vertical-descent law
+    thrust_max = float(C.LANDING_THRUST) * float(cfg.runtime_thrust_scale)
+    plan = gs.gfold_plan
+    remaining = (
+        plan.t_start + plan.time_of_flight - ctx.t if plan is not None else None
+    )
+    due = (
+        plan is None
+        or gs.gfold_last_solve_t is None
+        or ctx.t - gs.gfold_last_solve_t >= float(cfg.gfold_replan_period_s)
+    )
+    # Hold the final plan through the last ~1.5 s; very short horizons are
+    # numerically degenerate and the plan already ends at the pad.
+    if due and (remaining is None or remaining > 1.5):
+        limits = _gfold.DescentLimits(
+            thrust_min_n=float(cfg.min_engine_throttle_fraction) * thrust_max,
+            thrust_max_n=float(cfg.max_engine_throttle_fraction) * thrust_max,
+            mass_flow_per_newton=float(full_throttle_mdot) / max(thrust_max, 1e-9),
+            dry_mass_kg=float(cfg.stage1_dry_mass),
+            max_tilt_deg=min(
+                float(cfg.booster_terminal_attitude_error_max_deg),
+                float(cfg.landing_leg_max_tilt_deg),
+            ),
+            glideslope_deg=float(cfg.gfold_glideslope_deg),
+            gravity_mps2=float(g_loc),
+        )
+        new_plan = _gfold.plan_descent(
+            ctx.r, ctx.v_ground, ctx.m, ctx.t, ctx.landing_site_now, limits,
+            tf_guess_s=float(remaining) if remaining is not None else float(t_go),
+            nodes=int(cfg.gfold_nodes),
+            gate_altitude_m=float(cfg.gfold_terminal_altitude_m),
+            gate_descent_rate_mps=float(gate_descent_rate),
+        )
+        gs.gfold_last_solve_t = ctx.t
+        if new_plan is not None:
+            gs.gfold_plan = new_plan
+            gs.gfold_solves += 1
+        else:
+            gs.gfold_failures += 1
+    if gs.gfold_plan is None:
+        return None
+    return _gfold.command_from_plan(gs.gfold_plan, ctx.t, ctx.m, thrust_max)
+
+
 def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
     """BOOSTER_LANDING: latched suicide burn with budgeted ZEM/ZEV divert."""
     cfg = ctx.cfg
@@ -916,6 +972,21 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         a_cmd_mag = float(vec_norm(a_cmd))
         desired_dir = a_cmd / max(a_cmd_mag, 1e-6)
         throttle = float(np.clip(a_cmd_mag / max(t_accel, 1e-6), 0.0, 1.0))
+    landing_guidance_mode = "heuristic"
+    if cfg.booster_landing_guidance == "gfold":
+        gfold_cmd = _gfold_command(
+            ctx, gs, t_go, g_loc, full_throttle_mdot, landing_target_descent_rate,
+        )
+        if gfold_cmd is None:
+            landing_guidance_mode = (
+                "gfold_terminal"
+                if ctx.altitude <= float(cfg.gfold_terminal_altitude_m)
+                else "gfold_fallback"
+            )
+        else:
+            desired_dir, throttle = gfold_cmd
+            landing_guidance_mode = "gfold"
+
     if h < 10.0 and v_descent < landing_target_descent_rate:
         desired_dir = vertical
         throttle = 0.0
@@ -944,6 +1015,10 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         'predicted_landing_error': pad_error_m,
         'landing_reserve_authority': landing_reserve_authority,
         'landing_vertical_propellant_requirement': landing_vertical_propellant_requirement,
+        'landing_guidance_mode': landing_guidance_mode,
+        'gfold_time_of_flight_s': (
+            float(gs.gfold_plan.time_of_flight) if gs.gfold_plan is not None else 0.0
+        ),
     }
 
 
@@ -1032,6 +1107,8 @@ def compute_booster_guidance(
         'landing_reserve_authority': 1.0,
         'landing_vertical_propellant_requirement': 0.0,
         'grid_fin_zero_effort_miss': None,
+        'landing_guidance_mode': '',
+        'gfold_time_of_flight_s': 0.0,
     }
     if phase in ("BOOSTER_FLIP", "BOOSTER_COAST"):
         cmd['desired_dir'] = retrograde
@@ -1123,5 +1200,7 @@ def compute_booster_guidance(
         'planner_required_lateral_accel_mps2': float(plan.required_lateral_accel_mps2) if plan else 0.0,
         'planner_available_lateral_accel_mps2': float(plan.available_lateral_accel_mps2) if plan else 0.0,
         'planner_time_to_go_s': float(plan.time_to_go_s) if plan else 0.0,
+        'landing_guidance_mode': cmd['landing_guidance_mode'],
+        'gfold_time_of_flight_s': float(cmd['gfold_time_of_flight_s']),
     }
     return output, gs

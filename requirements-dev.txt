@@ -9,3 +9,4 @@ PySide6>=6.7
 PyInstaller>=6.0
 pywebview>=5.0
 numba>=0.60
+cvxpy>=1.5

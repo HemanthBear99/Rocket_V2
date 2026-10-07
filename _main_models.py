@@ -231,6 +231,8 @@ class SimulationLog:
             'planner_required_lateral_accel_mps2': float(guidance.get('planner_required_lateral_accel_mps2', 0.0)),
             'planner_available_lateral_accel_mps2': float(guidance.get('planner_available_lateral_accel_mps2', 0.0)),
             'planner_time_to_go_s': float(guidance.get('planner_time_to_go_s', 0.0)),
+            'landing_guidance_mode': str(guidance.get('landing_guidance_mode', '')),
+            'gfold_time_of_flight_s': float(guidance.get('gfold_time_of_flight_s', 0.0)),
             'touchdown_contact_status': str(guidance.get('touchdown_contact_status', '')),
             'nav_position_error_m': float(guidance.get('nav_position_error_m', 0.0)),
             'nav_velocity_error_mps': float(guidance.get('nav_velocity_error_mps', 0.0)),

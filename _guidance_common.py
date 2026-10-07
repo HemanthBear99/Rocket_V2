@@ -46,6 +46,11 @@ class GuidanceState:
 
     rcs_state: object | None = None
     control_state: object | None = None
+    # G-FOLD landing guidance: current plan and solve bookkeeping.
+    gfold_plan: object | None = None
+    gfold_last_solve_t: float | None = None
+    gfold_solves: int = 0
+    gfold_failures: int = 0
 
 
 def create_guidance_state() -> GuidanceState:

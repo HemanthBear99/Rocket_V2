@@ -33,6 +33,7 @@ from fastapi.responses import FileResponse
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 
+from rlv_sim import _gfold
 from rlv_sim import campaign as campaign_mod
 from rlv_sim import constants as C
 from rlv_sim._run_full_mission import MissionProgress, run_full_mission
@@ -292,6 +293,13 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
         overrides["enable_grid_fins"] = bool(r["grid_fins"])
     if "landing_legs" in r:
         overrides["enable_landing_legs"] = bool(r["landing_legs"])
+    if r.get("gfold_guidance"):
+        if not _gfold.AVAILABLE:
+            raise ValueError(
+                "G-FOLD landing guidance needs the optional 'cvxpy' package "
+                "(install the 'gfold' extra)"
+            )
+        overrides["booster_landing_guidance"] = "gfold"
     _require_unchanged(
         "recovery",
         r,
@@ -498,6 +506,8 @@ async def frontend_config_defaults() -> dict[str, Any]:
             "grid_fins": config.enable_grid_fins,
             "landing_legs": config.enable_landing_legs,
             "suicide_burn": True,
+            "gfold_guidance": config.booster_landing_guidance == "gfold",
+            "gfold_available": _gfold.AVAILABLE,
         },
         "demo_mode": False,
         "enable_s2_recovery": bool(config.enable_s2_recovery),

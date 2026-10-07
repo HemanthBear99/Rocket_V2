@@ -140,6 +140,13 @@ def parse_args(argv=None):
         help="Attitude controller for ascent/orbit/recovery (default: pd)",
     )
     parser.add_argument(
+        "--landing-guidance",
+        choices=["heuristic", "gfold"],
+        default=None,
+        help="Booster landing-burn guidance: heuristic suicide burn (default) "
+             "or G-FOLD convex minimum-fuel descent (needs cvxpy).",
+    )
+    parser.add_argument(
         "--recovery-attitude-controller",
         choices=("pd", "pid", "auto"),
         default=None,
@@ -193,6 +200,8 @@ def build_config_from_args(args) -> object:
             config,
             recovery_attitude_controller=args.recovery_attitude_controller,
         )
+    if getattr(args, "landing_guidance", None) is not None:
+        config = replace(config, booster_landing_guidance=args.landing_guidance)
     if getattr(args, "reuse_stage2", False):
         config = replace(config, enable_s2_recovery=True)
         # NOTE: a stage2_prop_mass increase + s2_landing_propellant_reserve_kg

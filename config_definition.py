@@ -246,6 +246,17 @@ class SimulationConfig:
     # It never steers the vehicle and costs ~10% of run time, so it is off by
     # default; enable it to log candidate-trajectory scores.
     enable_recovery_planner_diagnostics: bool = False
+    # Booster landing-burn guidance law (the 6-DOF dynamics are identical):
+    #   "heuristic" - latched suicide burn with ZEM/ZEV divert (default)
+    #   "gfold"     - G-FOLD convex minimum-fuel powered descent, re-planned
+    #                 every gfold_replan_period_s (needs the optional cvxpy)
+    booster_landing_guidance: str = "heuristic"
+    gfold_replan_period_s: float = 1.0
+    gfold_nodes: int = 25
+    gfold_glideslope_deg: float = 5.0
+    # Terminal gate: G-FOLD flies to this height above the pad, descending at
+    # the landing target rate; the vertical-descent law takes over below it.
+    gfold_terminal_altitude_m: float = 15.0
     booster_landing_site_lat_deg: float | None = None
     booster_landing_site_lon_deg: float | None = None
     booster_landing_site_altitude_m: float = 0.0
@@ -575,6 +586,19 @@ class SimulationConfig:
                 "demo_coast_max_dt must be >= dt "
                 f"({self.demo_coast_max_dt} < {self.dt})"
             )
+        if self.booster_landing_guidance not in ("heuristic", "gfold"):
+            errors.append(
+                "booster_landing_guidance must be 'heuristic' or 'gfold', "
+                f"got {self.booster_landing_guidance!r}"
+            )
+        if self.gfold_replan_period_s <= 0:
+            errors.append(f"gfold_replan_period_s must be positive, got {self.gfold_replan_period_s}")
+        if not (5 <= int(self.gfold_nodes) <= 200):
+            errors.append(f"gfold_nodes must be in [5, 200], got {self.gfold_nodes}")
+        if self.gfold_terminal_altitude_m < 0:
+            errors.append(f"gfold_terminal_altitude_m must be >= 0, got {self.gfold_terminal_altitude_m}")
+        if not (0.0 < self.gfold_glideslope_deg < 90.0):
+            errors.append(f"gfold_glideslope_deg must be in (0, 90), got {self.gfold_glideslope_deg}")
         if self.orbit_coast_max_dt <= 0:
             errors.append(f"orbit_coast_max_dt must be positive, got {self.orbit_coast_max_dt}")
         errors += _field_errors(self, (
