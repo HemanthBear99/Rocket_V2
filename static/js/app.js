@@ -100,6 +100,12 @@
     setTimeout(() => el.remove(), 4000);
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (ch) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+    ));
+  }
+
   function fmt(n, decimals = 1) {
     if (n === null || n === undefined || Number.isNaN(n)) return '—';
     return Number(n).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
@@ -849,7 +855,7 @@
     metricsTable.querySelector('thead').innerHTML =
       '<tr><th>Metric</th><th>Median</th><th>P05</th><th>P95</th><th>Min</th><th>Max</th></tr>';
     metricsTable.querySelector('tbody').innerHTML = metricRows.length
-      ? metricRows.map(([name, s]) => `<tr><td>${name}</td><td>${fmt(s.median, 2)}</td><td>${fmt(s.p05, 2)}</td><td>${fmt(s.p95, 2)}</td><td>${fmt(s.min, 2)}</td><td>${fmt(s.max, 2)}</td></tr>`).join('')
+      ? metricRows.map(([name, s]) => `<tr><td>${escapeHtml(name)}</td><td>${fmt(s.median, 2)}</td><td>${fmt(s.p05, 2)}</td><td>${fmt(s.p95, 2)}</td><td>${fmt(s.min, 2)}</td><td>${fmt(s.max, 2)}</td></tr>`).join('')
       : '<tr><td colspan="6">No metric data available.</td></tr>';
 
     const table = $('#camp-table');
@@ -863,9 +869,9 @@
       if (c === 'reason') {
         if (row.mission_success) return '<td>—</td>';
         const reason = [!row.orbit_success ? row.orbiter_reason : '', !row.landing_success ? row.booster_reason : ''].filter(Boolean).join(' / ');
-        return `<td style="max-width:280px;white-space:normal;">${reason || '—'}</td>`;
+        return `<td style="max-width:280px;white-space:normal;">${reason ? escapeHtml(reason) : '—'}</td>`;
       }
-      return `<td>${row[c]}</td>`;
+      return `<td>${escapeHtml(row[c])}</td>`;
     }).join('')}</tr>`).join('');
   }
 

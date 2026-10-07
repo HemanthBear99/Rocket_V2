@@ -402,6 +402,22 @@ class SimulationConfig:
     def experimental_flags_state(self) -> dict[str, bool]:
         return {name: bool(getattr(self, name)) for name in EXPERIMENTAL_FEATURE_FLAGS}
 
+    @property
+    def meco_mass_kg(self) -> float:
+        """Stacked-vehicle mass at main-engine cutoff.
+
+        Stage 1 dry + stage 2 wet + payload + the stage 1 landing reserve.
+        Single source of truth for ascent guidance, the mission manager and
+        the ascent loop's dry-mass floor.
+        """
+        return (
+            float(self.stage1_dry_mass)
+            + float(self.stage2_dry_mass)
+            + float(self.stage2_prop_mass)
+            + float(self.payload_mass)
+            + float(self.stage1_landing_fuel_reserve_kg)
+        )
+
     def validate(self) -> None:
         """Validate all configuration fields.  Raises ValueError on first
         batch of errors with a readable message."""

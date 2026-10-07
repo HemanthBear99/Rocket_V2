@@ -232,13 +232,7 @@ class MissionManager:
         """ASCENT -> COAST (MECO) -> STAGE_SEPARATION -> S2_COAST_TO_APOGEE."""
         if self.current_phase == MissionPhase.ASCENT:
             reserve_kg = self.config.stage1_landing_fuel_reserve_kg
-            meco_mass = (
-                float(self.config.stage1_dry_mass)
-                + float(self.config.stage2_dry_mass)
-                + float(self.config.stage2_prop_mass)
-                + float(self.config.payload_mass)
-                + reserve_kg
-            )
+            meco_mass = self.config.meco_mass_kg
             if state.m <= meco_mass:
                 s1_prop_burned = self._initial_mass - state.m
                 logger.info(f"MECO detected at t={state.t:.2f}s, "

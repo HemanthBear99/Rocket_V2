@@ -252,13 +252,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
     ascent_energy_tracker = _EnergyValidationTracker()
 
     current_stage = 1
-    current_dry_mass = (
-        float(config.stage1_dry_mass)
-        + float(config.stage2_dry_mass)
-        + float(config.stage2_prop_mass)
-        + float(config.payload_mass)
-        + float(config.stage1_landing_fuel_reserve_kg)
-    )
+    current_dry_mass = config.meco_mass_kg
     step_count = 0
     last_print_time = 0
     separation_time = None

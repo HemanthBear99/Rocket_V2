@@ -60,6 +60,20 @@ def main() -> None:
 
     if not _wait_for_server(host, port):
         logger.error("Backend did not start in time on %s:%s", host, port)
+        webview.create_window(
+            "Boostback - startup error",
+            html=(
+                "<body style='background:#05070b;color:#e6e6e6;font-family:sans-serif;padding:24px'>"
+                "<h2>The simulation backend failed to start.</h2>"
+                f"<p>No server responded on {host}:{port} within 10 seconds. "
+                "Close this window and try again; if it keeps happening, run "
+                "<code>python -m rlv_sim.server</code> from a terminal to see the error.</p></body>"
+            ),
+            width=640,
+            height=260,
+        )
+        webview.start(private_mode=False)
+        return
 
     window = webview.create_window(
         "Boostback",

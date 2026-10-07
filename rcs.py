@@ -20,11 +20,18 @@ class RCSState:
     total_impulse_used_ns: float = 0.0
     total_firing_time_s: float = 0.0
     exhausted: bool = False
+    initial_propellant_kg: float | None = None
+
+    def __post_init__(self):
+        if self.initial_propellant_kg is None:
+            self.initial_propellant_kg = self.propellant_remaining_kg
 
     @property
     def propellant_fraction(self) -> float:
-        """Fraction of RCS propellant remaining."""
-        return max(0.0, self.propellant_remaining_kg / C.RCS_PROPELLANT_MASS)
+        """Fraction of the initial RCS propellant remaining."""
+        if not self.initial_propellant_kg or self.initial_propellant_kg <= 0.0:
+            return 0.0
+        return max(0.0, self.propellant_remaining_kg / self.initial_propellant_kg)
 
 
 def compute_rcs_mass_flow_rate(

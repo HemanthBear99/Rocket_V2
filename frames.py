@@ -196,10 +196,7 @@ def direction_to_quaternion(direction: np.ndarray,
                                      
     dot = np.clip(np.dot(r, d), -1.0, 1.0)
     
-    if dot > 0.9999:
-                              
-        return np.array([1.0, 0.0, 0.0, 0.0])
-    elif dot < -0.9999:
+    if 1.0 + dot < 1e-12:  # exactly opposite: any perpendicular axis works
                                                                                      
         perp = np.array([1, 0, 0]) if abs(r[0]) < 0.9 else np.array([0, 1, 0])
         axis = cross3(r, perp)
@@ -207,16 +204,13 @@ def direction_to_quaternion(direction: np.ndarray,
         return np.array([0.0, axis[0], axis[1], axis[2]])
     
                   
-    axis = cross3(r, d)
-    axis = axis / vec_norm(axis)
-    angle = np.arccos(dot)
-    
-                                
-    half_angle = angle / 2.0
-    w = np.cos(half_angle)
-    xyz = axis * np.sin(half_angle)
-    
-    return np.array([w, xyz[0], xyz[1], xyz[2]])
+    # Half-way quaternion: [1 + r.d, r x d] normalised is the shortest-arc
+    # rotation and stays accurate for arbitrarily small angles (the old
+    # explicit-angle form snapped anything within ~0.8 deg to identity).
+    q = np.empty(4)
+    q[0] = 1.0 + dot
+    q[1:] = cross3(r, d)
+    return q / vec_norm(q)
 
 
 def quaternion_error(q_current: np.ndarray, q_desired: np.ndarray) -> np.ndarray:

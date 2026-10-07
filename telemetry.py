@@ -110,19 +110,27 @@ def extract_mission_progress(progress: MissionProgress, config: SimulationConfig
         "booster_throttle": float(booster_guidance.get("throttle", 0.0)),
         "booster_pitch_angle": float(np.degrees(booster_guidance.get("pitch_angle", 0.0))),
         "booster_fuel_remaining": float((fuel_remaining / reserve) * 100.0 if reserve > 0 else 0.0),
-        "booster_grid_fins": (
-            "DEPLOYED"
-            if config.enable_grid_fins and booster_phase in ("BOOSTER_ENTRY", "BOOSTER_LANDING")
-            else "STOWED"
-        ),
-        "booster_landing_legs": (
-            "DEPLOYED"
-            if config.enable_landing_legs and booster_phase == "BOOSTER_LANDING"
-            else "STOWED"
-        ),
+        "booster_grid_fins": _grid_fin_status(booster_guidance),
+        "booster_landing_legs": _landing_leg_status(booster_guidance),
         "booster_landing_error": landing_error_m,
     })
     return payload
+
+
+def _grid_fin_status(guidance: dict) -> str:
+    """Deployment state reported by the grid-fin model this step."""
+    deployed = float(guidance.get("grid_fin_deployed_fraction", 0.0) or 0.0)
+    if deployed >= 0.999:
+        return "DEPLOYED"
+    return "DEPLOYING" if deployed > 0.0 else "STOWED"
+
+
+def _landing_leg_status(guidance: dict) -> str:
+    """Landing-leg state from the leg model (stowed/deploying/locked/failed)."""
+    status = str(guidance.get("landing_leg_status", "") or "")
+    if status == "locked":
+        return "DEPLOYED"
+    return status.upper() if status else "STOWED"
 
 
 __all__ = ["extract_mission_progress", "extract_telemetry_point"]

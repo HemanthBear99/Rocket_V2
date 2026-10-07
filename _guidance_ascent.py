@@ -293,7 +293,11 @@ def compute_guidance_output(
     """
     gs = _resolve_guidance_state(gs)
     if meco_mass is None:
-        meco_mass = C.DRY_MASS + C.STAGE1_LANDING_FUEL_RESERVE
+        meco_mass = (
+            config.meco_mass_kg
+            if config is not None
+            else C.DRY_MASS + C.STAGE1_LANDING_FUEL_RESERVE
+        )
 
     altitude = float(vec_norm(r) - C.R_EARTH)
     pitchover_start_alt = (

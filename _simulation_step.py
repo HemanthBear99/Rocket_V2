@@ -34,7 +34,7 @@ from .forces import (
     _altitude_from_r,
     _tvc_lever_arm,
     apply_engine_transient,
-    compute_atmosphere_properties,
+    compute_configured_atmosphere_properties,
     compute_specific_forces,
 )
 from .frames import rotate_vector_by_quaternion
@@ -61,7 +61,12 @@ from .recovery_hardware import (
     update_landing_leg_state,
 )
 from .state import State
-from .utils import compute_relative_velocity, surface_relative_speed, vec_norm
+from .utils import (
+    axisymmetric_angle_of_attack,
+    compute_relative_velocity,
+    surface_relative_speed,
+    vec_norm,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +120,7 @@ def _run_guidance(
     stage1_landing_reserve_kg = config.stage1_landing_fuel_reserve_kg
 
     if phase == MissionPhase.ASCENT:
-        meco_mass = C.DRY_MASS + stage1_landing_reserve_kg
+        meco_mass = config.meco_mass_kg
         guidance, gs = compute_guidance_output(
             guidance_r, guidance_v, guidance_t, state.m,
             meco_mass=meco_mass, gs=gs, dt=dt, config=config,
@@ -560,15 +565,12 @@ def _check_runtime_safety_limits(
     v_rel = np.asarray(guidance.get('v_rel', state.v), dtype=float)
     v_rel_mag = float(vec_norm(v_rel))
     effective_alt = _altitude_from_r(state.r, config)
-    enable_upper = bool(getattr(config, 'enable_upper_atmosphere', False))
-    _, _, rho_atm, _ = compute_atmosphere_properties(effective_alt, enable_upper_atm=enable_upper)
+    _, _, rho_atm, _ = compute_configured_atmosphere_properties(effective_alt, config)
 
+    # Axisymmetric incidence: an engine-first (tail-first) booster aligned
+    # with the flow has zero angle of attack, not 180 degrees.
     body_z = rotate_vector_by_quaternion(C.BODY_Z_AXIS, state.q)
-    if v_rel_mag > 10.0:
-        cos_aoa = float(np.clip(np.dot(body_z, v_rel / v_rel_mag), -1.0, 1.0))
-        aoa_rad = float(np.arccos(cos_aoa))
-    else:
-        aoa_rad = 0.0
+    aoa_rad = axisymmetric_angle_of_attack(body_z, v_rel) if v_rel_mag > 10.0 else 0.0
     q_alpha = 0.5 * rho_atm * v_rel_mag ** 2 * aoa_rad
 
     if config.abort_on_q_alpha_limit and q_alpha > config.q_alpha_max:
@@ -603,6 +605,11 @@ def _check_runtime_safety_limits(
                 attitude_error_rad=float(control.get('error_angle', 0.0)),
                 wind_offset_mps=config.runtime_wind_offset_mps,
                 enable_upper_atmosphere=bool(getattr(config, 'enable_upper_atmosphere', False)),
+                atmosphere_density_scale=(
+                    float(config.runtime_atmosphere_density_scale)
+                    if bool(getattr(config, 'enable_atmosphere', True))
+                    else 0.0
+                ),
             )
             if abort_result.get('abort'):
                 return (
