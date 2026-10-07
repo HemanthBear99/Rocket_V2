@@ -5,12 +5,13 @@ booster return-to-launch-site landing) and pins the key outcomes. Any physics,
 guidance or integration change that shifts these numbers fails here instead of
 silently degrading the mission.
 
-The run takes ~75 s, so it is marked ``slow`` and excluded from the default
+The run takes ~35 s, so it is marked ``slow`` and excluded from the default
 test run. Run it with::
 
     pytest -m slow
 
-Reference values were recorded from the nominal mission on 2026-10-07. When a
+Reference values were recorded from the nominal mission on 2026-10-07
+(orbit_coast_max_dt = 0.5 s). When a
 change *intentionally* alters the trajectory, re-run the mission, confirm the
 new outcome is correct, and update the references below.
 """
@@ -25,11 +26,11 @@ pytestmark = pytest.mark.slow
 
 REFERENCE = {
     "separation_time_s": 129.25,
-    "perigee_km": 326.31,
-    "apogee_km": 435.09,
-    "eccentricity": 0.00806,
+    "perigee_km": 325.19,
+    "apogee_km": 433.64,
+    "eccentricity": 0.00803,
     "touchdown_speed_mps": 4.50,
-    "site_error_m": 1.0,
+    "site_error_m": 0.68,
 }
 
 

@@ -139,6 +139,11 @@ class SimulationConfig:
 
     enable_demo_mode: bool = False
     demo_coast_max_dt: float = 2.0
+    # Orbiter step size while coasting above the atmosphere with the engine
+    # off, once the booster has finished. Unpowered orbital arcs are smooth,
+    # so a coarser RK4 step is accurate there. The step used is
+    # max(dt, orbit_coast_max_dt); set it to dt or below to disable.
+    orbit_coast_max_dt: float = 0.5
 
 
     kp_attitude: float = C.KP_ATTITUDE
@@ -570,6 +575,8 @@ class SimulationConfig:
                 "demo_coast_max_dt must be >= dt "
                 f"({self.demo_coast_max_dt} < {self.dt})"
             )
+        if self.orbit_coast_max_dt <= 0:
+            errors.append(f"orbit_coast_max_dt must be positive, got {self.orbit_coast_max_dt}")
         errors += _field_errors(self, (
             ("max_time", "positive"),
             ("separation_delta_v", "nonneg"),

@@ -173,6 +173,14 @@ def _print_mission_summary(separation_time, orbiter_state, orbiter_reason,
     print("=" * 90)
 
 
+# Orbiter phases in which unpowered arcs may use orbit_coast_max_dt.
+_ORBIT_COAST_PHASES = (
+    MissionPhase.ORBIT_INSERTION,
+    MissionPhase.ORBIT_ACHIEVED,
+    MissionPhase.S2_ORBIT_HOLD,
+)
+
+
 @dataclasses.dataclass(frozen=True)
 class _MissionRuntime:
     """Settings and callbacks shared by the ascent and dual-vehicle phases."""
@@ -435,6 +443,13 @@ def _run_dual_vehicles(rt: _MissionRuntime, ascent: _AscentOutcome):
                 and orbiter_mgr.get_phase() == MissionPhase.S2_COAST_TO_APOGEE
             ):
                 orbiter_request_dt = float(config.demo_coast_max_dt)
+            elif (
+                booster_done
+                and orbiter_mgr.get_phase() in _ORBIT_COAST_PHASES
+                and not orb_guid.get('thrust_on', False)
+                and orbiter_state.altitude > C.AERO_DISABLE_ALTITUDE
+            ):
+                orbiter_request_dt = max(dt, float(config.orbit_coast_max_dt))
             orbiter_state, orbiter_actuator, gs_orbiter, orbiter_done, orbiter_reason, _, new_orb_guid = _step_vehicle(
                 orbiter_state, orbiter_actuator, orbiter_mgr, gs_orbiter, orbiter_log,
                 orbiter_abort_monitor, config, max_time,
