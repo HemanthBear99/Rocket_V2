@@ -279,3 +279,6 @@ class FullMissionResult:
     booster_reason: str
     orbiter_success: bool = False
     booster_landing_success: bool = False
+    # Measured at booster touchdown (None if the booster never touched down).
+    booster_touchdown_speed_mps: float | None = None
+    booster_site_error_m: float | None = None

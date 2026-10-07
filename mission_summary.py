@@ -322,7 +322,14 @@ def _landing_metrics_from_result(
     result: FullMissionResult,
     config: SimulationConfig,
 ) -> tuple[float, float]:
-    speed, site_error = extract_landing_metrics(result.booster_reason)
+    speed = getattr(result, "booster_touchdown_speed_mps", None)
+    site_error = getattr(result, "booster_site_error_m", None)
+    if speed is None or site_error is None:
+        # Results built without touchdown measurements (older callers):
+        # fall back to the values quoted in the reason text.
+        parsed_speed, parsed_error = extract_landing_metrics(result.booster_reason)
+        speed = parsed_speed if speed is None else speed
+        site_error = parsed_error if site_error is None else site_error
     if speed is None:
         speed = float(
             vec_norm(

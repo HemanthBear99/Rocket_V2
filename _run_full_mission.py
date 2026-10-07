@@ -615,5 +615,7 @@ def run_full_mission(dt: float | None = None, max_time: float | None = None,
             booster_log,
             booster_reason,
         ),
+        booster_touchdown_speed_mps=booster.mission_manager.touchdown_speed_mps,
+        booster_site_error_m=booster.mission_manager.touchdown_site_error_m,
     )
 

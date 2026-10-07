@@ -237,6 +237,10 @@ class SimulationConfig:
     booster_terminal_capture_landing_reserve_fraction: float = 1.0
     booster_tail_first_cp_z_m: float = C.STAGE1_RECOVERY_CP
     booster_landing_target_downrange_km: float = 0.0
+    # Diagnostic recovery-trajectory planner (planner_* telemetry columns).
+    # It never steers the vehicle and costs ~10% of run time, so it is off by
+    # default; enable it to log candidate-trajectory scores.
+    enable_recovery_planner_diagnostics: bool = False
     booster_landing_site_lat_deg: float | None = None
     booster_landing_site_lon_deg: float | None = None
     booster_landing_site_altitude_m: float = 0.0

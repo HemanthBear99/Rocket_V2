@@ -108,6 +108,9 @@ class MissionManager:
         self.apogee_time = None
         self.orbit_insertion_time = None
         self.max_altitude_reached = 0.0
+        # Booster touchdown measurements, set by check_termination.
+        self.touchdown_speed_mps: float | None = None
+        self.touchdown_site_error_m: float | None = None
         self._last_radial_velocity = 0.0
         self._phase_entry_time = 0.0
         self._launch_site = rotating_launch_site_eci(0.0, config=self.config)

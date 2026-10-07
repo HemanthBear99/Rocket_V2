@@ -462,6 +462,10 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
                 config=cfg,
             )
             site_error_m = great_circle_distance_m(state.r, target_site)
+            # Record the measured touchdown so the assessment never has to
+            # parse it back out of the human-readable reason string.
+            mission_mgr.touchdown_speed_mps = v_touchdown_rel
+            mission_mgr.touchdown_site_error_m = site_error_m
             propellant_remaining = max(0.0, state.m - cfg.stage1_dry_mass)
             body_z = rotate_vector_by_quaternion(C.BODY_Z_AXIS, state.q)
             terminal_attitude_error = float(

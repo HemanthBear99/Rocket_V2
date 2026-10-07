@@ -1056,7 +1056,8 @@ def compute_booster_guidance(
 
     plan = None
     if (
-        phase in ("BOOSTER_BOOSTBACK", "BOOSTER_ENTRY")
+        cfg.enable_recovery_planner_diagnostics
+        and phase in ("BOOSTER_BOOSTBACK", "BOOSTER_ENTRY")
         and abs(t - round(t)) < 0.51 * float(cfg.dt)
     ):
         plan = score_recovery_candidates(

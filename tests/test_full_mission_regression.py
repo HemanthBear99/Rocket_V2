@@ -62,7 +62,10 @@ def test_orbit_elements_unchanged(nominal_mission):
 
 
 def test_booster_landing_unchanged(nominal_mission):
-    _, assessment = nominal_mission
+    result, assessment = nominal_mission
+    # Touchdown metrics are carried as numbers, not parsed from reason text.
+    assert result.booster_touchdown_speed_mps == pytest.approx(assessment.landing.touchdown_speed_mps)
+    assert result.booster_site_error_m == pytest.approx(assessment.landing.site_error_m)
     landing = assessment.landing
     assert landing.touchdown_speed_mps == pytest.approx(REFERENCE["touchdown_speed_mps"], abs=0.25)
     assert landing.site_error_m == pytest.approx(REFERENCE["site_error_m"], abs=5.0)
