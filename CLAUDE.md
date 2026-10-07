@@ -11,5 +11,6 @@ Boostback (`rlv_sim`) is a Python 6-DOF two-stage reusable launch vehicle simula
 **Stack**: Python ≥3.10, numpy, matplotlib, FastAPI/uvicorn, pydantic v2, vanilla JS + Three.js, PyInstaller, uv, pytest/Playwright.
 **Structure**: repo root is the `rlv_sim` package (parent dir must be on `sys.path`). Mission loop `_run_full_mission.py` → `_simulation_step.py` → guidance (`_guidance_*.py`) / `control.py` → RK4 `integrators.py` → `dynamics.py`/`forces.py`. Config in `config_definition.py` (frozen) + `config_factory.py`. Outputs via `mission_summary.py`, `_plotting_*.py`, `run_manifest.py`.
 **Code navigation**: CodeGraph MCP (`codegraph_explore`) indexes this repo — use it before reading files.
+**Verify changes**: `pytest tests -q` (fast), `pytest -m slow` (~35 s full-mission regression), `ruff check .` (clean). For refactors, compare full-mission telemetry CSVs before/after. Use `utils.cross3` / `utils.vec_norm` in hot paths, not `np.cross` / `np.linalg.norm`.
 
 For detailed architecture, see [docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md).
