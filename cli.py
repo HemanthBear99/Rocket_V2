@@ -307,7 +307,7 @@ def main():
         else:
             logger.info("Starting ascent simulation...")
             print(">> Running Ascent Simulation Physics Engine...")
-            final_state, log, reason = run_simulation(
+            final_state, _log, reason = run_simulation(
                 config=config,
                 verbose=not args.quiet,
             )
@@ -327,7 +327,7 @@ def main():
                 from datetime import datetime
                 from pathlib import Path
 
-                folder = Path(plot_dir) / f"mission_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                folder = Path(plot_dir) / f"mission_{datetime.now().astimezone().strftime('%Y%m%d_%H%M%S')}"
                 folder.mkdir(parents=True, exist_ok=True)
                 if mission.ascent_log.get_series("time"):
                     mission.ascent_log.to_csv(folder / "ascent_telemetry.csv")
@@ -424,7 +424,7 @@ def main():
         print("\n[INTERRUPTED]")
         sys.exit(130)
     except (ValueError, RuntimeError, OSError) as e:
-        logger.error(f"Simulation failed: {e}", exc_info=True)
+        logger.exception("Simulation failed")
         print(f"\n[ERROR] Simulation failed: {e}")
         sys.exit(1)
 

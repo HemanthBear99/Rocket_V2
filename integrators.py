@@ -50,12 +50,12 @@ def rk4_step(state: State, torque: np.ndarray, dt: float,
     Raises:
         ValueError: If dt <= 0 or torque has wrong shape
     """
-                                             
+
     dry_mass = ctx.dry_mass
     if dry_mass is None:
         dry_mass = C.STAGE2_DRY_MASS if ctx.stage == 2 else C.DRY_MASS
 
-                      
+
     if dt <= 0:
         raise ValueError(f"Time step dt must be positive, got {dt}")
     if torque.shape != (3,):
@@ -63,11 +63,7 @@ def rk4_step(state: State, torque: np.ndarray, dt: float,
     if np.any(np.isnan(torque)):
         raise ValueError("Torque contains NaN values")
 
-                                                                               
-                                                                            
-                                                                              
-                                                                      
-                                                             
+
     _cfg = ctx.config
     if ctx.thrust_on and ctx.throttle > 0.0 and state.m > dry_mass:
         mdot_now = compute_mass_derivative(
@@ -99,41 +95,39 @@ def rk4_step(state: State, torque: np.ndarray, dt: float,
     t = state.t
     y = state.to_vector()
 
-                                                                
+
     k1 = np.zeros(14, dtype=np.float64)
     k2 = np.zeros(14, dtype=np.float64)
     k3 = np.zeros(14, dtype=np.float64)
     k4 = np.zeros(14, dtype=np.float64)
 
-                                                              
-                                                                                 
-                
+
     k1[:] = state_derivative_vector(y, t, torque, ctx)
 
-                                                                    
+
     y2 = y + 0.5 * dt * k1
     y2[6:10] = quaternion_normalize(y2[6:10])
     k2[:] = state_derivative_vector(y2, t + 0.5*dt, torque, ctx)
 
-                                                                    
+
     y3 = y + 0.5 * dt * k2
     y3[6:10] = quaternion_normalize(y3[6:10])
     k3[:] = state_derivative_vector(y3, t + 0.5*dt, torque, ctx)
 
-                                                                    
+
     y4 = y + dt * k3
     y4[6:10] = quaternion_normalize(y4[6:10])
     k4[:] = state_derivative_vector(y4, t + dt, torque, ctx)
 
-                                                          
+
     y_new = y + (dt / 6.0) * (k1 + 2*k2 + 2*k3 + k4)
-                                                                 
+
     y_new[6:10] = quaternion_normalize(y_new[6:10])
 
-                                           
+
     y_new[13] = max(y_new[13], dry_mass)
 
-                                                                             
+
     return State.from_vector(
         y_new,
         t + dt,

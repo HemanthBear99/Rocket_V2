@@ -13,10 +13,10 @@ import numpy as np
 
 from . import constants as C
 
-S1_DRY_CG_Z = 24.0                 
-S1_PROP_CG_Z = 19.0                
-S2_DRY_CG_Z = 59.0              
-S2_PROP_CG_Z = 56.0             
+S1_DRY_CG_Z = 24.0
+S1_PROP_CG_Z = 19.0
+S2_DRY_CG_Z = 59.0
+S2_PROP_CG_Z = 56.0
 
 
 def _stacked_component_masses(m: float) -> tuple[float, float, float, float]:
@@ -64,10 +64,7 @@ def compute_mass_flow_rate(
     else:
         mdot = C.MASS_FLOW_RATE
 
-                                                                             
-                                                                           
-                                                                            
-                                                             
+
     mdot *= float(thrust_scale) / max(float(isp_scale), 1e-9)
     return -mdot * float(np.clip(throttle, 0.0, 1.0))
 
@@ -76,7 +73,7 @@ def compute_mass_derivative(
     m: float,
     thrust_on: bool = True,
     throttle: float = 1.0,
-    dry_mass: float = None,
+    dry_mass: float | None = None,
     stage: int = 1,
     thrust_magnitude_override: float | None = None,
     thrust_scale: float = 1.0,

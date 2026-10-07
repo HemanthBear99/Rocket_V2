@@ -75,7 +75,7 @@ def main() -> None:
         webview.start(private_mode=False)
         return
 
-    window = webview.create_window(
+    webview.create_window(
         "Boostback",
         url=f"http://{host}:{port}/",
         width=1440,

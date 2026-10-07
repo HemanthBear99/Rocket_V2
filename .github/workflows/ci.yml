@@ -25,9 +25,9 @@ jobs:
         working-directory: rlv_sim
         run: pip install -r requirements.txt pytest numba ruff
 
-      - name: Lint (syntax errors and undefined names)
+      - name: Lint
         working-directory: rlv_sim
-        run: ruff check --select E9,F63,F7,F82 .
+        run: ruff check .
 
       - name: Unit tests
         working-directory: rlv_sim

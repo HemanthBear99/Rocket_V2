@@ -117,8 +117,6 @@ def _run_guidance(
     guidance_v = nav_estimate.velocity_eci_mps if use_nav_for_guidance else state.v
     guidance_t = nav_estimate.time_s if use_nav_for_guidance else state.t
 
-    stage1_landing_reserve_kg = config.stage1_landing_fuel_reserve_kg
-
     if phase == MissionPhase.ASCENT:
         meco_mass = config.meco_mass_kg
         guidance, gs = compute_guidance_output(
@@ -327,7 +325,7 @@ def apply_launch_pad_constraint(
 
     r_hat = r / r_norm
     altitude = r_norm - pad_r
-                            
+
     if altitude > 0.0:
         return state
 
@@ -337,7 +335,7 @@ def apply_launch_pad_constraint(
 
     v_rad = float(np.dot(v, r_hat))
     if v_rad < 0.0:
-                                                                                        
+
         v = v - v_rad * r_hat
 
     state.r = r
@@ -355,8 +353,8 @@ def _interpolate_ground_crossing(old_state: State, new_state: State) -> State:
     frac = old_alt / max(old_alt - new_alt, 1e-12)
     frac = float(np.clip(frac, 0.0, 1.0))
     from .frames import quaternion_normalize
-                                                                                
-                                                                 
+
+
     q_crossed = quaternion_normalize(old_state.q + frac * (new_state.q - old_state.q))
     crossed = State(
         r=old_state.r + frac * (new_state.r - old_state.r),
@@ -417,13 +415,10 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
     cfg = getattr(mission_mgr, 'config', None)
     s2_recovery = bool(cfg.enable_s2_recovery) if cfg is not None else False
 
-                                                  
-    if phase == MissionPhase.ORBIT_ACHIEVED:
-                                                                              
-                                                                             
-        if not s2_recovery:
-            return True, "ORBIT ACHIEVED - Mission Complete"
-                                                                
+
+    if phase == MissionPhase.ORBIT_ACHIEVED and not s2_recovery:
+        return True, "ORBIT ACHIEVED - Mission Complete"
+
     if phase == MissionPhase.S2_LANDING and state.altitude <= 0.1:
         if cfg is None:
             raise RuntimeError("S2 landing termination requires SimulationConfig")
@@ -449,7 +444,7 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
         reason = getattr(mission_mgr, 'orbit_failure_reason', None) or "Target orbit not achieved"
         return True, f"ORBIT INSERTION FAILED - {reason}"
 
-                                 
+
     if mission_mgr.vehicle_type == "booster":
         touchdown_tolerance_m = 0.1
         if phase == MissionPhase.BOOSTER_LANDING and state.altitude <= touchdown_tolerance_m:
@@ -491,8 +486,8 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
                     propellant_remaining_kg=propellant_remaining,
                 )
                 return True, landing.reason
-                                                                         
-                                                                         
+
+
             if v_touchdown_rel > hard_landing_speed_limit(cfg):
                 site_error_km = site_error_m / 1000.0
                 if site_error_m <= cfg.booster_pad_tolerance_m:
@@ -504,9 +499,8 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
                     f"OFFSITE CRASH - Missed pad by {site_error_km:.2f} km "
                     f"at {v_touchdown_rel:.2f} m/s"
                 )
-                                                                       
-                                                                                 
-                              
+
+
             if (
                 contact.status == "offsite_touchdown"
                 and cfg.booster_enforce_pad_landing
@@ -518,17 +512,15 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
                 )
             return True, contact.reason
 
-                                                                   
-                                                              
-                                                           
+
     if mission_mgr.vehicle_type == "ascent_only":
         vertical = compute_local_vertical(state.r)
         v_vert = float(np.dot(state.v, vertical))
-                                                           
+
         if state.t > 100.0 and v_vert <= 0.0:
             return True, "Apogee Reached (v_vert <= 0)"
 
-                          
+
     if state.t >= max_time:
         if (
             mission_mgr.vehicle_type == "orbiter"
@@ -537,17 +529,13 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
             return True, format_orbit_failure_reason(state, "maximum time reached")
         return True, "Maximum simulation time reached"
 
-                       
-                                                                      
+
     if cleared_pad and state.t > 1.0 and state.altitude <= 0.0:
         return True, "CRASH - Ground impact"
     if state.altitude < C.CRASH_ALTITUDE_TOLERANCE:
         return True, "CRASH - Below Earth's surface"
 
     return False, None
-
-
-
 
 
 def _check_runtime_safety_limits(
@@ -580,14 +568,8 @@ def _check_runtime_safety_limits(
         )
 
     if config.enable_abort_modes and abort_monitor is not None:
-                                                                      
-                                                                            
-                                                                                  
-                                                                                
-                                                              
-                                                                           
-                                                                            
-                                                                   
+
+
         _booster_recovery_phases = {
             MissionPhase.BOOSTER_FLIP,
             MissionPhase.BOOSTER_BOOSTBACK,
@@ -724,15 +706,15 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
     phase = mission_mgr.get_phase()
     stage1_landing_reserve_kg = config.stage1_landing_fuel_reserve_kg
 
-                                                                            
+
     guidance, gs = _run_guidance(state, gs, mission_mgr, config, dt)
 
-                                                                             
+
     guidance, gs, grid_fin_command = _run_booster_hardware(
         state, guidance, gs, mission_mgr, config, vehicle_model, dt,
     )
 
-                                                                             
+
     desired_dir = guidance['thrust_direction']
     s2_recovery_phase = vehicle_model == "orbiter" and phase in (
         MissionPhase.S2_DEORBIT, MissionPhase.S2_ENTRY, MissionPhase.S2_LANDING
@@ -763,7 +745,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
         mission_mgr, phase, stage, vehicle_model, config,
     )
 
-                                                                            
+
     I_tensor = compute_inertia_tensor(
         state.m, vehicle_model=vehicle_model,
         stage1_landing_reserve_kg=stage1_landing_reserve_kg,
@@ -837,7 +819,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
     control['torque_magnitude'] = float(vec_norm(control['torque']))
     control['saturated'] = control['torque_magnitude'] >= max(available_torque, 1e-9) * 0.999
 
-                                                                           
+
     if config.enable_rcs and gs.rcs_state is not None:
         # RCS covers only the torque beyond what the TVC can provide.
         xy_torque = float(vec_norm(control['torque'][:2]))
@@ -847,13 +829,13 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
             gs.rcs_state, float(np.hypot(rcs_xy_torque, roll_torque)), dt, config,
         )
 
-                                                                                        
+
     booster_aero_mode = phase.name if (
         vehicle_model == "booster"
         or (vehicle_model == "orbiter" and phase.name in ("S2_ENTRY", "S2_LANDING"))
     ) else None
 
-                                                      
+
     guidance['thrust_on'] = thrust_active
     guidance['throttle_commanded'] = throttle_cmd
     guidance['throttle'] = actual_throttle
@@ -866,10 +848,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
         guidance['rcs_propellant_remaining_kg'] = gs.rcs_state.propellant_remaining_kg
         guidance['rcs_exhausted'] = gs.rcs_state.exhausted
 
-                                                                           
-                                                                   
-                                                                            
-                                                
+
     dx = DynamicsContext(
         thrust_on=thrust_active, throttle=actual_throttle, dry_mass=dry_mass,
         stage=stage, vehicle_model=vehicle_model,
@@ -879,13 +858,11 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
         config=config,
     )
     new_state = integrate(state, control['torque'], dt, ctx=dx, method='rk4')
-                                                                             
-                                                                               
-                                                                                      
-                                                                               
+
+
     new_state = _apply_ground_contact(state, new_state, vehicle_model, phase, config)
 
-                                                                            
+
     force_breakdown = compute_specific_forces(
         new_state.r, new_state.v, new_state.q, new_state.m,
         thrust_on=thrust_active, stage=stage, throttle=actual_throttle,

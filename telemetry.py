@@ -3,7 +3,6 @@ from typing import Any
 import numpy as np
 
 from rlv_sim import constants as C
-from rlv_sim._guidance_common import compute_local_vertical
 from rlv_sim._mission_manager_helpers import compute_orbit_metrics
 from rlv_sim._run_full_mission import MissionProgress
 from rlv_sim.config_definition import SimulationConfig
@@ -27,32 +26,30 @@ def extract_telemetry_point(state: Any, guidance: dict, phase_name: str, config:
     Convert simulation state and guidance outputs into a formatted telemetry dictionary
     for transmission to the frontend or logging.
     """
-    vertical = compute_local_vertical(state.r)
     v_rel = np.asarray(guidance.get('v_rel', state.v))
-    v_vert = float(np.dot(v_rel, vertical))
-    
+
     alt_m = state.altitude
     if config.enable_atmosphere:
         _, _, rho_atm, _ = compute_configured_atmosphere_properties(alt_m, config)
     else:
         rho_atm = 0.0
     v_rel_mag = float(vec_norm(v_rel))
-    
+
     q_dyn = compute_dynamic_pressure(rho_atm, v_rel_mag)
     r_nose = C.REFERENCE_DIAMETER / 2.0
     q_heat = compute_aerodynamic_heating(rho_atm, v_rel_mag, r_nose)
-    
+
     pitch_angle_rad = guidance.get('pitch_angle', 0.0)
     orbit = compute_orbit_metrics(state)
     launch_site = rotating_launch_site_eci(state.t, config=config)
-    
+
     return {
         "time": float(state.t),
         "altitude": float(state.altitude),
         "velocity": float(surface_relative_speed(state, config)),
         "mass": float(state.m),
         "downrange": float(great_circle_distance_m(state.r, launch_site)),
-        "heat_flux": float(q_heat / 1000.0),                                        
+        "heat_flux": float(q_heat / 1000.0),
         "dynamic_pressure": float(q_dyn),
         "throttle": float(guidance.get('throttle', 0.0)),
         "pitch_angle": float(np.degrees(pitch_angle_rad)),
@@ -61,7 +58,7 @@ def extract_telemetry_point(state: Any, guidance: dict, phase_name: str, config:
         "apogee_altitude": float(orbit["apogee_alt"]),
         "eccentricity": float(orbit["ecc"]),
         "orbital_velocity_deficit": float(orbit["v_deficit"]),
-                                          
+
         "actual_quat_w": float(state.q[0]),
         "actual_quat_x": float(state.q[1]),
         "actual_quat_y": float(state.q[2]),
@@ -96,7 +93,7 @@ def extract_mission_progress(progress: MissionProgress, config: SimulationConfig
     reserve = float(config.stage1_landing_fuel_reserve_kg)
     booster_phase = str(booster_guidance.get("phase", "UNKNOWN"))
 
-                                                                           
+
     launch_site = rotating_launch_site_eci(booster_state.t, config=config)
     booster_downrange_m = float(great_circle_distance_m(booster_state.r, launch_site))
 

@@ -113,7 +113,7 @@ _EGM96_S = {
 
 _AOA_POST_STALL_START_RAD = np.radians(20.0)
 _AOA_POST_STALL_FULL_RAD = np.radians(45.0)
-                                                                           
+
 _US76_H = np.array([0.0, 11000.0, 20000.0, 32000.0, 47000.0, 51000.0, 71000.0, 84852.0])
 _US76_L = np.array([-0.0065, 0.0, 0.0010, 0.0028, 0.0, -0.0028, -0.0020])
 
@@ -147,16 +147,12 @@ def _build_us76_tables():
 
     us76_tb = np.array(tb)
     us76_pb = np.array(pb)
-                                                                           
-                                                                      
+
+
     us76_tb.flags.writeable = False
     us76_pb.flags.writeable = False
     return us76_tb, us76_pb
 
-
-                                                                               
-                                                             
-                                                                               
 
 def compute_atmosphere_properties(altitude: float, enable_upper_atm: bool = True) -> tuple:
     """
@@ -193,11 +189,8 @@ def compute_atmosphere_properties(altitude: float, enable_upper_atm: bool = True
             T = T0
             P = P0 * np.exp(-C.G0 * dh / (C.R_GAS * T0))
     elif enable_upper_atm:
-                                                                          
-                                                                   
-                                                                    
-                                                                             
-                                                                            
+
+
         h0 = _US76_H[-1]
         T0 = us76_tb[-1]
         P0 = us76_pb[-1]
@@ -205,7 +198,7 @@ def compute_atmosphere_properties(altitude: float, enable_upper_atm: bool = True
         T = T0
         P = P0 * np.exp(-(h - h0) / scale_height)
     else:
-                                                   
+
         T = us76_tb[-1]
         P = 0.0
 
@@ -224,7 +217,7 @@ def compute_configured_atmosphere_properties(altitude: float, config=None, r: np
     if enable_high_fidelity and r is not None:
         lat_deg, lon_deg, geodetic_alt = eci_to_geodetic(r, t)
         altitude = geodetic_alt
-        density_modifier, tropopause_base = compute_gram_atmosphere(lat_deg, lon_deg, geodetic_alt)
+        density_modifier, _tropopause_base = compute_gram_atmosphere(lat_deg, lon_deg, geodetic_alt)
         # Note: We could dynamically adjust US-76 model boundaries here, but keeping it simple:
         # scale the computed density/pressure using the GRAM density modifier.
 
@@ -243,11 +236,6 @@ def compute_configured_atmosphere_properties(altitude: float, config=None, r: np
         density = 0.0
     return temperature, pressure, density, speed_of_sound
 
-
-
-                                                                               
-                                
-                                                                               
 
 def compute_dynamic_pressure(rho: float, v_rel_mag: float) -> float:
     """
@@ -320,14 +308,10 @@ def compute_aerodynamic_heating(rho: float, v_rel_mag: float, nose_radius: float
         Heat flux (W/m^2)
     """
     if rho > 1e-12 and v_rel_mag > 100.0:
-                                                                      
+
         return 1.7415e-4 * np.sqrt(rho / max(nose_radius, 0.01)) * v_rel_mag ** 3
     return 0.0
 
-
-                                                                               
-              
-                                                                               
 
 # Position-independent EGM96 tables: the non-zero (n, m, C_nm, S_nm) terms
 # and the Legendre recurrence coefficients. Values are computed exactly as the per-call code used to.
@@ -583,12 +567,12 @@ def apply_engine_transient(throttle_cmd: float, throttle_prev: float, dt: float,
     """
     delta = throttle_cmd - throttle_prev
     if delta > 0:
-                  
+
         max_rate = 1.0 / max(spool_up_time, 0.01)
         max_delta = max_rate * dt
         actual_delta = min(delta, max_delta)
     else:
-                    
+
         max_rate = 1.0 / max(spool_down_time, 0.01)
         max_delta = max_rate * dt
         actual_delta = max(delta, -max_delta)
@@ -702,19 +686,19 @@ def compute_lift_force(
         return np.zeros(3)
 
     mach = v_rel_norm / max(speed_of_sound, 1.0)
-    
+
     R = quaternion_to_rotation_matrix(q)
     v_body = R.T @ v_rel
-    
+
     v_transverse = np.sqrt(v_body[0]**2 + v_body[1]**2)
-    alpha = np.arctan2(v_transverse, abs(v_body[2]))     
+    alpha = np.arctan2(v_transverse, abs(v_body[2]))
     alpha_deg = float(np.degrees(alpha))
-    
+
     # Beta (sideslip) is practically 0 due to symmetrical axis, but we compute it if needed
     beta_deg = 0.0
-                                              
+
     q_dyn = 0.5 * rho * v_rel_norm**2
-    
+
     aero_db = _get_aero_db(getattr(config, 'aero_deck_path', None) if config else None)
     if aero_db and aero_db.is_loaded:
         cl = aero_db.interpolate_4d(mach, alpha_deg, beta_deg, fin_deg, "CL")
@@ -725,14 +709,14 @@ def compute_lift_force(
             cl_alpha,
             max_coefficient=1.2,
         )
-        
+
     lift_mag = q_dyn * cl * C.REFERENCE_AREA
 
-    body_z_inertial = R[:, 2]                                             
+    body_z_inertial = R[:, 2]
     cross_intermediate = cross3(v_rel, body_z_inertial)
     cross_norm = float(vec_norm(cross_intermediate))
     v_rel_mag = float(vec_norm(v_rel))
-                                                                          
+
     if cross_norm < 1e-4 * v_rel_mag:
         return np.zeros(3)
     lift_dir = cross3(cross_intermediate, v_rel)
@@ -870,39 +854,33 @@ def compute_thrust_force(q: np.ndarray, r: np.ndarray, thrust_on: bool = True, t
     if not thrust_on:
         return np.zeros(3)
 
-                                                          
-                                                                              
-                                                                              
-                                                                               
+
     throttle = float(np.clip(throttle, 0.0, 1.0))
     if throttle < 0.01:
         return np.zeros(3)
 
-                        
+
     altitude = vec_norm(r) - C.R_EARTH
     _, P_amb, _, _ = compute_configured_atmosphere_properties(altitude, config)
     P0 = C.ATM_P0
 
     if stage == 2:
-                                                                     
-                                                                                 
-                                                                          
-                                                                              
+
+
         s2_thrust = (
             float(thrust_magnitude_override)
             if thrust_magnitude_override is not None
             else float(config.stage2_thrust_vac if config is not None else C.STAGE2_THRUST)
         )
         thrust_magnitude = s2_thrust * float(thrust_scale)
-                                                                             
-        if P_amb > 100.0:                             
-                                                                                              
-                                                                         
+
+        if P_amb > 100.0:
+
+
             thrust_magnitude *= max(0.0, 1.0 - 0.1 * P_amb / P0)
     else:
-                                              
-                                                                                          
-                                                       
+
+
         thrust_sl = (
             float(thrust_magnitude_override)
             if thrust_magnitude_override is not None
@@ -912,19 +890,17 @@ def compute_thrust_force(q: np.ndarray, r: np.ndarray, thrust_on: bool = True, t
         pressure_thrust_scale = thrust_sl / max(C.THRUST_MAGNITUDE, 1e-9)
         thrust_vac = pressure_thrust_scale * C.MASS_FLOW_RATE * C.ISP_VAC * C.G0
 
-                                                              
+
         pressure_ratio = float(np.clip(P_amb / P0, 0.0, 1.2))
         thrust_magnitude = thrust_vac - (thrust_vac - thrust_sl) * pressure_ratio
 
-                                                                        
-                                                                               
-                                                             
+
     throttle_efficiency = 0.96 + 0.04 * throttle
     thrust_magnitude *= throttle * throttle_efficiency
 
     F_body = _gimbaled_thrust_body_vector(thrust_magnitude, control_torque_xy, lever_arm)
 
-                                 
+
     R = quaternion_to_rotation_matrix(q)
     F_inertial = R @ F_body
 
@@ -932,14 +908,14 @@ def compute_thrust_force(q: np.ndarray, r: np.ndarray, thrust_on: bool = True, t
 
 
 def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
-                               cg_pos_z: float, cp_pos_z: float = None,
+                               cg_pos_z: float, cp_pos_z: float | None = None,
                                wind_offset_mps: float = 0.0,
                                omega: np.ndarray = None,
                                config=None,
                                fin_deg: float = 0.0) -> np.ndarray:
     """
     Compute aerodynamic moment about the Center of Mass (Body Frame).
-    
+
     Models the aerodynamic instability (CP ahead of CG) or uses tabular Aero-Deck.
     """
     altitude = _altitude_from_r(r, config)
@@ -954,39 +930,38 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
 
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset_mps)
     v_rel_norm = vec_norm(v_rel)
-    
+
     if v_rel_norm < C.SMALL_VELOCITY_TOL:
         return np.zeros(3)
-        
+
     R = quaternion_to_rotation_matrix(q)
     v_body = R.T @ v_rel
-    
+
     vx, vy, vz = v_body
-    
+
     q_dyn = 0.5 * rho * v_rel_norm**2
-    
+
     v_transverse = np.sqrt(vx**2 + vy**2)
     mach = v_rel_norm / max(speed_of_sound, 1.0)
-    
+
     if v_transverse < 1e-6:
         alpha = 0.0
         u_trans = np.array([1.0, 0.0, 0.0]) # Arbitrary transverse direction
     else:
         alpha = np.arctan2(v_transverse, max(abs(vz), 1e-9))
         u_trans = np.array([vx, vy, 0.0]) / v_transverse
-        if alpha > _AOA_POST_STALL_START_RAD:
-            if not compute_aerodynamic_moment._post_stall_warned:
-                compute_aerodynamic_moment._post_stall_warned = True
-                logger.warning(
-                    "Angle of attack %.1f deg is post-stall; using bounded cross-flow aerodynamics.",
-                    np.degrees(alpha),
-                )
-    
+        if alpha > _AOA_POST_STALL_START_RAD and not compute_aerodynamic_moment._post_stall_warned:
+            compute_aerodynamic_moment._post_stall_warned = True
+            logger.warning(
+                "Angle of attack %.1f deg is post-stall; using bounded cross-flow aerodynamics.",
+                np.degrees(alpha),
+            )
+
     alpha_deg = float(np.degrees(alpha))
     beta_deg = 0.0
 
     aero_db = _get_aero_db(getattr(config, 'aero_deck_path', None) if config else None)
-    
+
     if aero_db and aero_db.is_loaded:
         cm = aero_db.interpolate_4d(mach, alpha_deg, beta_deg, fin_deg, "CM")
         # A pitching-moment coefficient acts about the axis normal to the
@@ -1013,7 +988,7 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         )
         Fn_mag = q_dyn * C.REFERENCE_AREA * cn
         F_normal_body = -Fn_mag * u_trans
-        
+
         if cp_pos_z is None:
             cp_pos_z = C.H_CP
         cp_effective = float(cp_pos_z)
@@ -1031,7 +1006,7 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
             broadside_fraction = float(np.sin(alpha) ** 2)
             broadside_cp = min(cp_effective, tail_cp)
             cp_effective = ((1.0 - broadside_fraction) * tail_cp + broadside_fraction * broadside_cp)
-            
+
         arm_z = cp_effective - cg_pos_z
         r_arm = np.array([0.0, 0.0, arm_z])
         torque_aero = cross3(r_arm, F_normal_body)
@@ -1047,8 +1022,6 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
     return torque_aero
 
 
-                                                                                  
-                                                                            
 compute_aerodynamic_moment._post_stall_warned = False
 
 
@@ -1056,7 +1029,7 @@ def _booster_recovery_aero_scale(
     mode: str | None,
     grid_fin_deployed: float = 0.0,
     landing_leg_deployed: float = 0.0,
-    reference_area: float = None,
+    reference_area: float | None = None,
     config=None,
 ) -> tuple[float, float]:
     """Effective drag/moment scaling for booster recovery configurations.
@@ -1082,20 +1055,19 @@ def _booster_recovery_aero_scale(
 
     normalized = (mode or "").upper()
 
-                                                               
+
     if grid_fin_deployed <= 0.0:
         if normalized in ("BOOSTER_ENTRY", "BOOSTER_LANDING"):
             grid_fin_deployed = 1.0
         elif normalized == "BOOSTER_COAST":
-            grid_fin_deployed = 0.5                                   
-    if landing_leg_deployed <= 0.0:
-        if normalized == "BOOSTER_LANDING":
-            landing_leg_deployed = 1.0
+            grid_fin_deployed = 0.5
+    if landing_leg_deployed <= 0.0 and normalized == "BOOSTER_LANDING":
+        landing_leg_deployed = 1.0
 
-                            
+
     base_area = reference_area
 
-                                                                                       
+
     if config is not None:
         grid_fin_total_area = float(
             getattr(config, "grid_fin_drag_area_m2", C.GRID_FIN_COUNT * C.GRID_FIN_AREA_M2)
@@ -1105,14 +1077,14 @@ def _booster_recovery_aero_scale(
     grid_fin_area = grid_fin_total_area * grid_fin_deployed
     grid_fin_drag_area = grid_fin_area * C.GRID_FIN_CD
 
-                                                                                           
+
     leg_area = C.LANDING_LEG_COUNT * C.LANDING_LEG_AREA_M2 * landing_leg_deployed
     leg_drag_area = leg_area * C.LANDING_LEG_CD
 
-                                                            
+
     entry_plume_factor = 1.0
     if normalized == "BOOSTER_ENTRY":
-        entry_plume_factor = 1.3                             
+        entry_plume_factor = 1.3
 
     # Known simplification: this returns an area-ratio multiplier applied on
     # top of the vehicle body's own Mach-dependent Cd (CD_VALUES table), so
@@ -1123,15 +1095,14 @@ def _booster_recovery_aero_scale(
     total_drag_area = (base_area + grid_fin_drag_area + leg_drag_area) * entry_plume_factor
     drag_scale = total_drag_area / max(base_area, 1e-9)
 
-                                                                         
-                                                             
+
     moment_scale = 1.0
     if grid_fin_deployed > 0.0:
-                                                                  
-                                                        
+
+
         moment_scale = 1.0 + 2.5 * grid_fin_deployed
     if normalized == "BOOSTER_ENTRY":
-                                                      
+
         moment_scale *= 1.2
 
     return float(np.clip(drag_scale, 1.0, 8.0)), float(np.clip(moment_scale, 1.0, 6.0))
@@ -1220,8 +1191,8 @@ def _compute_force_breakdown(
             if lift_enabled else np.zeros(3)
         )
         if (vehicle_model or "").lower() == "booster":
-                                                                               
-                                                                                  
+
+
             drag_scale, _ = _booster_recovery_aero_scale(booster_aero_mode, config=config)
             F_drag = drag_scale * F_drag
 
@@ -1256,8 +1227,6 @@ def _compute_force_breakdown(
         'lift_magnitude': vec_norm(F_lift),
         'grid_fin_magnitude': vec_norm(F_grid_fin),
     }
-
-
 
 
 def compute_specific_forces(r: np.ndarray, v: np.ndarray, q: np.ndarray,

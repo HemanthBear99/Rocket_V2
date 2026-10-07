@@ -22,12 +22,12 @@ class GuidanceState:
     Each vehicle (stacked, orbiter, booster) gets its own instance so that
     guidance can run independently in parallel simulations.
     """
-                                  
+
     prev_gamma_meas: float = 90.0
     gamma_int: float = 0.0
     prev_dynamic_pressure_pa: float = 0.0
 
-                                   
+
     oi_start_time: float | None = None
     oi_start_direction: np.ndarray | None = None
     last_ascent_direction: np.ndarray | None = None
@@ -35,15 +35,15 @@ class GuidanceState:
     coast_start_time: float | None = None
     orbit_circularization_active: bool = False
     orbit_circularization_start_time: float | None = None
-                                                                              
-                                                                                 
+
+
     apogee_raise_complete: bool = False
     booster_landing_burn_started: bool = False
     deorbit_start_mass: float | None = None
     landing_leg_state: object | None = None
     navigation_state: object | None = None
-                                                                         
-                              
+
+
     rcs_state: object | None = None
     control_state: object | None = None
 
@@ -51,9 +51,6 @@ class GuidanceState:
 def create_guidance_state() -> GuidanceState:
     """Create a fresh GuidanceState. Replaces the old reset_guidance()."""
     return GuidanceState()
-
-
-                                                                   
 
 
 def _resolve_guidance_state(gs: GuidanceState | None) -> GuidanceState:
@@ -72,10 +69,6 @@ def reset_guidance() -> GuidanceState:
     """Return a fresh run-local guidance state for compatibility."""
     return create_guidance_state()
 
-
-                                                                               
-                              
-                                                                               
 
 def _limit_aoa(thrust_dir: np.ndarray, velocity: np.ndarray,
                max_aoa_rad: float) -> np.ndarray:
@@ -98,24 +91,23 @@ def _limit_aoa(thrust_dir: np.ndarray, velocity: np.ndarray,
     """
     v_norm = vec_norm(velocity)
     if v_norm < 50.0:
-        return thrust_dir                              
+        return thrust_dir
 
     v_hat = velocity / v_norm
     cos_aoa = np.clip(np.dot(thrust_dir, v_hat), -1.0, 1.0)
     aoa = np.arccos(cos_aoa)
 
     if aoa <= max_aoa_rad:
-        return thrust_dir                        
+        return thrust_dir
 
-                                                                 
-                                                                 
+
     axis = cross3(v_hat, thrust_dir)
     axis_norm = vec_norm(axis)
     if axis_norm < 1e-9:
-        return thrust_dir                             
+        return thrust_dir
 
     axis = axis / axis_norm
-                                                                                 
+
     limited = (v_hat * np.cos(max_aoa_rad)
                + cross3(axis, v_hat) * np.sin(max_aoa_rad)
                + axis * np.dot(axis, v_hat) * (1.0 - np.cos(max_aoa_rad)))
@@ -170,9 +162,8 @@ def gamma_profile_from_altitude(
     the typical 45-60 deg pitch-from-vertical at engine cutoff.
     """
     gamma_start = 90.0
-                                                                           
-                                                                             
-                                                         
+
+
     gamma_final = 45.0
 
     turn_start_alt = (
@@ -185,8 +176,8 @@ def gamma_profile_from_altitude(
         if config is not None
         else C.GRAVITY_TURN_TRANSITION_RANGE
     )
-                                                                               
-                                                                        
+
+
     turn_scale = max(1.4 * transition_range, 1.0)
 
     if altitude < turn_start_alt:
@@ -237,8 +228,4 @@ def compute_blend_parameter(
     x = (altitude - start) / max(width, 1.0)
     return x * x * (3.0 - 2.0 * x)
 
-
-                                                                               
-                                                       
-                                                                               
 

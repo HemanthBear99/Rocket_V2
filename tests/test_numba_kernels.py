@@ -33,7 +33,7 @@ def test_impact_predictor_kernel_matches_python(monkeypatch):
     for up, r in _random_positions(rng, 20, 80.0e3):
         r = up * (C.R_EARTH + 5.0e3) + (r - up * C.R_EARTH)
         v = rng.normal(size=3) * 800.0 - up * rng.uniform(100.0, 1500.0)
-        kwargs = dict(mass_kg=30000.0, config=cfg, aero_mode="BOOSTER_ENTRY")
+        kwargs = {"mass_kg": 30000.0, "config": cfg, "aero_mode": "BOOSTER_ENTRY"}
         compiled = recovery._propagate_2body_to_surface(r, v, **kwargs)
         monkeypatch.setattr(_numba_kernels, "AVAILABLE", False)
         reference = recovery._propagate_2body_to_surface(r, v, **kwargs)

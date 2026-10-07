@@ -14,7 +14,7 @@ from . import constants as C
 AttitudeController = Literal["pd", "pid"]
 RecoveryAttitudeController = Literal["pd", "pid", "auto"]
 
-                                                                       
+
 VALIDATED_RUNTIME_FIELDS = (
     "dt", "max_time",
     "kp_attitude", "kd_attitude", "ki_attitude",
@@ -64,7 +64,7 @@ VALIDATED_RUNTIME_FIELDS = (
     "stage2_thrust_vac", "stage2_isp_vac", "stage_sep_velocity", "target_inclination_deg",
 )
 
-                                                                        
+
 EXPERIMENTAL_FEATURE_FLAGS = (
     "enable_j2", "enable_engine_transients", "abort_on_q_alpha_limit",
     "enable_separation_dynamics",
@@ -103,7 +103,6 @@ def _validate_aero_deck_path(deck_path: str) -> str | None:
     return None
 
 
-
 _FIELD_RULES = {
     # kind: (predicate that flags an INVALID value, message phrase)
     "positive": (lambda value: value <= 0, "must be positive"),
@@ -133,15 +132,15 @@ class SimulationConfig:
     All validation is inlined in validate() — no sub-config classes.
     """
 
-                                                                           
+
     dt: float = C.DT
     max_time: float = C.MAX_TIME
-                                                                          
-                                                                        
+
+
     enable_demo_mode: bool = False
     demo_coast_max_dt: float = 2.0
 
-                                                                           
+
     kp_attitude: float = C.KP_ATTITUDE
     kd_attitude: float = C.KD_ATTITUDE
     ki_attitude: float = C.KI_ATTITUDE
@@ -151,7 +150,7 @@ class SimulationConfig:
     max_torque: float = C.MAX_TORQUE
     max_gimbal_angle_deg: float = 15.0
 
-                                                                           
+
     gravity_turn_start_altitude: float = C.GRAVITY_TURN_START_ALTITUDE
     gravity_turn_transition_range: float = C.GRAVITY_TURN_TRANSITION_RANGE
     min_velocity_for_turn: float = C.MIN_VELOCITY_FOR_TURN
@@ -165,8 +164,8 @@ class SimulationConfig:
     launch_site_lon_deg: float = C.DEFAULT_LAUNCH_SITE_LON_DEG
     launch_site_altitude_m: float = 0.0
     orbit_target_altitude_m: float = C.TARGET_ORBIT_ALTITUDE
-                                                                         
-                                                                      
+
+
     orbit_altitude_tolerance_m: float = 75000.0
     orbit_ecc_max: float = 0.02
     orbit_insertion_start_altitude_m: float = 85000.0
@@ -205,20 +204,20 @@ class SimulationConfig:
     # have propellant headroom (e.g. a larger stage2_prop_mass) can opt in.
     s2_landing_propellant_reserve_kg: float = 0.0
 
-                                                                           
+
     stage1_dry_mass: float = C.STAGE1_DRY_MASS
     stage1_prop_mass: float = C.STAGE1_PROPELLANT_MASS
     stage2_dry_mass: float = C.STAGE2_DRY_MASS
     stage2_prop_mass: float = C.STAGE2_PROPELLANT_MASS
     payload_mass: float = 8000.0
-                                                                              
-                                                                       
+
+
     stage2_thrust_vac: float = C.STAGE2_THRUST
     stage2_isp_vac: float = C.STAGE2_ISP_VAC
     stage_sep_velocity: float = 2200.0
     target_inclination_deg: float = 28.5
 
-                                                                           
+
     booster_boostback_budget_kg: float = 43000.0
     booster_boostback_impact_corridor_m: float = 10000.0
     booster_entry_budget_kg: float = 5700.0
@@ -285,7 +284,7 @@ class SimulationConfig:
     landing_leg_footprint_radius_m: float = 8.0
     booster_powered_descent_lead_time_s: float = 15.0
 
-                                       
+
     booster_terminal_capture_floor_kg: float = 2500.0
     booster_terminal_capture_floor_margin_kg: float = 0.0
     booster_late_entry_east_bias_m: float = 3200.0
@@ -293,7 +292,7 @@ class SimulationConfig:
     booster_late_entry_bias_scale_m: float = 30000.0
     booster_late_entry_bias_miss_ref_m: float = 1200.0
     booster_late_entry_bias_miss_cutoff_m: float = 400.0
-    booster_max_divert_accel_far_mps2: float = 40.0                                                   
+    booster_max_divert_accel_far_mps2: float = 40.0
     booster_max_divert_accel_near_mps2: float = 40.0
     booster_divert_accel_miss_threshold_m: float = 3000.0
     booster_divert_fraction_high: float = 0.55
@@ -316,7 +315,7 @@ class SimulationConfig:
     booster_terminal_capture_geom_retrograde_blend: float = 0.74
     booster_terminal_capture_geom_max_throttle: float = 0.10
 
-                                                                           
+
     enable_atmosphere: bool = True
     enable_high_fidelity_gram: bool = False
     enable_drag: bool = True
@@ -343,7 +342,7 @@ class SimulationConfig:
     rcs_isp: float = C.RCS_ISP
     rcs_num_thrusters: int = 8
     rcs_propellant_mass: float = C.RCS_PROPELLANT_MASS
-                                                                           
+
     imu_accel_bias: float = 0.001
     imu_accel_noise: float = 0.01
     imu_gyro_bias: float = 1e-5
@@ -371,17 +370,17 @@ class SimulationConfig:
     abort_q_alpha_threshold: float = 60000.0
     abort_attitude_threshold: float = 30.0
 
-                                                                           
+
     quaternion_norm_tolerance: float = C.QUATERNION_NORM_TOL
     zero_tolerance: float = 1e-10
 
-                                                                           
+
     enable_run_manifest: bool = True
     energy_violation_terminates: bool = False
     min_engine_throttle_fraction: float = 0.35
     max_engine_throttle_fraction: float = 1.0
 
-                                  
+
     runtime_thrust_scale: float = 1.0
     runtime_isp_scale: float = 1.0
     runtime_initial_mass_offset_kg: float = 0.0
@@ -436,7 +435,7 @@ class SimulationConfig:
             if deck_error is not None:
                 errors.append(deck_error)
 
-                                                                            
+
         errors += _field_errors(self, (
             ("kp_attitude", "nonneg"),
             ("kd_attitude", "nonneg"),
@@ -555,7 +554,7 @@ class SimulationConfig:
                 "booster_landing_target_downrange_km must be 0 when explicit landing-site coordinates are provided"
             )
 
-                                                                            
+
         if self.dt <= 0:
             errors.append(f"dt must be positive, got {self.dt}")
         if self.demo_coast_max_dt <= 0:
@@ -588,7 +587,7 @@ class SimulationConfig:
             ("runtime_isp_scale", "positive"),
         ))
 
-                                                                    
+
         if C.INITIAL_MASS + self.runtime_initial_mass_offset_kg <= C.DRY_MASS + self.stage1_landing_fuel_reserve_kg:
             errors.append(
                 "runtime_initial_mass_offset_kg leaves no ascent propellant above MECO mass"

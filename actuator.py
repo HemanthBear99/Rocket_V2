@@ -18,7 +18,7 @@ class ActuatorState:
 
     def __post_init__(self):
         if self.thrust_dir is None:
-            self.thrust_dir = np.array([1.0, 0.0, 0.0], dtype=float)                       
+            self.thrust_dir = np.array([1.0, 0.0, 0.0], dtype=float)
         else:
             self.thrust_dir = np.asarray(self.thrust_dir, dtype=float)
         self.throttle = float(np.clip(self.throttle, 0.0, 1.0))
@@ -32,16 +32,16 @@ def _limit_rotation(current: np.ndarray, desired: np.ndarray, max_rate: float, d
     angle = np.arccos(dot)
     if angle <= max_rate * dt:
         return des_n
-                                               
+
     axis = cross3(cur_n, des_n)
     axis_norm = vec_norm(axis)
     if axis_norm < 1e-9:
         if dot >= 0.0:
-                                                                               
-                                       
+
+
             return des_n
-                                                                              
-                                                 
+
+
         perp = np.array([1.0, 0.0, 0.0])
         if abs(float(cur_n[0])) > 0.9:
             perp = np.array([0.0, 1.0, 0.0])
@@ -49,7 +49,7 @@ def _limit_rotation(current: np.ndarray, desired: np.ndarray, max_rate: float, d
         axis_norm = vec_norm(axis)
     axis /= axis_norm
     theta = max_rate * dt
-                        
+
     return (
         cur_n * np.cos(theta)
         + cross3(axis, cur_n) * np.sin(theta)

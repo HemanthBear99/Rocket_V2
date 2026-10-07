@@ -111,9 +111,8 @@ def _select_insertion_mode(
     # then an apsidal, tangential burn at that radius, as assumed by the
     # vis-viva target below.
     raise_apogee_cutoff = target_alt
-                                                                           
-                                                                             
-                                                             
+
+
     # Circularisation is governed by the configured orbital-element acceptance
     # band.  Do not introduce a second, tighter apogee ceiling here: vis-viva
     # computes the tangential speed for the requested semi-major axis, and the
@@ -133,7 +132,7 @@ def _select_insertion_mode(
     apogee_too_high = apogee_alt > upper_alt
     perigee_needs_raise = perigee_alt < lower_alt
     distance_to_apogee = apogee_alt - altitude
-                                                                          
+
     at_apogee_peak = altitude >= apogee_alt - 30000.0 and abs(v_radial) <= 60.0
     ready_to_start_circularization = at_apogee_peak
     can_circularize_this_pass = (
@@ -181,8 +180,8 @@ def _select_insertion_mode(
     elif perigee_needs_raise:
         orbit_guidance_mode = "COAST_TO_CIRCULARIZATION"
     else:
-                                                                               
-                                                                            
+
+
         orbit_guidance_mode = "HOLD_ORBIT" if not apogee_too_high else "COAST_TO_CIRCULARIZATION"
     return {
         "orbit_guidance_mode": orbit_guidance_mode,
@@ -420,19 +419,11 @@ def compute_deorbit_guidance(
     )
     s2_prop_available = s2_prop_remaining - landing_reserve_kg
 
-                                                                              
-                                                                         
-                                                                          
-                                                                              
-                                                                           
-                                                   
+
     if gs.deorbit_start_mass is None:
         gs.deorbit_start_mass = float(m)
-                                                                                
-                                                                                
-                                                                           
-                                                                                
-                                         
+
+
     dv_used = max(
         0.0,
         float(C.STAGE2_ISP_VAC * C.G0 * np.log(max(gs.deorbit_start_mass, 1.0) / max(m, 1.0))),
@@ -511,36 +502,19 @@ def compute_s2_entry_landing_guidance(
     throttle = 0.0
     desired_dir = retrograde
 
-                                                                                
-                                                                            
-                                                                        
-                                                                                
-                                                         
+
     if phase == "S2_ENTRY" and altitude < 20000.0:
         desired_dir = vertical
 
     if phase == "S2_LANDING":
-                                                             
-                                                                               
-                                                                                
-                                                                                
-                                                                               
-                                                                             
-                                                        
-                                                                               
-                                                         
-         
-                                                                      
-                                                                               
-                                                                             
-                                                                                
+
+
         ignite_sf = (
             float(config.booster_landing_ignition_safety_factor)
             if config is not None else 1.35
         )
-                                                                                
-                                                                               
-                                                  
+
+
         burn = estimate_suicide_burn(
             r,
             v,

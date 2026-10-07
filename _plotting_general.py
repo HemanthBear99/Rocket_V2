@@ -27,7 +27,6 @@ def plot_altitude_profile(data: TrajectoryData, output_dir: str) -> str:
 
     """Generate altitude vs time profile plot.
 
-    
 
     Args:
 
@@ -35,7 +34,6 @@ def plot_altitude_profile(data: TrajectoryData, output_dir: str) -> str:
 
         output_dir: Directory to save the plot
 
-        
 
     Returns:
 
@@ -47,23 +45,19 @@ def plot_altitude_profile(data: TrajectoryData, output_dir: str) -> str:
 
     meco_idx = _find_stage1_meco_index(data)
 
-    
 
     ax.fill_between(data.time, 0, data.altitude, alpha=0.25, color='#1f77b4')
 
     ax.plot(data.time, data.altitude, 'b-', linewidth=2, label='Altitude')
 
-    
 
-                
-
-    ax.scatter([data.time[0]], [data.altitude[0]], 
+    ax.scatter([data.time[0]], [data.altitude[0]],
 
                c='green', s=80, marker='o', zorder=5, label='Liftoff')
 
     ax.scatter([data.time[meco_idx]], [data.altitude[meco_idx]],
 
-               c='red', s=80, marker='x', zorder=5, 
+               c='red', s=80, marker='x', zorder=5,
 
                label=f'S1 MECO ({data.altitude[meco_idx]:.1f} km)')
 
@@ -75,7 +69,6 @@ def plot_altitude_profile(data: TrajectoryData, output_dir: str) -> str:
 
                    label=f'Final ({data.altitude[-1]:.1f} km)')
 
-    
 
     ax.set_xlabel('Time (s)')
 
@@ -89,7 +82,6 @@ def plot_altitude_profile(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_ylim(0, None)
 
-    
 
     plt.tight_layout()
 
@@ -99,19 +91,14 @@ def plot_altitude_profile(data: TrajectoryData, output_dir: str) -> str:
 
     plt.close(fig)
 
-    
 
     return path
-
-
-
 
 
 def plot_velocity_profile(data: TrajectoryData, output_dir: str) -> str:
 
     """Generate velocity profile comparing inertial and relative velocities.
 
-    
 
     Args:
 
@@ -119,7 +106,6 @@ def plot_velocity_profile(data: TrajectoryData, output_dir: str) -> str:
 
         output_dir: Directory to save the plot
 
-        
 
     Returns:
 
@@ -129,27 +115,24 @@ def plot_velocity_profile(data: TrajectoryData, output_dir: str) -> str:
 
     fig, ax = plt.subplots()
 
-    
 
-    ax.plot(data.time, data.velocity, 'r-', linewidth=2, 
+    ax.plot(data.time, data.velocity, 'r-', linewidth=2,
 
             label='Inertial Velocity')
 
-    ax.plot(data.time, data.velocity_rel, 'g--', linewidth=2, 
+    ax.plot(data.time, data.velocity_rel, 'g--', linewidth=2,
 
             label='Relative Velocity (Airspeed)')
 
-    
 
-    ax.scatter([data.time[0]], [data.velocity[0]], 
+    ax.scatter([data.time[0]], [data.velocity[0]],
 
                c='red', s=50, marker='o', zorder=5)
 
-    ax.scatter([data.time[0]], [data.velocity_rel[0]], 
+    ax.scatter([data.time[0]], [data.velocity_rel[0]],
 
                c='green', s=50, marker='o', zorder=5)
 
-    
 
     ax.set_xlabel('Time (s)')
 
@@ -163,11 +146,8 @@ def plot_velocity_profile(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_ylim(0, None)
 
-    
 
-                
-
-    ax.text(0.02, 0.98, 
+    ax.text(0.02, 0.98,
 
             f'Difference due to Earth rotation\n(~{data.velocity[0]:.0f} m/s at equator)',
 
@@ -175,9 +155,8 @@ def plot_velocity_profile(data: TrajectoryData, output_dir: str) -> str:
 
             verticalalignment='top',
 
-            bbox=dict(boxstyle='round', facecolor='white', alpha=0.9))
+            bbox={'boxstyle': 'round', 'facecolor': 'white', 'alpha': 0.9})
 
-    
 
     plt.tight_layout()
 
@@ -187,19 +166,14 @@ def plot_velocity_profile(data: TrajectoryData, output_dir: str) -> str:
 
     plt.close(fig)
 
-    
 
     return path
-
-
-
 
 
 def plot_mass_profile(data: TrajectoryData, output_dir: str) -> str:
 
     """Generate vehicle mass vs time profile.
 
-    
 
     Args:
 
@@ -207,7 +181,6 @@ def plot_mass_profile(data: TrajectoryData, output_dir: str) -> str:
 
         output_dir: Directory to save the plot
 
-        
 
     Returns:
 
@@ -217,11 +190,9 @@ def plot_mass_profile(data: TrajectoryData, output_dir: str) -> str:
 
     fig, ax = plt.subplots()
 
-    
 
     mass_tonnes = data.mass / 1000.0
 
-    
 
     ax.fill_between(data.time, 0, mass_tonnes, alpha=0.25, color='#2ca02c')
 
@@ -237,7 +208,6 @@ def plot_mass_profile(data: TrajectoryData, output_dir: str) -> str:
 
                linewidth=1.2, label=f'S2 Dry Mass ({C.STAGE2_DRY_MASS/1000:.0f} t)')
 
-    
 
     ax.set_xlabel('Time (s)')
 
@@ -251,7 +221,6 @@ def plot_mass_profile(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_ylim(0, None)
 
-    
 
     plt.tight_layout()
 
@@ -261,19 +230,14 @@ def plot_mass_profile(data: TrajectoryData, output_dir: str) -> str:
 
     plt.close(fig)
 
-    
 
     return path
-
-
-
 
 
 def plot_pitch_angle(data: TrajectoryData, output_dir: str) -> str:
 
     """Generate pitch angle evolution plot.
 
-    
 
     Args:
 
@@ -281,7 +245,6 @@ def plot_pitch_angle(data: TrajectoryData, output_dir: str) -> str:
 
         output_dir: Directory to save the plot
 
-        
 
     Returns:
 
@@ -291,23 +254,20 @@ def plot_pitch_angle(data: TrajectoryData, output_dir: str) -> str:
 
     fig, ax = plt.subplots()
 
-    
 
     gravity_turn_time = compute_gravity_turn_start(data)
 
-    
 
     ax.fill_between(data.time, 0, data.pitch_angle, alpha=0.25, color='#9467bd')
 
-    ax.plot(data.time, data.pitch_angle, color='purple', linewidth=2, 
+    ax.plot(data.time, data.pitch_angle, color='purple', linewidth=2,
 
             label='Pitch Angle (from Vertical)')
 
-    ax.axvline(x=gravity_turn_time, color='gray', linestyle=':', 
+    ax.axvline(x=gravity_turn_time, color='gray', linestyle=':',
 
                linewidth=1.5, label='Gravity Turn Start')
 
-    
 
     ax.set_xlabel('Time (s)')
 
@@ -321,7 +281,6 @@ def plot_pitch_angle(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_ylim(0, 95)
 
-    
 
     plt.tight_layout()
 
@@ -331,12 +290,8 @@ def plot_pitch_angle(data: TrajectoryData, output_dir: str) -> str:
 
     plt.close(fig)
 
-    
 
     return path
-
-
-
 
 
 def plot_attitude_error(data: TrajectoryData, output_dir: str) -> str:
@@ -354,9 +309,6 @@ def plot_attitude_error(data: TrajectoryData, output_dir: str) -> str:
             legend_loc="upper right",
         ),
     )
-
-
-
 
 
 def plot_control_torque(data: TrajectoryData, output_dir: str) -> str:
@@ -377,9 +329,6 @@ def plot_control_torque(data: TrajectoryData, output_dir: str) -> str:
             ),
         ),
     )
-
-
-
 
 
 def plot_trajectory_local(data: TrajectoryData, output_dir: str) -> str:
@@ -410,14 +359,10 @@ def plot_trajectory_local(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_trajectory_3d(data: TrajectoryData, output_dir: str) -> str:
 
     """Generate 3D trajectory plot.
 
-    
 
     Args:
 
@@ -425,7 +370,6 @@ def plot_trajectory_3d(data: TrajectoryData, output_dir: str) -> str:
 
         output_dir: Directory to save the plot
 
-        
 
     Returns:
 
@@ -437,23 +381,19 @@ def plot_trajectory_3d(data: TrajectoryData, output_dir: str) -> str:
 
     ax = fig.add_subplot(111, projection='3d')
 
-    
 
     pos_x = data.position[:, 0]
 
     pos_y = data.position[:, 1]
 
-    
 
     east = (pos_y - pos_y[0]) / 1000
 
     north = (pos_x - pos_x[0]) / 1000
 
-    
 
     ax.plot(east, north, data.altitude, linewidth=2, color='#1f77b4')
 
-    
 
     ax.set_xlabel('East (km)')
 
@@ -463,7 +403,6 @@ def plot_trajectory_3d(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_title('3D Trajectory', fontweight='bold')
 
-    
 
     plt.tight_layout()
 
@@ -473,12 +412,8 @@ def plot_trajectory_3d(data: TrajectoryData, output_dir: str) -> str:
 
     plt.close(fig)
 
-    
 
     return path
-
-
-
 
 
 def plot_thrust_vs_gravity(data: TrajectoryData, output_dir: str) -> str:
@@ -501,9 +436,6 @@ def plot_thrust_vs_gravity(data: TrajectoryData, output_dir: str) -> str:
             legend_loc="upper right",
         ),
     )
-
-
-
 
 
 def plot_flight_path_angle(data: TrajectoryData, output_dir: str) -> str:
@@ -548,9 +480,6 @@ def plot_flight_path_angle(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_dynamic_pressure(data: TrajectoryData, output_dir: str) -> str:
     """Generate dynamic pressure plot with structural limit."""
     limit_kpa = C.MAX_DYNAMIC_PRESSURE / 1000.0
@@ -585,14 +514,10 @@ def plot_dynamic_pressure(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_physics_check(data: TrajectoryData, output_dir: str) -> str:
 
     """Generate physics validation plot (angle of attack analysis).
 
-    
 
     Args:
 
@@ -600,7 +525,6 @@ def plot_physics_check(data: TrajectoryData, output_dir: str) -> str:
 
         output_dir: Directory to save the plot
 
-        
 
     Returns:
 
@@ -610,9 +534,6 @@ def plot_physics_check(data: TrajectoryData, output_dir: str) -> str:
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
 
-    
-
-                                          
 
     v_rel_mag = np.linalg.norm(data.velocity_rel_vec, axis=1)
 
@@ -626,9 +547,6 @@ def plot_physics_check(data: TrajectoryData, output_dir: str) -> str:
 
     velocity_angle = np.degrees(np.arccos(cos_theta))
 
-    
-
-                                        
 
     ax1.plot(data.time, data.pitch_angle, 'purple', linewidth=2,
 
@@ -648,67 +566,41 @@ def plot_physics_check(data: TrajectoryData, output_dir: str) -> str:
 
     ax1.grid(True, which='both', alpha=0.3)
 
-    
-
-                                                        
 
     alpha = np.abs(data.pitch_angle - velocity_angle)
 
-    
 
-                                                                
-
-                                                                  
-
-                                                                       
-
-    q_threshold = 100.0      
+    q_threshold = 100.0
 
     alpha_masked = np.where(data.dynamic_pressure > q_threshold, alpha, np.nan)
 
-    
 
-                       
-
-    line1 = ax2.plot(data.time, alpha_masked, 'r-', linewidth=2, 
+    line1 = ax2.plot(data.time, alpha_masked, 'r-', linewidth=2,
 
              label='Angle of Attack (Wind-Relative)')
 
     ax2.axhline(y=0, color='k', linestyle='-', linewidth=0.8)
 
-    line2 = ax2.axhline(y=10, color='orange', linestyle='--', 
+    line2 = ax2.axhline(y=10, color='orange', linestyle='--',
 
                 label='10Â° Safety Threshold')
 
-    
 
     ax2.set_ylabel('Angle of Attack (Â°)')
 
-                                                                 
 
     ax2.set_ylim(0, min(15, max(12, np.nanmax(alpha_masked)*1.2 if not np.all(np.isnan(alpha_masked)) else 12)))
 
-    
-
-                                      
 
     ax2b = ax2.twinx()
 
     q_kpa = data.dynamic_pressure / 1000.0
 
-    
-
-                                
-
-                                        
-
-                           
 
     ax2b.fill_between(data.time, 0, q_kpa, color='gray', alpha=0.15, label='Dynamic Pressure (q)')
 
     line3 = ax2b.plot(data.time, q_kpa, color='gray', linestyle=':', linewidth=1, label='Dynamic Pressure')
 
-    
 
     ax2b.set_ylabel('Dynamic Pressure (kPa)', color='gray')
 
@@ -716,9 +608,6 @@ def plot_physics_check(data: TrajectoryData, output_dir: str) -> str:
 
     ax2b.set_ylim(0, None)
 
-    
-
-                     
 
     lines = line1 + [line2] + line3
 
@@ -726,19 +615,11 @@ def plot_physics_check(data: TrajectoryData, output_dir: str) -> str:
 
     ax2.legend(lines, lbls, loc='upper right', framealpha=0.95)
 
-    
 
     ax2.set_xlabel('Time (s)')
 
     ax2.set_title('Angle of Attack & Dynamic Pressure', fontweight='bold')
 
-    
-
-                                     
-
-                                                               
-
-                                     
 
     high_q_idx = np.where(q_kpa > 10.0)[0]
 
@@ -748,10 +629,9 @@ def plot_physics_check(data: TrajectoryData, output_dir: str) -> str:
 
         ax2.axvline(x=t_lock, color='blue', linestyle='-.', alpha=0.5)
 
-        ax2.text(t_lock + 2, ax2.get_ylim()[1]*0.8, "High-Q / Prograde Lock", 
+        ax2.text(t_lock + 2, ax2.get_ylim()[1]*0.8, "High-Q / Prograde Lock",
 
                  color='blue', fontsize=9, rotation=0)
-
 
 
     plt.tight_layout()
@@ -762,19 +642,14 @@ def plot_physics_check(data: TrajectoryData, output_dir: str) -> str:
 
     plt.close(fig)
 
-    
 
     return path
-
-
-
 
 
 def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     """Generate diagnostic plot comparing thrust direction vs velocity direction.
 
-    
 
     This is the key diagnostic for verifying pitch/trajectory coupling:
 
@@ -784,11 +659,9 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     - Gamma command (from horizontal): Guidance target
 
-    
 
     If these don't align properly, there's a frame or coupling issue.
 
-    
 
     Args:
 
@@ -796,7 +669,6 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
         output_dir: Directory to save the plot
 
-        
 
     Returns:
 
@@ -806,49 +678,30 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 12), sharex=True)
 
-    fig.suptitle('Pitch/Gamma Diagnostic: Thrust Direction vs Velocity Direction', 
+    fig.suptitle('Pitch/Gamma Diagnostic: Thrust Direction vs Velocity Direction',
 
                  fontsize=14, fontweight='bold')
 
-    
-
-                                                                         
 
     r_mag = np.linalg.norm(data.position, axis=1)
 
     r_hat = data.position / r_mag[:, np.newaxis]
 
-    
 
-                                              
+    v_rel_radial = np.sum(data.velocity_rel_vec * r_hat, axis=1)
 
-    v_rel_radial = np.sum(data.velocity_rel_vec * r_hat, axis=1)                      
-
-    v_rel_tangent = np.sqrt(np.maximum(data.velocity_rel**2 - v_rel_radial**2, 0))              
+    v_rel_tangent = np.sqrt(np.maximum(data.velocity_rel**2 - v_rel_radial**2, 0))
 
     velocity_tilt_from_vertical = np.degrees(np.arctan2(v_rel_tangent, np.maximum(v_rel_radial, 1.0)))
 
-    
-
-                    
-
-                                                      
-
-                                                         
 
     pitch_cmd = data.pitch_angle
 
     pitch_actual = data.actual_pitch
 
-    
-
-                                                                 
 
     gamma_implies_pitch = 90.0 - data.gamma_cmd
 
-    
-
-                                                     
 
     ax1.plot(data.time, pitch_cmd, 'b-', linewidth=2, label='Pitch Command (from vertical)')
 
@@ -858,7 +711,6 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     ax1.plot(data.time, gamma_implies_pitch, 'r:', linewidth=2, label='90Â° - Î³_cmd')
 
-    
 
     ax1.set_ylabel('Angle from Vertical (Â°)')
 
@@ -870,9 +722,6 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     ax1.axhline(45, color='gray', linestyle=':', alpha=0.3)
 
-    
-
-                                                           
 
     gamma_measured = 90.0 - velocity_tilt_from_vertical
 
@@ -882,7 +731,6 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     ax2.plot(data.time, data.gamma_rel, 'k--', linewidth=1.5, alpha=0.7, label='Î³ Relative (logged)')
 
-    
 
     ax2.set_ylabel('Flight Path Angle Î³ (Â° from horizontal)')
 
@@ -896,19 +744,13 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     ax2.axhline(0, color='gray', linestyle=':', alpha=0.3, label='Horizontal')
 
-    
-
-                                            
-
-                                                                                 
 
     pitch_velocity_diff = np.abs(pitch_actual - velocity_tilt_from_vertical)
 
     gamma_tracking_error = np.abs(data.gamma_cmd - gamma_measured)
 
-    
 
-    ax3.plot(data.time, pitch_velocity_diff, 'r-', linewidth=2, 
+    ax3.plot(data.time, pitch_velocity_diff, 'r-', linewidth=2,
 
              label='|Thrust Pitch - Velocity Tilt|')
 
@@ -918,7 +760,6 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     ax3.axhline(10, color='orange', linestyle='--', linewidth=1.5, label='10Â° Warning')
 
-    
 
     ax3.set_xlabel('Time (s)')
 
@@ -930,9 +771,6 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     ax3.set_ylim(0, None)
 
-    
-
-                      
 
     meco_idx = _find_stage1_meco_index(data)
 
@@ -944,7 +782,6 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     max_downrange = data.downrange[meco_idx] if len(data.downrange) > 0 else 0
 
-    
 
     summary = (f"At S1 MECO:\n"
 
@@ -958,15 +795,13 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
                f"Expected: pitch â‰ˆ vel_tilt â‰ˆ (90-Î³)")
 
-    
 
     ax3.text(0.98, 0.97, summary, transform=ax3.transAxes, fontsize=9,
 
              verticalalignment='top', horizontalalignment='right',
 
-             bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.95))
+             bbox={'boxstyle': 'round', 'facecolor': 'lightyellow', 'alpha': 0.95})
 
-    
 
     plt.tight_layout()
 
@@ -976,17 +811,14 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     plt.close(fig)
 
-    
 
     return path
-
 
 
 def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
     """Generate comprehensive 6-panel dashboard summary.
 
-    
 
     Args:
 
@@ -994,7 +826,6 @@ def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
         output_dir: Directory to save the plot
 
-        
 
     Returns:
 
@@ -1006,9 +837,6 @@ def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
     fig.suptitle('RLV Phase-I Ascent Summary', fontsize=16, fontweight='bold')
 
-    
-
-                       
 
     ax = axes[0, 0]
 
@@ -1024,9 +852,6 @@ def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_xlim(0, data.time[-1])
 
-    
-
-                       
 
     ax = axes[0, 1]
 
@@ -1044,9 +869,6 @@ def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_xlim(0, data.time[-1])
 
-    
-
-                   
 
     ax = axes[0, 2]
 
@@ -1070,9 +892,6 @@ def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_xlim(0, data.time[-1])
 
-    
-
-                    
 
     ax = axes[1, 0]
 
@@ -1088,9 +907,6 @@ def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_ylim(0, 95)
 
-    
-
-                                
 
     ax = axes[1, 1]
 
@@ -1110,9 +926,6 @@ def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_ylim(-5, 100)
 
-    
-
-                         
 
     ax = axes[1, 2]
 
@@ -1128,7 +941,6 @@ def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_ylim(0, None)
 
-    
 
     plt.tight_layout()
 
@@ -1138,31 +950,17 @@ def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
     plt.close(fig)
 
-    
 
     return path
-
-
-
-
-
-                                                                               
-
-                       
-
-                                                                               
-
 
 
 def plot_ascent_profile(data: TrajectoryData, output_dir: str) -> str:
 
     """Generate the ascent_profile.png dashboard referenced in README.
 
-    
 
     Combined 4-panel view of Altitude, Velocity, Mass, and Pitch.
 
-    
 
     Args:
 
@@ -1170,7 +968,6 @@ def plot_ascent_profile(data: TrajectoryData, output_dir: str) -> str:
 
         output_dir: Directory to save the plot
 
-        
 
     Returns:
 
@@ -1184,9 +981,6 @@ def plot_ascent_profile(data: TrajectoryData, output_dir: str) -> str:
 
     meco_idx = _find_stage1_meco_index(data)
 
-    
-
-                       
 
     ax = axes[0, 0]
 
@@ -1218,9 +1012,6 @@ def plot_ascent_profile(data: TrajectoryData, output_dir: str) -> str:
 
     ax.grid(True, alpha=0.3)
 
-    
-
-                       
 
     ax = axes[0, 1]
 
@@ -1252,9 +1043,6 @@ def plot_ascent_profile(data: TrajectoryData, output_dir: str) -> str:
 
     ax.grid(True, alpha=0.3)
 
-    
-
-                   
 
     ax = axes[1, 0]
 
@@ -1288,9 +1076,6 @@ def plot_ascent_profile(data: TrajectoryData, output_dir: str) -> str:
 
     ax.grid(True, alpha=0.3)
 
-    
-
-                    
 
     ax = axes[1, 1]
 
@@ -1310,7 +1095,6 @@ def plot_ascent_profile(data: TrajectoryData, output_dir: str) -> str:
 
     ax.grid(True, alpha=0.3)
 
-    
 
     plt.tight_layout()
 
@@ -1320,23 +1104,17 @@ def plot_ascent_profile(data: TrajectoryData, output_dir: str) -> str:
 
     plt.close(fig)
 
-    
 
     return path
-
-
-
 
 
 def plot_control_dynamics(data: TrajectoryData, output_dir: str) -> str:
 
     """Generate the control_dynamics.png referenced in README.
 
-    
 
     Combined view of Attitude Error, Control Torque, and Guidance Commands.
 
-    
 
     Args:
 
@@ -1344,7 +1122,6 @@ def plot_control_dynamics(data: TrajectoryData, output_dir: str) -> str:
 
         output_dir: Directory to save the plot
 
-        
 
     Returns:
 
@@ -1356,9 +1133,6 @@ def plot_control_dynamics(data: TrajectoryData, output_dir: str) -> str:
 
     fig.suptitle('Control System Performance', fontsize=16, fontweight='bold')
 
-    
-
-                             
 
     ax = axes[0]
 
@@ -1382,9 +1156,6 @@ def plot_control_dynamics(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_ylim(0, None)
 
-    
-
-                             
 
     ax = axes[1]
 
@@ -1406,9 +1177,6 @@ def plot_control_dynamics(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_ylim(0, None)
 
-    
-
-                                                 
 
     ax = axes[2]
 
@@ -1432,7 +1200,6 @@ def plot_control_dynamics(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_ylim(-5, 100)
 
-    
 
     plt.tight_layout()
 
@@ -1442,23 +1209,17 @@ def plot_control_dynamics(data: TrajectoryData, output_dir: str) -> str:
 
     plt.close(fig)
 
-    
 
     return path
-
-
-
 
 
 def plot_flight_path_readme(data: TrajectoryData, output_dir: str) -> str:
 
     """Generate the 11_flight_path_angle.png referenced in README.
 
-    
 
     Flight path angle evolution with correct filename for README.
 
-    
 
     Args:
 
@@ -1466,7 +1227,6 @@ def plot_flight_path_readme(data: TrajectoryData, output_dir: str) -> str:
 
         output_dir: Directory to save the plot
 
-        
 
     Returns:
 
@@ -1476,9 +1236,8 @@ def plot_flight_path_readme(data: TrajectoryData, output_dir: str) -> str:
 
     fig, ax = plt.subplots(figsize=(10, 7))
 
-    
 
-    ax.plot(data.time, data.gamma_rel, 'b-', linewidth=3, 
+    ax.plot(data.time, data.gamma_rel, 'b-', linewidth=3,
 
             label=r'$\gamma_{relative}$ (Primary)')
 
@@ -1490,13 +1249,11 @@ def plot_flight_path_readme(data: TrajectoryData, output_dir: str) -> str:
 
             label=r'$\gamma_{actual}$')
 
-    
 
     ax.axhline(y=90, color='gray', linestyle=':', alpha=0.5, linewidth=1.5)
 
     ax.axhline(y=0, color='gray', linestyle=':', alpha=0.5, linewidth=1.5)
 
-    
 
     ax.set_xlabel('Time (s)', fontsize=12)
 
@@ -1512,9 +1269,6 @@ def plot_flight_path_readme(data: TrajectoryData, output_dir: str) -> str:
 
     ax.grid(True, alpha=0.3)
 
-    
-
-                             
 
     textstr = (r'$\gamma$ Definition:' + '\n'
 
@@ -1528,9 +1282,8 @@ def plot_flight_path_readme(data: TrajectoryData, output_dir: str) -> str:
 
             verticalalignment='top',
 
-            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.95))
+            bbox={'boxstyle': 'round', 'facecolor': 'lightyellow', 'alpha': 0.95})
 
-    
 
     plt.tight_layout()
 
@@ -1541,25 +1294,12 @@ def plot_flight_path_readme(data: TrajectoryData, output_dir: str) -> str:
     plt.close(fig)
 
 
-
     return path
-
-
-
-
-
-                                                                               
-
-                                                                          
-
-                                                                               
-
 
 
 def plot_quaternion_norm(data: TrajectoryData, output_dir: str) -> str:
 
     """Quaternion norm history â€” validates numerical integration integrity.
-
 
 
     A deviation from ||q|| = 1 indicates numerical drift in the attitude
@@ -1573,7 +1313,6 @@ def plot_quaternion_norm(data: TrajectoryData, output_dir: str) -> str:
     fig, ax = plt.subplots()
 
 
-
     norm_err = np.maximum(np.abs(data.quaternion_norm - 1.0), 1e-16)
 
     ax.semilogy(data.time, norm_err, color='#d62728', linewidth=1.8,
@@ -1583,7 +1322,6 @@ def plot_quaternion_norm(data: TrajectoryData, output_dir: str) -> str:
     ax.axhline(y=C.QUATERNION_NORM_TOL, color='orange', linestyle='--',
 
                linewidth=1.5, label=f'Tolerance ({C.QUATERNION_NORM_TOL:.0e})')
-
 
 
     ax.set_xlabel('Time (s)')
@@ -1597,7 +1335,6 @@ def plot_quaternion_norm(data: TrajectoryData, output_dir: str) -> str:
     ax.set_xlim(0, data.time[-1])
 
 
-
     textstr = (f'Max deviation: {np.max(norm_err):.2e}\n'
 
                f'Mean deviation: {np.mean(norm_err):.2e}\n'
@@ -1608,8 +1345,7 @@ def plot_quaternion_norm(data: TrajectoryData, output_dir: str) -> str:
 
             verticalalignment='top',
 
-            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.95))
-
+            bbox={'boxstyle': 'round', 'facecolor': 'lightyellow', 'alpha': 0.95})
 
 
     plt.tight_layout()
@@ -1621,9 +1357,6 @@ def plot_quaternion_norm(data: TrajectoryData, output_dir: str) -> str:
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_angular_velocity_x(data: TrajectoryData, output_dir: str) -> str:
@@ -1641,9 +1374,6 @@ def plot_angular_velocity_x(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_angular_velocity_y(data: TrajectoryData, output_dir: str) -> str:
     """Body-frame angular velocity Y component (pitch rate)."""
     return plot_time_series(
@@ -1659,9 +1389,6 @@ def plot_angular_velocity_y(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_angular_velocity_z(data: TrajectoryData, output_dir: str) -> str:
     """Body-frame angular velocity Z component (roll rate about longitudinal axis)."""
     return plot_time_series(
@@ -1675,9 +1402,6 @@ def plot_angular_velocity_z(data: TrajectoryData, output_dir: str) -> str:
             hlines=(ZERO_HLINE,),
         ),
     )
-
-
-
 
 
 def plot_acceleration_profile(data: TrajectoryData, output_dir: str) -> str:
@@ -1705,13 +1429,9 @@ def plot_acceleration_profile(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_twr(data: TrajectoryData, output_dir: str) -> str:
 
     """Thrust-to-Weight Ratio vs time.
-
 
 
     TWR > 1 is required for liftoff; TWR increases as propellant is consumed.
@@ -1725,13 +1445,11 @@ def plot_twr(data: TrajectoryData, output_dir: str) -> str:
     meco_idx = _find_stage1_meco_index(data)
 
 
-
     r_center = data.altitude * 1000.0 + C.R_EARTH
 
     weight = C.MU_EARTH * data.mass / (r_center ** 2)
 
     twr = data.thrust_force / np.maximum(weight, 1.0)
-
 
 
     ax.plot(data.time, twr, color='#e377c2', linewidth=2, label='TWR')
@@ -1741,7 +1459,6 @@ def plot_twr(data: TrajectoryData, output_dir: str) -> str:
     ax.fill_between(data.time, 1.0, twr, where=(twr > 1.0),
 
                     alpha=0.15, color='green', label='Excess thrust')
-
 
 
     ax.set_xlabel('Time (s)')
@@ -1757,7 +1474,6 @@ def plot_twr(data: TrajectoryData, output_dir: str) -> str:
     ax.set_ylim(0, None)
 
 
-
     textstr = (f'Liftoff TWR: {twr[0]:.2f}\n'
 
                f'S1 MECO TWR: {twr[meco_idx]:.2f}\n'
@@ -1768,8 +1484,7 @@ def plot_twr(data: TrajectoryData, output_dir: str) -> str:
 
             ha='right', va='center',
 
-            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.95))
-
+            bbox={'boxstyle': 'round', 'facecolor': 'lightyellow', 'alpha': 0.95})
 
 
     plt.tight_layout()
@@ -1781,9 +1496,6 @@ def plot_twr(data: TrajectoryData, output_dir: str) -> str:
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_specific_orbital_energy(data: TrajectoryData, output_dir: str) -> str:
@@ -1813,9 +1525,6 @@ def plot_specific_orbital_energy(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_velocity_eci_x(data: TrajectoryData, output_dir: str) -> str:
     """ECI velocity X-component vs time."""
     return plot_time_series(
@@ -1829,9 +1538,6 @@ def plot_velocity_eci_x(data: TrajectoryData, output_dir: str) -> str:
             hlines=(ZERO_HLINE,),
         ),
     )
-
-
-
 
 
 def plot_velocity_eci_y(data: TrajectoryData, output_dir: str) -> str:
@@ -1849,9 +1555,6 @@ def plot_velocity_eci_y(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_velocity_eci_z(data: TrajectoryData, output_dir: str) -> str:
     """ECI velocity Z-component vs time."""
     return plot_time_series(
@@ -1867,13 +1570,9 @@ def plot_velocity_eci_z(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_horizontal_vs_vertical_velocity(data: TrajectoryData, output_dir: str) -> str:
 
     """Horizontal vs vertical velocity decomposition.
-
 
 
     This shows the transition from vertical ascent to horizontal flight,
@@ -1883,7 +1582,6 @@ def plot_horizontal_vs_vertical_velocity(data: TrajectoryData, output_dir: str) 
     """
 
     fig, ax = plt.subplots()
-
 
 
     ax.plot(data.time, data.velocity_vertical, color='#1f77b4', linewidth=2,
@@ -1897,21 +1595,17 @@ def plot_horizontal_vs_vertical_velocity(data: TrajectoryData, output_dir: str) 
     ax.axhline(y=0, color='gray', linestyle=':', alpha=0.5)
 
 
-
-                          
-
     diff = np.abs(data.velocity_horizontal - data.velocity_vertical)
 
     if len(diff) > 5:
 
-        crossover_idx = np.argmin(diff[5:]) + 5                               
+        crossover_idx = np.argmin(diff[5:]) + 5
 
         ax.axvline(x=data.time[crossover_idx], color='purple', linestyle='-.',
 
                    alpha=0.6, linewidth=1.5,
 
                    label=f'Crossover t={data.time[crossover_idx]:.0f}s')
-
 
 
     ax.set_xlabel('Time (s)')
@@ -1925,7 +1619,6 @@ def plot_horizontal_vs_vertical_velocity(data: TrajectoryData, output_dir: str) 
     ax.set_xlim(0, data.time[-1])
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '28_horiz_vs_vert_velocity.png')
@@ -1937,13 +1630,9 @@ def plot_horizontal_vs_vertical_velocity(data: TrajectoryData, output_dir: str) 
     return path
 
 
-
-
-
 def plot_mach_number(data: TrajectoryData, output_dir: str) -> str:
 
     """Mach number vs time.
-
 
 
     Key regimes: subsonic (M<0.8), transonic (0.8<M<1.3), supersonic (M>1.3),
@@ -1955,20 +1644,13 @@ def plot_mach_number(data: TrajectoryData, output_dir: str) -> str:
     fig, ax = plt.subplots()
 
 
-
     ax.plot(data.time, data.mach_number, color='#d62728', linewidth=2, label='Mach Number')
 
-
-
-                       
 
     ax.axhline(y=1.0, color='orange', linestyle='--', linewidth=1.5, label='M = 1 (sonic)')
 
     ax.axhline(y=5.0, color='blue', linestyle='-.', linewidth=1.2, label='M = 5 (hypersonic)')
 
-
-
-                             
 
     ax.axhspan(0, 0.8, alpha=0.04, color='green')
 
@@ -1977,7 +1659,6 @@ def plot_mach_number(data: TrajectoryData, output_dir: str) -> str:
     ax.axhspan(1.3, 5.0, alpha=0.04, color='red')
 
     ax.axhspan(5.0, max(15, np.max(data.mach_number)*1.1), alpha=0.04, color='blue')
-
 
 
     ax.text(data.time[-1]*0.02, 0.4, 'Subsonic', fontsize=8, color='green')
@@ -1989,7 +1670,6 @@ def plot_mach_number(data: TrajectoryData, output_dir: str) -> str:
     if np.max(data.mach_number) > 5.5:
 
         ax.text(data.time[-1]*0.02, 6.0, 'Hypersonic', fontsize=8, color='blue')
-
 
 
     ax.set_xlabel('Time (s)')
@@ -2005,7 +1685,6 @@ def plot_mach_number(data: TrajectoryData, output_dir: str) -> str:
     ax.set_ylim(0, None)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '29_mach_number.png')
@@ -2015,9 +1694,6 @@ def plot_mach_number(data: TrajectoryData, output_dir: str) -> str:
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_atmospheric_temperature(data: TrajectoryData, output_dir: str) -> str:
@@ -2048,9 +1724,6 @@ def plot_atmospheric_temperature(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_atmospheric_density(data: TrajectoryData, output_dir: str) -> str:
 
     """Atmospheric density (log scale) vs altitude."""
@@ -2058,15 +1731,11 @@ def plot_atmospheric_density(data: TrajectoryData, output_dir: str) -> str:
     fig, ax = plt.subplots()
 
 
-
-                                             
-
     valid = data.density > 0
 
     ax.semilogy(data.altitude[valid], data.density[valid],
 
                 color='#9467bd', linewidth=2)
-
 
 
     ax.set_xlabel('Altitude (km)')
@@ -2078,7 +1747,6 @@ def plot_atmospheric_density(data: TrajectoryData, output_dir: str) -> str:
     ax.set_xlim(0, None)
 
 
-
     textstr = (f'Sea level: {data.density[0]:.3f} kg/m$^3$\n'
 
                f'Final sample: {data.density[-1]:.2e} kg/m$^3$')
@@ -2087,8 +1755,7 @@ def plot_atmospheric_density(data: TrajectoryData, output_dir: str) -> str:
 
             ha='center', va='top',
 
-            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.95))
-
+            bbox={'boxstyle': 'round', 'facecolor': 'lightyellow', 'alpha': 0.95})
 
 
     plt.tight_layout()
@@ -2102,9 +1769,6 @@ def plot_atmospheric_density(data: TrajectoryData, output_dir: str) -> str:
     return path
 
 
-
-
-
 def plot_atmospheric_pressure(data: TrajectoryData, output_dir: str) -> str:
 
     """Atmospheric pressure (log scale) vs altitude."""
@@ -2112,13 +1776,11 @@ def plot_atmospheric_pressure(data: TrajectoryData, output_dir: str) -> str:
     fig, ax = plt.subplots()
 
 
-
     valid = data.pressure > 0
 
     ax.semilogy(data.altitude[valid], data.pressure[valid] / 1000.0,
 
                 color='#17becf', linewidth=2)
-
 
 
     ax.set_xlabel('Altitude (km)')
@@ -2130,15 +1792,13 @@ def plot_atmospheric_pressure(data: TrajectoryData, output_dir: str) -> str:
     ax.set_xlim(0, None)
 
 
-
     textstr = f'Sea level: {data.pressure[0]/1000:.1f} kPa'
 
     ax.text(0.50, 0.97, textstr, transform=ax.transAxes, fontsize=10,
 
             ha='center', va='top',
 
-            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.95))
-
+            bbox={'boxstyle': 'round', 'facecolor': 'lightyellow', 'alpha': 0.95})
 
 
     plt.tight_layout()
@@ -2152,18 +1812,12 @@ def plot_atmospheric_pressure(data: TrajectoryData, output_dir: str) -> str:
     return path
 
 
-
-
-
 def plot_speed_of_sound(data: TrajectoryData, output_dir: str) -> str:
 
     """Speed of sound vs altitude along trajectory."""
 
     fig, ax = plt.subplots()
 
-                                                                         
-
-                                                                                  
 
     alt_limit_km = 120.0
 
@@ -2182,7 +1836,6 @@ def plot_speed_of_sound(data: TrajectoryData, output_dir: str) -> str:
                label='Tropopause (11 km)')
 
 
-
     ax.set_xlabel('Altitude (km)')
 
     ax.set_ylabel('Speed of Sound (m/s)')
@@ -2192,7 +1845,6 @@ def plot_speed_of_sound(data: TrajectoryData, output_dir: str) -> str:
     ax.set_xlim(0, alt_limit_km)
 
     ax.legend(loc='best', framealpha=0.95)
-
 
 
     plt.tight_layout()
@@ -2206,15 +1858,11 @@ def plot_speed_of_sound(data: TrajectoryData, output_dir: str) -> str:
     return path
 
 
-
-
-
 def plot_throttle_history(data: TrajectoryData, output_dir: str) -> str:
 
     """Engine throttle setting vs time."""
 
     fig, ax = plt.subplots()
-
 
 
     throttle_pct = data.throttle * 100.0
@@ -2224,13 +1872,9 @@ def plot_throttle_history(data: TrajectoryData, output_dir: str) -> str:
     ax.fill_between(data.time, 0, throttle_pct, alpha=0.2, color='#e377c2')
 
 
-
-                             
-
     ax.plot(data.time, data.thrust_on * 100.0, 'k--', linewidth=1.0,
 
             alpha=0.4, label='Engine ON flag')
-
 
 
     ax.set_xlabel('Time (s)')
@@ -2246,7 +1890,6 @@ def plot_throttle_history(data: TrajectoryData, output_dir: str) -> str:
     ax.set_ylim(-5, 110)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '34_throttle_history.png')
@@ -2256,9 +1899,6 @@ def plot_throttle_history(data: TrajectoryData, output_dir: str) -> str:
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_inertia_variation(data: TrajectoryData, output_dir: str) -> str:
@@ -2294,9 +1934,6 @@ def plot_inertia_variation(data: TrajectoryData, output_dir: str) -> str:
             ylim=(0, None),
         ),
     )
-
-
-
 
 
 def plot_commanded_vs_actual_quat_w(data: TrajectoryData, output_dir: str) -> str:
@@ -2383,13 +2020,9 @@ def plot_downrange_distance(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_mass_flow_rate(data: TrajectoryData, output_dir: str) -> str:
 
     """Propellant mass flow rate vs time.
-
 
 
     Computed from mass derivative. Shows constant flow rate during powered
@@ -2407,9 +2040,6 @@ def plot_mass_flow_rate(data: TrajectoryData, output_dir: str) -> str:
     s2_ign_idx = _find_stage2_ignition_index(data, meco_idx)
 
 
-
-                                                    
-
     dt = np.diff(data.time)
 
     dm = np.diff(data.mass)
@@ -2420,20 +2050,16 @@ def plot_mass_flow_rate(data: TrajectoryData, output_dir: str) -> str:
 
     valid_idx = np.where(valid_dt)[0] + 1
 
-    mdot_fd[valid_idx] = -dm[valid_dt] / dt[valid_dt]                                        
+    mdot_fd[valid_idx] = -dm[valid_dt] / dt[valid_dt]
 
     if len(mdot_fd) > 1:
 
         mdot_fd[0] = mdot_fd[1]
 
 
-
-                                                                               
-
     if sep_idx is not None and sep_idx < len(mdot_fd):
 
         mdot_fd[sep_idx] = np.nan
-
 
 
     spike_threshold = 10.0 * max(C.MASS_FLOW_RATE, C.STAGE2_MASS_FLOW_RATE)
@@ -2442,11 +2068,6 @@ def plot_mass_flow_rate(data: TrajectoryData, output_dir: str) -> str:
 
     mdot_fd = np.where(mdot_fd < -1e-6, np.nan, np.maximum(mdot_fd, 0.0))
 
-
-
-                                                                       
-
-                                                                                   
 
     mdot = mdot_fd.copy()
 
@@ -2471,18 +2092,12 @@ def plot_mass_flow_rate(data: TrajectoryData, output_dir: str) -> str:
             s2_mask[:] = False
 
 
-
         mdot[:] = np.nan
 
         mdot[s1_mask] = np.clip(throttle[s1_mask], 0.0, 1.0) * C.MASS_FLOW_RATE
 
         mdot[s2_mask] = np.clip(throttle[s2_mask], 0.0, 1.0) * C.STAGE2_MASS_FLOW_RATE
 
-
-
-                                                                            
-
-                                                
 
     on_mask = _compute_engine_on_mask(data)
 
@@ -2499,7 +2114,6 @@ def plot_mass_flow_rate(data: TrajectoryData, output_dir: str) -> str:
     else:
 
         s2_mask[:] = False
-
 
 
     mdot_s1 = np.where(s1_mask, mdot, np.nan)
@@ -2525,7 +2139,6 @@ def plot_mass_flow_rate(data: TrajectoryData, output_dir: str) -> str:
                    alpha=0.6, label='Stage separation')
 
 
-
     ax.set_xlabel('Time (s)')
 
     ax.set_ylabel(r'$\dot{m}$ (kg/s)')
@@ -2547,7 +2160,6 @@ def plot_mass_flow_rate(data: TrajectoryData, output_dir: str) -> str:
         ax.set_ylim(0, None)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '41_mass_flow_rate.png')
@@ -2559,13 +2171,9 @@ def plot_mass_flow_rate(data: TrajectoryData, output_dir: str) -> str:
     return path
 
 
-
-
-
 def plot_propellant_fraction(data: TrajectoryData, output_dir: str) -> str:
 
     """Propellant fraction remaining vs time.
-
 
 
     Shows the fraction of total propellant still on board.
@@ -2580,9 +2188,6 @@ def plot_propellant_fraction(data: TrajectoryData, output_dir: str) -> str:
 
     n = len(data.time)
 
-
-
-                                                                       
 
     s1_remaining = np.full(n, np.nan)
 
@@ -2613,9 +2218,6 @@ def plot_propellant_fraction(data: TrajectoryData, output_dir: str) -> str:
         s1_remaining[s1_end_idx + 1:] = np.nan
 
 
-
-                                                                         
-
     s2_remaining = np.full(n, np.nan)
 
     s2_start_idx = sep_idx if sep_idx is not None else _find_stage2_ignition_index(data, meco_idx)
@@ -2635,7 +2237,6 @@ def plot_propellant_fraction(data: TrajectoryData, output_dir: str) -> str:
             100.0,
 
         )
-
 
 
     ax.plot(data.time, s1_remaining, color='#7f7f7f', linewidth=2,
@@ -2667,7 +2268,6 @@ def plot_propellant_fraction(data: TrajectoryData, output_dir: str) -> str:
                 label='10% Reserve Warning')
 
 
-
     ax.set_xlabel('Time (s)')
 
     ax.set_ylabel('Propellant Remaining (%)')
@@ -2679,7 +2279,6 @@ def plot_propellant_fraction(data: TrajectoryData, output_dir: str) -> str:
     ax.set_xlim(0, data.time[-1])
 
     ax.set_ylim(0, 105)
-
 
 
     reserve_kg = C.STAGE1_LANDING_FUEL_RESERVE
@@ -2698,8 +2297,7 @@ def plot_propellant_fraction(data: TrajectoryData, output_dir: str) -> str:
 
             ha='right', va='center',
 
-            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.95))
-
+            bbox={'boxstyle': 'round', 'facecolor': 'lightyellow', 'alpha': 0.95})
 
 
     plt.tight_layout()
@@ -2713,13 +2311,9 @@ def plot_propellant_fraction(data: TrajectoryData, output_dir: str) -> str:
     return path
 
 
-
-
-
 def plot_drag_coefficient_vs_mach(data: TrajectoryData, output_dir: str) -> str:
 
     """Drag coefficient Cd vs Mach number (as experienced along trajectory).
-
 
 
     Shows the Mach-dependent Cd look-up table values, including the transonic
@@ -2731,20 +2325,13 @@ def plot_drag_coefficient_vs_mach(data: TrajectoryData, output_dir: str) -> str:
     fig, ax = plt.subplots()
 
 
-
-                                                    
-
     cd_trajectory = np.interp(data.mach_number, C.MACH_BREAKPOINTS, C.CD_VALUES)
-
 
 
     ax.plot(data.mach_number, cd_trajectory, 'o', markersize=1.5, alpha=0.3,
 
             color='#1f77b4', label='Trajectory Cd(M)')
 
-
-
-                                   
 
     mach_fine = np.linspace(0, max(np.max(data.mach_number), 10), 500)
 
@@ -2753,11 +2340,9 @@ def plot_drag_coefficient_vs_mach(data: TrajectoryData, output_dir: str) -> str:
     ax.plot(mach_fine, cd_fine, 'r-', linewidth=2, label='Cd(M) Look-up Table')
 
 
-
     ax.axvline(x=1.0, color='gray', linestyle=':', linewidth=1.2, alpha=0.6,
 
                label='M = 1')
-
 
 
     ax.set_xlabel('Mach Number')
@@ -2773,7 +2358,6 @@ def plot_drag_coefficient_vs_mach(data: TrajectoryData, output_dir: str) -> str:
     ax.set_ylim(0, None)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '43_drag_coeff_vs_mach.png')
@@ -2783,9 +2367,6 @@ def plot_drag_coefficient_vs_mach(data: TrajectoryData, output_dir: str) -> str:
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_energy_budget(data: TrajectoryData, output_dir: str) -> str:
@@ -2816,13 +2397,9 @@ def plot_energy_budget(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_altitude_vs_velocity(data: TrajectoryData, output_dir: str) -> str:
 
     """Altitude vs velocity (state-space trajectory).
-
 
 
     This phase portrait shows the trajectory in altitude-velocity space,
@@ -2836,15 +2413,11 @@ def plot_altitude_vs_velocity(data: TrajectoryData, output_dir: str) -> str:
     meco_idx = _find_stage1_meco_index(data)
 
 
-
-                   
-
     sc = ax.scatter(data.velocity, data.altitude, c=data.time, cmap='viridis',
 
                     s=3, alpha=0.8)
 
-    cbar = plt.colorbar(sc, ax=ax, label='Time (s)')
-
+    plt.colorbar(sc, ax=ax, label='Time (s)')
 
 
     ax.scatter([data.velocity[0]], [data.altitude[0]], c='green', s=80,
@@ -2866,7 +2439,6 @@ def plot_altitude_vs_velocity(data: TrajectoryData, output_dir: str) -> str:
                    label=f'Final ({data.velocity[-1]:.0f} m/s, {data.altitude[-1]:.0f} km)')
 
 
-
     ax.set_xlabel('Inertial Velocity (m/s)')
 
     ax.set_ylabel('Altitude (km)')
@@ -2880,7 +2452,6 @@ def plot_altitude_vs_velocity(data: TrajectoryData, output_dir: str) -> str:
     ax.set_ylim(0, None)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '45_altitude_vs_velocity.png')
@@ -2890,9 +2461,6 @@ def plot_altitude_vs_velocity(data: TrajectoryData, output_dir: str) -> str:
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_gravity_loss(data: TrajectoryData, output_dir: str) -> str:
@@ -2929,9 +2497,6 @@ def plot_gravity_loss(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_drag_loss(data: TrajectoryData, output_dir: str) -> str:
     """Cumulative drag loss vs time."""
     cd_traj = np.interp(data.mach_number, C.MACH_BREAKPOINTS, C.CD_VALUES)
@@ -2963,9 +2528,6 @@ def plot_drag_loss(data: TrajectoryData, output_dir: str) -> str:
             ylim=(0, None),
         ),
     )
-
-
-
 
 
 def plot_delta_v_budget(data: TrajectoryData, output_dir: str) -> str:
@@ -3031,9 +2593,6 @@ def plot_delta_v_budget(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_position_eci_x(data: TrajectoryData, output_dir: str) -> str:
     """ECI position X-component vs time."""
     return plot_time_series(
@@ -3046,9 +2605,6 @@ def plot_position_eci_x(data: TrajectoryData, output_dir: str) -> str:
             lines=(TimeSeriesLine(data.position[:, 0] / 1000.0, color="#1f77b4"),),
         ),
     )
-
-
-
 
 
 def plot_position_eci_y(data: TrajectoryData, output_dir: str) -> str:
@@ -3065,9 +2621,6 @@ def plot_position_eci_y(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_position_eci_z(data: TrajectoryData, output_dir: str) -> str:
     """ECI position Z-component vs time."""
     return plot_time_series(
@@ -3082,13 +2635,9 @@ def plot_position_eci_z(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_natural_frequency(data: TrajectoryData, output_dir: str) -> str:
 
     """Control system natural frequency and damping ratio vs time.
-
 
 
     Uses the *scheduled* gains (Kp, Kd scaled proportionally to inertia)
@@ -3104,14 +2653,10 @@ def plot_natural_frequency(data: TrajectoryData, output_dir: str) -> str:
     from rlv_sim.mass import compute_inertia_tensor
 
 
-
     inertia_hist = np.array([compute_inertia_tensor(m) for m in data.mass])
 
     Ixx = inertia_hist[:, 0, 0]
 
-
-
-                                                                 
 
     gain_ratio = Ixx / C.IXX_FULL
 
@@ -3120,21 +2665,14 @@ def plot_natural_frequency(data: TrajectoryData, output_dir: str) -> str:
     kd_eff = C.KD_ATTITUDE * gain_ratio
 
 
-
-                                                                                     
-
     omega_n = np.sqrt(kp_eff / (2.0 * Ixx))
 
     zeta    = kd_eff / (2.0 * np.sqrt(kp_eff * Ixx / 2.0))
 
 
-
-                                                   
-
     omega_n_ref = np.sqrt(C.KP_ATTITUDE / (2.0 * Ixx))
 
     zeta_ref    = C.KD_ATTITUDE / (2.0 * np.sqrt(C.KP_ATTITUDE * Ixx / 2.0))
-
 
 
     ax1.plot(data.time, omega_n, color='#1f77b4', linewidth=2,
@@ -3150,7 +2688,6 @@ def plot_natural_frequency(data: TrajectoryData, output_dir: str) -> str:
     ax1.set_title('Control System Natural Frequency', fontweight='bold')
 
     ax1.legend(loc='best', fontsize=9, framealpha=0.95)
-
 
 
     ax2.plot(data.time, zeta, color='#d62728', linewidth=2,
@@ -3178,11 +2715,9 @@ def plot_natural_frequency(data: TrajectoryData, output_dir: str) -> str:
     ax2.legend(loc='upper left', framealpha=0.95, fontsize=9)
 
 
-
     ax1.set_xlim(0, data.time[-1])
 
     ax2.set_xlim(0, data.time[-1])
-
 
 
     plt.tight_layout()
@@ -3194,9 +2729,6 @@ def plot_natural_frequency(data: TrajectoryData, output_dir: str) -> str:
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_geocentric_radius(data: TrajectoryData, output_dir: str) -> str:
@@ -3225,9 +2757,6 @@ def plot_geocentric_radius(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_specific_angular_momentum(data: TrajectoryData, output_dir: str) -> str:
     """Specific angular momentum magnitude vs time."""
     h_vec = np.cross(data.position, data.velocity_vec)
@@ -3246,13 +2775,9 @@ def plot_specific_angular_momentum(data: TrajectoryData, output_dir: str) -> str
     )
 
 
-
-
-
 def plot_dynamic_pressure_vs_altitude(data: TrajectoryData, output_dir: str) -> str:
 
     """Dynamic pressure vs altitude (instead of time).
-
 
 
     Shows the Max-Q region in altitude space.
@@ -3260,7 +2785,6 @@ def plot_dynamic_pressure_vs_altitude(data: TrajectoryData, output_dir: str) -> 
     """
 
     fig, ax = plt.subplots()
-
 
 
     q_kpa = data.dynamic_pressure / 1000.0
@@ -3274,9 +2798,6 @@ def plot_dynamic_pressure_vs_altitude(data: TrajectoryData, output_dir: str) -> 
                linewidth=1.5, label=f'Limit ({C.MAX_DYNAMIC_PRESSURE/1000:.0f} kPa)')
 
 
-
-                
-
     maxq_idx = np.argmax(q_kpa)
 
     ax.scatter([data.altitude[maxq_idx]], [q_kpa[maxq_idx]], c='red', s=100,
@@ -3284,7 +2805,6 @@ def plot_dynamic_pressure_vs_altitude(data: TrajectoryData, output_dir: str) -> 
                marker='*', zorder=5,
 
                label=f'Max-Q: {q_kpa[maxq_idx]:.1f} kPa @ {data.altitude[maxq_idx]:.1f} km')
-
 
 
     ax.set_xlabel('Altitude (km)')
@@ -3300,7 +2820,6 @@ def plot_dynamic_pressure_vs_altitude(data: TrajectoryData, output_dir: str) -> 
     ax.set_ylim(0, None)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '55_q_vs_altitude.png')
@@ -3312,13 +2831,9 @@ def plot_dynamic_pressure_vs_altitude(data: TrajectoryData, output_dir: str) -> 
     return path
 
 
-
-
-
 def plot_effective_isp(data: TrajectoryData, output_dir: str) -> str:
 
     """Effective specific impulse vs altitude.
-
 
 
     ISP varies with ambient pressure: Isp_eff = T / (mdot * g0)
@@ -3338,7 +2853,6 @@ def plot_effective_isp(data: TrajectoryData, output_dir: str) -> str:
     sample_idx = np.arange(len(data.time))
 
 
-
     T_sl = C.THRUST_MAGNITUDE
 
     T_vac = C.ISP_VAC * C.G0 * C.MASS_FLOW_RATE
@@ -3346,13 +2860,11 @@ def plot_effective_isp(data: TrajectoryData, output_dir: str) -> str:
     P_sl = C.ATM_P0
 
 
-
     T_eff_s1 = T_vac - (T_vac - T_sl) * np.clip(data.pressure / P_sl, 0, 1)
 
     Isp_stage1 = np.full(len(data.time), np.nan)
 
     Isp_stage2 = np.full(len(data.time), np.nan)
-
 
 
     if s2_start_idx is None:
@@ -3366,13 +2878,11 @@ def plot_effective_isp(data: TrajectoryData, output_dir: str) -> str:
     Isp_stage1[stage1_mask] = T_eff_s1[stage1_mask] / (C.MASS_FLOW_RATE * C.G0)
 
 
-
     if s2_start_idx is not None:
 
         stage2_mask = on_mask & (sample_idx >= s2_start_idx)
 
         Isp_stage2[stage2_mask] = C.STAGE2_ISP_VAC
-
 
 
     ax.plot(data.altitude, Isp_stage1, color='#e377c2', linewidth=2, label='Stage 1 effective Isp')
@@ -3394,7 +2904,6 @@ def plot_effective_isp(data: TrajectoryData, output_dir: str) -> str:
                label=f'Stage 2 Vacuum Isp = {C.STAGE2_ISP_VAC:.0f} s')
 
 
-
     ax.set_xlabel('Altitude (km)')
 
     ax.set_ylabel('Effective Isp (s)')
@@ -3406,7 +2915,6 @@ def plot_effective_isp(data: TrajectoryData, output_dir: str) -> str:
     ax.set_xlim(0, None)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '56_effective_isp.png')
@@ -3416,9 +2924,6 @@ def plot_effective_isp(data: TrajectoryData, output_dir: str) -> str:
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_altitude_rate(data: TrajectoryData, output_dir: str) -> str:
@@ -3443,13 +2948,9 @@ def plot_altitude_rate(data: TrajectoryData, output_dir: str) -> str:
     )
 
 
-
-
-
 def plot_ground_track(data: TrajectoryData, output_dir: str) -> str:
 
     """Ground track projection (East vs North from launch site).
-
 
 
     Shows the 2D footprint of the trajectory projected onto Earth's surface.
@@ -3461,15 +2962,12 @@ def plot_ground_track(data: TrajectoryData, output_dir: str) -> str:
     meco_idx = _find_stage1_meco_index(data)
 
 
-
     east, north = _compute_ground_track_enu(data)
-
 
 
     sc = ax.scatter(east, north, c=data.time, cmap='plasma', s=4, alpha=0.8)
 
     plt.colorbar(sc, ax=ax, label='Time (s)')
-
 
 
     ax.scatter([0], [0], c='green', s=100, marker='^', zorder=5, label='Launch Site')
@@ -3485,7 +2983,6 @@ def plot_ground_track(data: TrajectoryData, output_dir: str) -> str:
                    zorder=5, label='Final projection')
 
 
-
     ax.set_xlabel('East (km)')
 
     ax.set_ylabel('North (km)')
@@ -3495,17 +2992,11 @@ def plot_ground_track(data: TrajectoryData, output_dir: str) -> str:
     ax.legend(loc='upper left', framealpha=0.95)
 
 
-
-                                                                                
-
-                                                                        
-
     north_center = (north.max() + north.min()) / 2.0
 
     north_half = max((north.max() - north.min()) / 2.0, 5.0)
 
     ax.set_ylim(north_center - north_half, north_center + north_half)
-
 
 
     plt.tight_layout()
@@ -3517,16 +3008,5 @@ def plot_ground_track(data: TrajectoryData, output_dir: str) -> str:
     plt.close(fig)
 
     return path
-
-
-
-
-
-
-
-
-
-
-
 
 

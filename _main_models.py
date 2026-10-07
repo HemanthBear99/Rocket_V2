@@ -30,7 +30,7 @@ class SimulationLog:
         self._data: dict[str, list] = {}
 
     def __getattr__(self, name: str) -> Any:
-                                                              
+
         try:
             return self._data[name]
         except KeyError:
@@ -41,7 +41,7 @@ class SimulationLog:
         """Return a logged series, or an empty list when it was never emitted."""
         return self._data.get(name, [])
 
-                                                                             
+
     def append(self, state: State, guidance: dict, control: dict):
 
         v_rel = np.asarray(guidance.get('v_rel', state.v))
@@ -254,7 +254,7 @@ class SimulationLog:
         for k, v in entry.items():
             self._data.setdefault(k, []).append(v)
 
-                                                                             
+
     def to_csv(self, filename: str):
         os.makedirs(os.path.dirname(filename) or '.', exist_ok=True)
         with open(filename, 'w', newline='') as fh:

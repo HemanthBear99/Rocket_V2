@@ -82,7 +82,7 @@ async def _periodic_cleanup_loop(interval_s: float = 60.0, retention_s: float = 
                 logger.info(f"Pruned stale campaign from memory: {campaign_id}")
         except asyncio.CancelledError:
             break
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - keep the cleanup loop alive
             logger.error(f"Error in periodic cleanup loop: {e}")
 
 class StartupConfigurationError(RuntimeError):
@@ -112,7 +112,7 @@ async def lifespan(app: FastAPI):
 
     cleanup_task = asyncio.create_task(_periodic_cleanup_loop())
     yield
-                               
+
     cleanup_task.cancel()
     await asyncio.gather(cleanup_task, return_exceptions=True)
 
@@ -201,7 +201,6 @@ def _json_error(status_code: int, detail: str, request_id: str):
     )
 
 
-                                      
 _cors_origins = [
     origin.strip()
     for origin in os.getenv(
@@ -232,8 +231,6 @@ if static_dir.exists():
         return FileResponse(static_dir / "index.html")
 
 
-                                            
-                                                                                                          
 active_simulations: dict[str, dict] = {}
 
 
@@ -267,8 +264,8 @@ def _require_unchanged(
 def map_config(setup: SimulationSetup) -> SimulationConfig:
     """Map frontend configuration JSON structure to Python SimulationConfig."""
     overrides = {}
-    
-                        
+
+
     m = setup.mission.model_dump()
     if "dt" in m:
         overrides["dt"] = float(m["dt"])
@@ -284,8 +281,8 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
         overrides["target_inclination_deg"] = float(m["target_inclination_deg"])
     if "stage_sep_velocity" in m:
         overrides["stage_sep_velocity"] = float(m["stage_sep_velocity"])
-        
-                         
+
+
     r = setup.recovery.model_dump()
     if "landing_lat" in r:
         overrides["booster_landing_site_lat_deg"] = float(r["landing_lat"])
@@ -304,8 +301,8 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
             "suicide_burn": True,
         },
     )
-        
-                        
+
+
     p = setup.physics.model_dump()
     if "j2" in p:
         overrides["enable_j2"] = bool(p["j2"])
@@ -320,10 +317,10 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
         overrides["enable_gps"] = bool(p["sensor_noise"])
         overrides["enable_landing_altimeter"] = bool(p["sensor_noise"])
 
-                                                                  
+
     v = setup.vehicle.model_dump()
-    default_thrust = C.THRUST_MAGNITUDE            
-    default_isp    = C.ISP                      
+    default_thrust = C.THRUST_MAGNITUDE
+    default_isp    = C.ISP
     if "thrust_sl" in v and float(v["thrust_sl"]) > 0:
         overrides["runtime_thrust_scale"] = float(v["thrust_sl"]) / default_thrust
     if "isp_sl" in v and float(v["isp_sl"]) > 0:
@@ -405,7 +402,6 @@ async def _publish(sim_meta: dict, payload: dict) -> None:
             except asyncio.QueueEmpty:
                 pass
         await queue.put(outgoing)
-
 
 
 def _finish_simulation(sim_meta: dict, status: str, **details: Any) -> None:
@@ -520,7 +516,7 @@ async def frontend_config_defaults() -> dict[str, Any]:
 
 
 @app.post("/api/config/validate", dependencies=[Depends(require_api_key)])
-async def validate_config_upload(file: UploadFile = File(...)) -> dict[str, Any]:
+async def validate_config_upload(file: UploadFile = File(...)) -> dict[str, Any]:  # noqa: B008 - FastAPI idiom
     """Parse and validate an uploaded configuration JSON file without starting a run."""
     if file.filename and not file.filename.lower().endswith(".json"):
         raise HTTPException(status_code=422, detail="Configuration file must be JSON")
@@ -531,7 +527,7 @@ async def validate_config_upload(file: UploadFile = File(...)) -> dict[str, Any]
     try:
         payload = json.loads(raw.decode("utf-8"))
         if not isinstance(payload, dict):
-            raise ValueError("Configuration JSON must contain an object")
+            raise ValueError("Configuration JSON must contain an object")  # noqa: TRY004 - mapped to 422 below
         config = create_default_config(**payload)
     except (json.JSONDecodeError, ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=f"Invalid configuration: {exc}") from exc
@@ -636,8 +632,8 @@ async def run_simulation_task(sim_id: str, sim_meta: dict) -> None:
 @app.post("/api/simulations/start", dependencies=[Depends(require_api_key)])
 async def start_sim(setup: SimulationSetup):
     _prune_finished_simulations()
-    
-                             
+
+
     active_runs = sum(
         1 for meta in active_simulations.values()
         if meta.get("status") in ("running", "paused")
@@ -653,7 +649,7 @@ async def start_sim(setup: SimulationSetup):
         config = map_config(setup)
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    
+
     # No placeholder queue here. A queue inserted into sim_meta["queues"] but
     # never drained made every _publish() get/put into a permanently-full
     # 100-slot queue for the whole run. WebSocket clients create and register
@@ -672,10 +668,9 @@ async def start_sim(setup: SimulationSetup):
     }
     active_simulations[sim_id] = sim_meta
 
-    
-                                                               
+
     sim_meta["task"] = asyncio.create_task(run_simulation_task(sim_id, sim_meta))
-    
+
     logger.info(f"Started simulation {sim_id}")
     return {
         "simulation_id": sim_id,
@@ -835,48 +830,46 @@ async def websocket_telemetry(websocket: WebSocket, sim_id: str):
         await websocket.send_json({"error": "Telemetry client limit reached"})
         await websocket.close(code=1013, reason="Telemetry client limit reached")
         return
-    
-                                               
+
+
     queue = asyncio.Queue(maxsize=100)
     sim_meta["queues"].add(queue)
     if "last_payload" in sim_meta:
         queue.put_nowait(sim_meta["last_payload"])
-    
-                             
+
+
     client_id = id(websocket)
     sim_meta["clients"].add(client_id)
-    
+
     logger.info(f"Client connected for telemetry streaming: {sim_id} (active clients: {len(sim_meta['clients'])})")
-    
+
     try:
         while True:
-                                            
+
             telemetry = await queue.get()
             await websocket.send_json(telemetry)
-            
+
             if "event" in telemetry and telemetry["event"] in ("completed", "stopped"):
                 break
             if "error" in telemetry:
                 break
-                
+
     except WebSocketDisconnect:
         logger.info(f"Client disconnected from {sim_id}")
-    except Exception as e:
-        logger.exception(f"Error in websocket streaming: {e}")
+    except Exception:
+        logger.exception("Error in websocket streaming")
     finally:
-                             
+
         sim_meta["queues"].discard(queue)
         sim_meta["clients"].discard(client_id)
-        
-                                                                  
+
+
         # Keep a strong reference to the reaper task. asyncio's event loop only
         # holds a weak reference to a task, so an un-referenced create_task can
         # be garbage-collected before it ever runs, silently skipping the abort.
         if not sim_meta["clients"] and sim_meta["status"] in ("running", "paused"):
             orphan_check = asyncio.create_task(_graceful_abort_check(sim_id))
             sim_meta["orphan_check_task"] = orphan_check
-
-
 
 
 active_campaigns: dict[str, dict] = {}

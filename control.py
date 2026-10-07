@@ -40,17 +40,17 @@ AttitudeControllerName = Literal["pd", "pid"]
 def compute_commanded_quaternion(desired_direction: np.ndarray) -> np.ndarray:
     """
     Convert desired thrust direction to commanded orientation quaternion.
-    
+
     The body +Z axis should align with the desired thrust direction.
-    
+
     Args:
         desired_direction: Desired thrust direction (inertial frame)
-        
+
     Returns:
         Commanded quaternion [w, x, y, z]
     """
-                                                  
-                                                                               
+
+
     return direction_to_quaternion(desired_direction, C.BODY_Z_AXIS)
 
 
@@ -80,14 +80,13 @@ def compute_thrust_axis_error(q_current: np.ndarray, desired_direction: np.ndarr
     axis_inertial = cross3(body_z_inertial, desired)
     axis_norm = float(vec_norm(axis_inertial))
     if axis_norm < C.ZERO_TOLERANCE:
-                                                              
+
         axis_body = np.array([1.0, 0.0, 0.0])
     else:
         axis_inertial /= axis_norm
         axis_body = R.T @ axis_inertial
 
     return axis_body * np.sin(0.5 * angle), angle
-
 
 
 @dataclass
@@ -185,19 +184,19 @@ def _apply_integral_anti_windup(
     else:
         limit_roll = limit_transverse
 
-                                    
+
     integral_error = integral_error.copy()
     tau_i = ki * integral_error
-    
-                                     
+
+
     tau_i_trans = tau_i[0:2]
     mag_trans = float(vec_norm(tau_i_trans))
     if limit_transverse > 0.0 and mag_trans > limit_transverse:
         integral_error[0:2] = integral_error[0:2] * (limit_transverse / mag_trans)
     elif limit_transverse <= 0.0:
         integral_error[0:2] = 0.0
-        
-                   
+
+
     tau_i_roll = tau_i[2]
     mag_roll = abs(tau_i_roll)
     if limit_roll > 0.0 and mag_roll > limit_roll:
@@ -208,13 +207,12 @@ def _apply_integral_anti_windup(
     return integral_error
 
 
-
 def pd_control_law(q_error_vector: np.ndarray, error_angle: float,
                    omega: np.ndarray, inertia=None,
-                   max_torque: float = None,
-                   kp_attitude: float = None,
-                   kd_attitude: float = None,
-                   ki_attitude: float = None,
+                   max_torque: float | None = None,
+                   kp_attitude: float | None = None,
+                   kd_attitude: float | None = None,
+                   ki_attitude: float | None = None,
                    control_state: ControlState | None = None,
                    dt: float = 0.0,
                    controller: AttitudeControllerName = "pd",
@@ -270,8 +268,7 @@ def pd_control_law(q_error_vector: np.ndarray, error_angle: float,
 
     q_error_vector = np.asarray(q_error_vector, dtype=float)
 
-                                                                              
-                                                                                                    
+
     # RCS-only detection. The deadband exists to stop the RCS thrusters
     # chasing sub-deadband attitude errors it cannot null, wasting propellant.
     # It previously keyed on a hard-coded max_torque < 50000.0 literal, but
@@ -287,13 +284,10 @@ def pd_control_law(q_error_vector: np.ndarray, error_angle: float,
         if error_angle < deadband_rad:
             q_error_vector = np.zeros_like(q_error_vector)
 
-                                  
+
     tau_p = kp * q_error_vector
 
-                                    
-                                                                              
-                                                                                  
-                                                                                           
+
     tau_d = -kd * omega
 
     tau_i = np.zeros(3, dtype=float)
@@ -316,7 +310,7 @@ def pd_control_law(q_error_vector: np.ndarray, error_angle: float,
 
     torque = tau_p + tau_d + tau_i
 
-                     
+
     torque_magnitude = vec_norm(torque)
     if torque_magnitude > max_torque:
         torque = torque * (max_torque / torque_magnitude)
@@ -324,14 +318,13 @@ def pd_control_law(q_error_vector: np.ndarray, error_angle: float,
     return torque, control_state
 
 
-
 def compute_control_output(q_current: np.ndarray, omega: np.ndarray,
                           desired_direction: np.ndarray,
-                          inertia: float = None,
-                          max_torque: float = None,
-                          kp_attitude: float = None,
-                          kd_attitude: float = None,
-                          ki_attitude: float = None,
+                          inertia: float | None = None,
+                          max_torque: float | None = None,
+                          kp_attitude: float | None = None,
+                          kd_attitude: float | None = None,
+                          ki_attitude: float | None = None,
                           control_state: ControlState | None = None,
                           dt: float = 0.0,
                           controller: AttitudeControllerName = "pd",

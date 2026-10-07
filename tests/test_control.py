@@ -32,12 +32,12 @@ class TestScheduleGains:
         assert ki == pytest.approx(np.full(3, C.KI_ATTITUDE))
 
     def test_half_inertia_halves_gains(self):
-        kp, kd, ki = _schedule_gains(C.IXX_FULL / 2, None, None, None)
+        kp, _kd, _ki = _schedule_gains(C.IXX_FULL / 2, None, None, None)
         assert kp == pytest.approx(np.full(3, C.KP_ATTITUDE / 2))
 
     def test_per_axis_inertia_scales_independently(self):
         inertia = np.array([C.IXX_FULL, C.IXX_FULL / 2, C.IXX_FULL / 23.0])
-        kp, kd, ki = _schedule_gains(inertia, None, None, None)
+        kp, _kd, _ki = _schedule_gains(inertia, None, None, None)
         assert kp[0] == pytest.approx(C.KP_ATTITUDE)
         assert kp[1] == pytest.approx(C.KP_ATTITUDE / 2)
         assert kp[2] == pytest.approx(C.KP_ATTITUDE / 23.0, rel=1e-3)
@@ -48,7 +48,7 @@ class TestScheduleGains:
         assert kp == pytest.approx(np.full(3, C.KP_ATTITUDE))
 
     def test_none_inertia_uses_reference_gains_directly(self):
-        kp, kd, ki = _schedule_gains(None, None, None, None)
+        kp, _kd, _ki = _schedule_gains(None, None, None, None)
         assert kp == pytest.approx(np.full(3, C.KP_ATTITUDE))
 
     def test_explicit_gain_overrides_respected(self):
@@ -238,12 +238,12 @@ class TestThrustAxisError:
 
     def test_perpendicular_direction_gives_90_degree_error(self):
         q = np.array([1.0, 0.0, 0.0, 0.0])
-        q_ev, angle = compute_thrust_axis_error(q, np.array([1.0, 0.0, 0.0]))
+        _q_ev, angle = compute_thrust_axis_error(q, np.array([1.0, 0.0, 0.0]))
         assert angle == pytest.approx(np.pi / 2, rel=1e-6)
 
     def test_opposite_direction_gives_180_degree_error(self):
         q = np.array([1.0, 0.0, 0.0, 0.0])
-        q_ev, angle = compute_thrust_axis_error(q, np.array([0.0, 0.0, -1.0]))
+        _q_ev, angle = compute_thrust_axis_error(q, np.array([0.0, 0.0, -1.0]))
         assert angle == pytest.approx(np.pi, rel=1e-6)
 
     def test_zero_desired_direction_returns_zero_error(self):

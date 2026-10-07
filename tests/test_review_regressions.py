@@ -99,13 +99,13 @@ def test_s2_report_uses_achieved_or_last_insertion_state(achieved_phase):
     radius = C.R_EARTH + config.orbit_target_altitude_m
     speed = np.sqrt(C.MU_EARTH / radius)
     log = SimulationLog()
-    log._data = dict(
-        time=[100., 300., 400.],
-        phase_name=["ORBIT_INSERTION", achieved_phase or "ORBIT_INSERTION", "S2_DEORBIT"],
-        position_x=[radius] * 3, position_y=[0.] * 3, position_z=[0.] * 3,
-        velocity_x=[0.] * 3, velocity_y=[6000., speed if achieved_phase else 6500., 5000.],
-        velocity_z=[0.] * 3, mass=[20000.] * 3,
-    )
+    log._data = {
+        "time": [100., 300., 400.],
+        "phase_name": ["ORBIT_INSERTION", achieved_phase or "ORBIT_INSERTION", "S2_DEORBIT"],
+        "position_x": [radius] * 3, "position_y": [0.] * 3, "position_z": [0.] * 3,
+        "velocity_x": [0.] * 3, "velocity_y": [6000., speed if achieved_phase else 6500., 5000.],
+        "velocity_z": [0.] * 3, "mass": [20000.] * 3,
+    }
     result.orbiter_log = log
     assessment = _assess_s2_initial_orbit(result, config)
     recovery = _extract_s2_recovery(result, config)

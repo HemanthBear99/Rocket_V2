@@ -22,15 +22,9 @@ for name, ov in CASES:
     cfg = create_demo_config(**ov)
     res = run_full_mission(config=cfg, verbose=False)
     a = assess_full_mission(res, cfg)
+    failed = f"failed={a.failed_criteria}" if a.failed_criteria else ""
     print(
-        "%-22s success=%-5s landing=%-20s speed=%-6s site_err=%-8s ecc=%.4f %s"
-        % (
-            name,
-            a.mission_success,
-            a.landing.status,
-            a.landing.touchdown_speed_mps,
-            a.landing.site_error_m,
-            a.orbit.eccentricity,
-            ("failed=" + str(a.failed_criteria)) if a.failed_criteria else "",
-        )
+        f"{name:<22} success={a.mission_success!s:<5} landing={a.landing.status:<20} "
+        f"speed={a.landing.touchdown_speed_mps!s:<6} site_err={a.landing.site_error_m!s:<8} "
+        f"ecc={a.orbit.eccentricity:.4f} {failed}"
     )

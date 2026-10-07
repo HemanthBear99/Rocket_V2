@@ -6,6 +6,8 @@ former does NOT inherit the "research profile" overrides -- flagged in the
 verified test architecture report, section 24/27).
 """
 
+import dataclasses
+
 import pytest
 
 from rlv_sim.config_definition import SimulationConfig
@@ -89,5 +91,5 @@ class TestConfigRoundTripOverrides:
 
     def test_frozen_dataclass_rejects_attribute_mutation(self):
         config = create_test_config()
-        with pytest.raises(Exception):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             config.dt = 0.5

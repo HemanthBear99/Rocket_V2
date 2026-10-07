@@ -94,9 +94,6 @@ def _extract_series(log, field: str) -> np.ndarray:
     return np.array(values)
 
 
-
-
-
 def _compute_engine_on_mask_from_log(log) -> np.ndarray:
 
     """Infer engine-on samples from raw log telemetry."""
@@ -110,13 +107,11 @@ def _compute_engine_on_mask_from_log(log) -> np.ndarray:
         return np.array([], dtype=bool)
 
 
-
     thrust_on = _extract_series(log, "thrust_on")
 
     if len(thrust_on) == n:
 
         return thrust_on > 0.5
-
 
 
     thrust_x = _extract_series(log, "inertial_thrust_x")
@@ -136,11 +131,7 @@ def _compute_engine_on_mask_from_log(log) -> np.ndarray:
             return thrust_mag > threshold
 
 
-
     return np.ones(n, dtype=bool)
-
-
-
 
 
 def _find_stage1_meco_time(log, min_off_duration_s: float = 0.5) -> float | None:
@@ -160,11 +151,9 @@ def _find_stage1_meco_time(log, min_off_duration_s: float = 0.5) -> float | None
         return float(t[0])
 
 
-
     on_mask = _compute_engine_on_mask_from_log(log)
 
     off_mask = ~on_mask
-
 
 
     i = 0
@@ -190,7 +179,6 @@ def _find_stage1_meco_time(log, min_off_duration_s: float = 0.5) -> float | None
         i += 1
 
 
-
     edges = np.where(on_mask[:-1] & (~on_mask[1:]))[0]
 
     if len(edges) > 0:
@@ -198,11 +186,7 @@ def _find_stage1_meco_time(log, min_off_duration_s: float = 0.5) -> float | None
         return float(t[int(edges[0] + 1)])
 
 
-
     return None
-
-
-
 
 
 def _find_phase_time(log, phase: str) -> float | None:
@@ -218,7 +202,6 @@ def _find_phase_time(log, phase: str) -> float | None:
         return None
 
 
-
     for i, name in enumerate(phases):
 
         if name == phase:
@@ -226,9 +209,6 @@ def _find_phase_time(log, phase: str) -> float | None:
             return float(t[i])
 
     return None
-
-
-
 
 
 def _collect_mission_timeline_events(
@@ -248,7 +228,6 @@ def _collect_mission_timeline_events(
     events: list[PlotEvent] = []
 
 
-
     meco_time = _find_stage1_meco_time(ascent_log)
 
     if meco_time is not None:
@@ -256,9 +235,7 @@ def _collect_mission_timeline_events(
         events.append(PlotEvent(meco_time, "MECO", '0.25', ':'))
 
 
-
     events.append(PlotEvent(float(separation_time), "Stage Separation", 'black', '--'))
-
 
 
     boostback_time = _find_phase_time(booster_log, "BOOSTER_BOOSTBACK")
@@ -268,13 +245,11 @@ def _collect_mission_timeline_events(
         events.append(PlotEvent(boostback_time, "Boostback Burn", '#cc2222', '--'))
 
 
-
     orbit_insertion_time = _find_phase_time(orbiter_log, "ORBIT_INSERTION")
 
     if orbit_insertion_time is not None:
 
         events.append(PlotEvent(orbit_insertion_time, "Orbit Insertion", '#228833', '--'))
-
 
 
     orbit_achieved_time = _find_phase_time(orbiter_log, "ORBIT_ACHIEVED")
@@ -284,17 +259,10 @@ def _collect_mission_timeline_events(
         events.append(PlotEvent(orbit_achieved_time, "Orbit Achieved", '#228833', ':'))
 
 
-
-                                                                    
-
     events.extend(_collect_s2_recovery_events(orbiter_log))
 
 
-
     return sorted(events, key=lambda event: event.time)
-
-
-
 
 
 def _collect_booster_timeline_events(booster_log, separation_time: float) -> list[PlotEvent]:
@@ -302,7 +270,6 @@ def _collect_booster_timeline_events(booster_log, separation_time: float) -> lis
     """Assemble key booster events for post-separation timeline plots."""
 
     events: list[PlotEvent] = [PlotEvent(float(separation_time), "Stage Separation", 'black', '--')]
-
 
 
     phase_markers = [
@@ -326,7 +293,6 @@ def _collect_booster_timeline_events(booster_log, separation_time: float) -> lis
             events.append(PlotEvent(phase_time, label, color, linestyle))
 
 
-
     t_b = _extract_series(booster_log, "time")
 
     h_b = _extract_series(booster_log, "altitude")
@@ -336,11 +302,7 @@ def _collect_booster_timeline_events(booster_log, separation_time: float) -> lis
         events.append(PlotEvent(float(t_b[-1]), "Touchdown", '0.15', ':'))
 
 
-
     return sorted(events, key=lambda event: event.time)
-
-
-
 
 
 def _mission_events_with_liftoff_maxq(
@@ -378,9 +340,6 @@ def _mission_events_with_liftoff_maxq(
     return sorted(events, key=lambda event: event.time)
 
 
-
-
-
 def _plot_log_branch(ax: Axes, log, field: str, label: str, color: str, *, scale: float = 1.0,
 
                      linestyle: str = '-') -> None:
@@ -392,9 +351,6 @@ def _plot_log_branch(ax: Axes, log, field: str, label: str, color: str, *, scale
     if len(t) > 0 and len(y) == len(t):
 
         ax.plot(t, y * scale, color=color, linewidth=1.8, linestyle=linestyle, label=label)
-
-
-
 
 
 def _quat_matrix(log, prefix: str) -> np.ndarray:
@@ -420,9 +376,6 @@ def _quat_matrix(log, prefix: str) -> np.ndarray:
     return np.column_stack([part[:n] for part in parts])
 
 
-
-
-
 def _euler_from_log(log, prefix: str) -> tuple[np.ndarray, np.ndarray]:
 
     t = _extract_series(log, "time")
@@ -440,13 +393,9 @@ def _euler_from_log(log, prefix: str) -> tuple[np.ndarray, np.ndarray]:
     return t[:n], angles
 
 
-
-
-
 def _booster_touchdown_speed(booster_log) -> float:
 
     """Compute surface-relative touchdown speed from the final logged state vectors.
-
 
 
     The logged 'velocity_rel' field is populated from the guidance dict's 'v_rel'
@@ -456,7 +405,6 @@ def _booster_touchdown_speed(booster_log) -> float:
     than the logged position/velocity).  This means velocity_rel[-1] is one
 
     timestep stale at the moment of landing detection.
-
 
 
     This function recomputes v_rel from the *post-integration* position_x/y/z and
@@ -488,14 +436,10 @@ def _booster_touchdown_speed(booster_log) -> float:
 
         return float(np.linalg.norm(compute_ground_relative_velocity(pos, vel)))
 
-                                                                      
 
     vr = getattr(booster_log, 'velocity_rel', None)
 
     return float(vr[-1]) if vr and len(vr) > 0 else 0.0
-
-
-
 
 
 def plot_mission_altitude_split(ascent_log, orbiter_log, booster_log,
@@ -534,9 +478,6 @@ def plot_mission_altitude_split(ascent_log, orbiter_log, booster_log,
     )
 
 
-
-
-
 def plot_mission_velocity_split(ascent_log, orbiter_log, booster_log,
                                 separation_time: float, output_dir: str) -> str:
     """Velocity timeline for stacked ascent, orbiter, and booster segments."""
@@ -573,9 +514,6 @@ def plot_mission_velocity_split(ascent_log, orbiter_log, booster_log,
     )
 
 
-
-
-
 def plot_booster_altitude_profile(booster_log, separation_time: float, output_dir: str) -> str:
 
     """Booster altitude from separation to touchdown/termination."""
@@ -583,13 +521,11 @@ def plot_booster_altitude_profile(booster_log, separation_time: float, output_di
     fig, ax = plt.subplots(figsize=(10, 6))
 
 
-
     t_b = _extract_series(booster_log, "time")
 
     h_b = _extract_series(booster_log, "altitude")
 
-    v_b_rel = _extract_series(booster_log, "velocity_rel")                          
-
+    v_b_rel = _extract_series(booster_log, "velocity_rel")
 
 
     if len(t_b) == 0:
@@ -622,8 +558,7 @@ def plot_booster_altitude_profile(booster_log, separation_time: float, output_di
 
                         textcoords='offset points',
 
-                        arrowprops=dict(arrowstyle='->', alpha=0.7))
-
+                        arrowprops={"arrowstyle": '->', "alpha": 0.7})
 
 
     _add_timeline_event_markers(ax, _collect_booster_timeline_events(booster_log, separation_time))
@@ -639,7 +574,6 @@ def plot_booster_altitude_profile(booster_log, separation_time: float, output_di
     ax.grid(True, alpha=0.3)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '61_booster_altitude_profile.png')
@@ -651,13 +585,9 @@ def plot_booster_altitude_profile(booster_log, separation_time: float, output_di
     return path
 
 
-
-
-
 def plot_booster_velocity_profile(booster_log, separation_time: float, output_dir: str) -> str:
 
     """Booster speed and vertical velocity versus time.
-
 
 
     Both inertial speed and surface-relative speed are shown.  The inertial
@@ -671,7 +601,6 @@ def plot_booster_velocity_profile(booster_log, separation_time: float, output_di
     fig, ax = plt.subplots(figsize=(10, 6))
 
 
-
     t_b   = _extract_series(booster_log, "time")
 
     v_b   = _extract_series(booster_log, "velocity")
@@ -679,7 +608,6 @@ def plot_booster_velocity_profile(booster_log, separation_time: float, output_di
     v_rel = _extract_series(booster_log, "velocity_rel")
 
     v_vert = _extract_series(booster_log, "velocity_vertical")
-
 
 
     if len(t_b) == 0:
@@ -706,7 +634,6 @@ def plot_booster_velocity_profile(booster_log, separation_time: float, output_di
 
                     label='Vertical velocity')
 
-                                                                                           
 
         if len(v_rel) == len(t_b) and len(t_b) > 0:
 
@@ -718,8 +645,7 @@ def plot_booster_velocity_profile(booster_log, separation_time: float, output_di
 
                         xytext=(-120, 30), textcoords='offset points',
 
-                        arrowprops=dict(arrowstyle='->', lw=1.1), fontsize=9)
-
+                        arrowprops={"arrowstyle": '->', "lw": 1.1}, fontsize=9)
 
 
     ax.axhline(0.0, color='gray', linestyle=':', alpha=0.5)
@@ -737,7 +663,6 @@ def plot_booster_velocity_profile(booster_log, separation_time: float, output_di
     ax.grid(True, alpha=0.3)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '62_booster_velocity_profile.png')
@@ -749,13 +674,9 @@ def plot_booster_velocity_profile(booster_log, separation_time: float, output_di
     return path
 
 
-
-
-
 def plot_booster_landing_zoom(booster_log, output_dir: str, window_s: float = 140.0) -> str:
 
     """Zoom into the final landing segment of booster descent.
-
 
 
     Speed axis shows SURFACE-RELATIVE speed (not inertial), so the touchdown
@@ -767,13 +688,11 @@ def plot_booster_landing_zoom(booster_log, output_dir: str, window_s: float = 14
     fig, ax1 = plt.subplots(figsize=(10, 6))
 
 
-
     t_b   = _extract_series(booster_log, "time")
 
     h_b   = _extract_series(booster_log, "altitude")
 
-    v_rel = _extract_series(booster_log, "velocity_rel")                    
-
+    v_rel = _extract_series(booster_log, "velocity_rel")
 
 
     if len(t_b) == 0:
@@ -797,13 +716,11 @@ def plot_booster_landing_zoom(booster_log, output_dir: str, window_s: float = 14
         vz_rel = v_rel[mask] if len(v_rel) == len(t_b) else np.array([])
 
 
-
         ax1.plot(tz, hz, color='tab:red', linewidth=2.0, label='Altitude')
 
         ax1.set_ylabel('Altitude (km)', color='tab:red')
 
         ax1.tick_params(axis='y', labelcolor='tab:red')
-
 
 
         ax2 = ax1.twinx()
@@ -819,13 +736,11 @@ def plot_booster_landing_zoom(booster_log, output_dir: str, window_s: float = 14
         ax2.tick_params(axis='y', labelcolor='tab:blue')
 
 
-
         lines = ax1.get_lines() + ax2.get_lines()
 
         labels = [l.get_label() for l in lines]
 
         ax1.legend(lines, labels, loc='upper right', framealpha=0.95)
-
 
 
         ax1.scatter([tz[-1]], [hz[-1]], color='black', s=55, zorder=5, marker='*')
@@ -838,8 +753,7 @@ def plot_booster_landing_zoom(booster_log, output_dir: str, window_s: float = 14
 
                      textcoords='offset points',
 
-                     arrowprops=dict(arrowstyle='->', alpha=0.8), fontsize=9)
-
+                     arrowprops={"arrowstyle": '->', "alpha": 0.8}, fontsize=9)
 
 
     ax1.set_xlabel('Time (s)')
@@ -849,7 +763,6 @@ def plot_booster_landing_zoom(booster_log, output_dir: str, window_s: float = 14
                   fontweight='bold')
 
     ax1.grid(True, alpha=0.3)
-
 
 
     plt.tight_layout()
@@ -863,9 +776,6 @@ def plot_booster_landing_zoom(booster_log, output_dir: str, window_s: float = 14
     return path
 
 
-
-
-
 def plot_booster_velocity_components(booster_log, output_dir: str) -> str:
 
     """Booster radial and inertial-horizontal velocity history."""
@@ -877,7 +787,6 @@ def plot_booster_velocity_components(booster_log, output_dir: str) -> str:
     v_rad = _extract_series(booster_log, "radial_velocity")
 
     v_horiz = _extract_series(booster_log, "horizontal_velocity_inertial")
-
 
 
     if len(t) == 0:
@@ -901,7 +810,6 @@ def plot_booster_velocity_components(booster_log, output_dir: str) -> str:
         ax.legend(loc='best', framealpha=0.95)
 
 
-
     ax.set_xlabel('Time (s)')
 
     ax.set_ylabel('Velocity (m/s)')
@@ -909,7 +817,6 @@ def plot_booster_velocity_components(booster_log, output_dir: str) -> str:
     ax.set_title('Booster Velocity Components', fontweight='bold')
 
     ax.grid(True, alpha=0.3)
-
 
 
     plt.tight_layout()
@@ -923,13 +830,9 @@ def plot_booster_velocity_components(booster_log, output_dir: str) -> str:
     return path
 
 
-
-
-
 def plot_booster_ignition_prediction(booster_log, output_dir: str) -> str:
 
     """Actual altitude vs predicted ignition altitude â€” zoomed to descent phase.
-
 
 
     The predicted ignition altitude is the energy-based estimate of how much
@@ -951,7 +854,6 @@ def plot_booster_ignition_prediction(booster_log, output_dir: str) -> str:
     ignite_pred_m = _extract_series(booster_log, "ignition_altitude_prediction_m")
 
 
-
     if len(t) == 0:
 
         ax.text(0.5, 0.5, 'No booster telemetry available', transform=ax.transAxes,
@@ -960,7 +862,6 @@ def plot_booster_ignition_prediction(booster_log, output_dir: str) -> str:
 
     else:
 
-                                                          
 
         apogee_idx = int(np.argmax(alt_km))
 
@@ -969,22 +870,17 @@ def plot_booster_ignition_prediction(booster_log, output_dir: str) -> str:
         alt_desc = alt_km[apogee_idx:]
 
 
-
         ax.plot(t_desc, alt_desc, color='tab:red', linewidth=1.9, label='Actual altitude')
-
 
 
         if len(ignite_pred_m) == len(t):
 
-            pred_desc = ignite_pred_m[apogee_idx:] / 1000.0            
+            pred_desc = ignite_pred_m[apogee_idx:] / 1000.0
 
             ax.plot(t_desc, pred_desc, color='tab:green', linewidth=1.8,
 
                     linestyle='--', label='Predicted ignition altitude')
 
-
-
-                                                                                
 
             trigger = np.where(alt_desc <= pred_desc * 1.5)[0]
 
@@ -997,11 +893,9 @@ def plot_booster_ignition_prediction(booster_log, output_dir: str) -> str:
                            label=f'~Ignition trigger (t={t_desc[ti]:.0f}s)')
 
 
-
         ax.legend(loc='upper right', framealpha=0.95)
 
         ax.set_title('Booster Landing Ignition Prediction (Descent Phase)', fontweight='bold')
-
 
 
     ax.set_xlabel('Time (s)')
@@ -1009,7 +903,6 @@ def plot_booster_ignition_prediction(booster_log, output_dir: str) -> str:
     ax.set_ylabel('Altitude (km)')
 
     ax.grid(True, alpha=0.3)
-
 
 
     plt.tight_layout()
@@ -1023,9 +916,6 @@ def plot_booster_ignition_prediction(booster_log, output_dir: str) -> str:
     return path
 
 
-
-
-
 def plot_booster_phase_fuel_budget(booster_log, output_dir: str) -> str:
 
     """Propellant consumed in each booster phase."""
@@ -1037,7 +927,6 @@ def plot_booster_phase_fuel_budget(booster_log, output_dir: str) -> str:
     m = _extract_series(booster_log, "mass")
 
     phases = getattr(booster_log, "phase_name", [])
-
 
 
     usage = {}
@@ -1061,7 +950,6 @@ def plot_booster_phase_fuel_budget(booster_log, output_dir: str) -> str:
         usage[phase] = usage.get(phase, 0.0) + max(0.0, m[start] - m[-1])
 
 
-
     if len(usage) == 0:
 
         ax.text(0.5, 0.5, 'No phase fuel usage data available', transform=ax.transAxes,
@@ -1083,13 +971,11 @@ def plot_booster_phase_fuel_budget(booster_log, output_dir: str) -> str:
                     ha='center', va='bottom', fontsize=9)
 
 
-
     ax.set_ylabel('Propellant Used (kg)')
 
     ax.set_title('Booster Phase Fuel Budget', fontweight='bold')
 
     ax.grid(True, axis='y', alpha=0.3)
-
 
 
     plt.tight_layout()
@@ -1103,15 +989,11 @@ def plot_booster_phase_fuel_budget(booster_log, output_dir: str) -> str:
     return path
 
 
-
-
-
 def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
 
                                   separation_time: float, output_dir: str) -> str:
 
     """RTLS Trajectory Profile â€” Altitude vs Downrange Distance.
-
 
 
     Replicates the classic RTLS altitude-vs-downrange diagram showing the
@@ -1123,14 +1005,10 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
     fig, ax = plt.subplots(figsize=(12, 7))
 
 
-
-    dr_a = _extract_series(ascent_log,  "downrange_ground")                        
+    dr_a = _extract_series(ascent_log,  "downrange_ground")
 
     h_a  = _extract_series(ascent_log,  "altitude")
 
-                                                                           
-
-                                                                               
 
     dr_b = _extract_series(booster_log, "downrange_ground")
 
@@ -1138,9 +1016,6 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
 
     ph_b = list(getattr(booster_log, "phase_name", []))
 
-
-
-                                                          
 
     if len(dr_a) == 0:
 
@@ -1150,9 +1025,6 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
 
         dr_b = _extract_series(booster_log, "downrange")
 
-
-
-                                                                 
 
     if len(dr_a) > 0 and len(dr_b) > 0:
 
@@ -1167,7 +1039,6 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
         ax.plot(dr_a, h_a, color='#CC2222', linewidth=2.2, zorder=3)
 
 
-
     def _first_phase_idx(target):
 
         for i, p in enumerate(ph_b):
@@ -1179,14 +1050,10 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
         return None
 
 
-
     entry_idx   = _first_phase_idx("BOOSTER_ENTRY")
 
     landing_idx = _first_phase_idx("BOOSTER_LANDING")
 
-
-
-                   
 
     if len(dr_a) > 0:
 
@@ -1199,9 +1066,6 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
                     textcoords='offset points', fontsize=9)
 
 
-
-                                           
-
     if len(dr_b) > 0:
 
         ax.scatter([dr_b[0]], [h_b[0]], color='#CC2222', s=70, zorder=6)
@@ -1212,11 +1076,8 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
 
                     textcoords='offset points', fontsize=9,
 
-                    arrowprops=dict(arrowstyle='->', color='black', lw=1.1))
+                    arrowprops={"arrowstyle": '->', "color": 'black', "lw": 1.1})
 
-
-
-                      
 
         peak_idx = int(np.argmax(h_b))
 
@@ -1228,11 +1089,8 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
 
                     textcoords='offset points', fontsize=9,
 
-                    arrowprops=dict(arrowstyle='->', color='black', lw=1.1))
+                    arrowprops={"arrowstyle": '->', "color": 'black', "lw": 1.1})
 
-
-
-                
 
     if entry_idx is not None:
 
@@ -1244,11 +1102,8 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
 
                     textcoords='offset points', fontsize=9,
 
-                    arrowprops=dict(arrowstyle='->', color='black', lw=1.1))
+                    arrowprops={"arrowstyle": '->', "color": 'black', "lw": 1.1})
 
-
-
-                                     
 
     if landing_idx is not None:
 
@@ -1260,11 +1115,8 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
 
                     textcoords='offset points', fontsize=9,
 
-                    arrowprops=dict(arrowstyle='->', color='black', lw=1.1))
+                    arrowprops={"arrowstyle": '->', "color": 'black', "lw": 1.1})
 
-
-
-               
 
     if len(dr_b) > 0:
 
@@ -1278,11 +1130,8 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
 
                     textcoords='offset points', fontsize=9,
 
-                    arrowprops=dict(arrowstyle='->', color='black', lw=1.1))
+                    arrowprops={"arrowstyle": '->', "color": 'black', "lw": 1.1})
 
-
-
-                        
 
     if len(dr_a) > 1:
 
@@ -1291,7 +1140,6 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
         ax.text(dr_a[mid] + 4, h_a[mid], "Ascent Phase",
 
                 fontsize=10, style='italic', color='#444444', ha='left')
-
 
 
     if len(dr_b) > 0:
@@ -1307,7 +1155,6 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
                     fontsize=10, style='italic', color='#444444', ha='left')
 
 
-
     ax.set_xlabel("Downrange Distance from Launch Site (km)", fontsize=12)
 
     ax.set_ylabel("Altitude (km)", fontsize=12)
@@ -1321,7 +1168,6 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
     ax.grid(True, alpha=0.3)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '67_rtls_trajectory_profile.png')
@@ -1331,9 +1177,6 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_full_mission_attitude_error(ascent_log, orbiter_log, booster_log,
@@ -1377,9 +1220,6 @@ def plot_full_mission_attitude_error(ascent_log, orbiter_log, booster_log,
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_full_mission_angular_rates(ascent_log, orbiter_log, booster_log,
@@ -1435,9 +1275,6 @@ def plot_full_mission_angular_rates(ascent_log, orbiter_log, booster_log,
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_full_mission_euler_angles(ascent_log, orbiter_log, booster_log,
@@ -1503,9 +1340,6 @@ def plot_full_mission_euler_angles(ascent_log, orbiter_log, booster_log,
     return path
 
 
-
-
-
 def plot_full_mission_quaternion_tracking(ascent_log, orbiter_log, booster_log,
 
                                           separation_time: float, output_dir: str) -> str:
@@ -1567,9 +1401,6 @@ def plot_full_mission_quaternion_tracking(ascent_log, orbiter_log, booster_log,
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_full_mission_control_response(ascent_log, orbiter_log, booster_log,
@@ -1647,9 +1478,6 @@ def plot_full_mission_control_response(ascent_log, orbiter_log, booster_log,
     return path
 
 
-
-
-
 def plot_full_mission_torque_components(ascent_log, orbiter_log, booster_log,
 
                                         separation_time: float, output_dir: str) -> str:
@@ -1713,9 +1541,6 @@ def plot_full_mission_torque_components(ascent_log, orbiter_log, booster_log,
     return path
 
 
-
-
-
 def plot_gravity_turn_pitch_fpa_tracking(ascent_log, separation_time: float, output_dir: str) -> str:
 
     """Commanded vs actual pitch and flight-path angle through the gravity turn."""
@@ -1725,7 +1550,6 @@ def plot_gravity_turn_pitch_fpa_tracking(ascent_log, separation_time: float, out
     if len(t) == 0:
 
         raise ValueError("ascent log has no time samples")
-
 
 
     pitch_cmd = _extract_series(ascent_log, "pitch_angle")
@@ -1741,13 +1565,11 @@ def plot_gravity_turn_pitch_fpa_tracking(ascent_log, separation_time: float, out
     h = _extract_series(ascent_log, "altitude")
 
 
-
     n = min(len(t), len(pitch_cmd), len(pitch_actual), len(gamma_cmd), len(gamma_actual))
 
     if n == 0:
 
         raise ValueError("ascent log has no pitch/gamma tracking samples")
-
 
 
     t = t[:n]
@@ -1769,11 +1591,9 @@ def plot_gravity_turn_pitch_fpa_tracking(ascent_log, separation_time: float, out
     gamma_error = gamma_actual - gamma_cmd
 
 
-
     fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
 
     fig.suptitle("Gravity Turn Pitch and Flight-Path-Angle Tracking", fontweight="bold", fontsize=14)
-
 
 
     axes[0].plot(t, pitch_cmd, color="#005f73", linewidth=2.2, label="Commanded pitch from vertical")
@@ -1787,7 +1607,6 @@ def plot_gravity_turn_pitch_fpa_tracking(ascent_log, separation_time: float, out
     axes[0].set_ylim(-5, 100)
 
     axes[0].legend(loc="best", fontsize=9)
-
 
 
     axes[1].plot(t, gamma_cmd, color="#0a9396", linewidth=2.2, label="Commanded flight-path angle gamma")
@@ -1807,7 +1626,6 @@ def plot_gravity_turn_pitch_fpa_tracking(ascent_log, separation_time: float, out
     axes[1].legend(loc="best", fontsize=9)
 
 
-
     axes[2].plot(t, pitch_error, color="#ae2012", linewidth=2.0, label="Pitch tracking error")
 
     axes[2].plot(t, gamma_error, color="#1d3557", linewidth=2.0, linestyle="--", label="Gamma tracking error")
@@ -1819,7 +1637,6 @@ def plot_gravity_turn_pitch_fpa_tracking(ascent_log, separation_time: float, out
     axes[2].set_xlabel("Mission Time (s)")
 
     axes[2].legend(loc="best", fontsize=9)
-
 
 
     events = [PlotEvent(0.0, "Liftoff", "black", "-")]
@@ -1839,7 +1656,6 @@ def plot_gravity_turn_pitch_fpa_tracking(ascent_log, separation_time: float, out
     events.append(PlotEvent(float(separation_time), "Stage Separation", "black", "--"))
 
 
-
     for ax in axes:
 
         _add_timeline_event_markers(ax, events)
@@ -1847,7 +1663,6 @@ def plot_gravity_turn_pitch_fpa_tracking(ascent_log, separation_time: float, out
         ax.grid(True, alpha=0.25)
 
         ax.set_xlim(0.0, max(float(separation_time), float(t[-1])))
-
 
 
     if len(h) == len(_extract_series(ascent_log, "time")):
@@ -1861,7 +1676,6 @@ def plot_gravity_turn_pitch_fpa_tracking(ascent_log, separation_time: float, out
             axes[0].axvspan(gt_time, float(separation_time), color="#e9d8a6", alpha=0.18, label="Gravity-turn region")
 
 
-
     fig.tight_layout()
 
     path = os.path.join(output_dir, '76_gravity_turn_pitch_fpa_tracking.png')
@@ -1871,9 +1685,6 @@ def plot_gravity_turn_pitch_fpa_tracking(ascent_log, separation_time: float, out
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_full_mission_aero_loads(ascent_log, orbiter_log, booster_log,
@@ -1918,7 +1729,7 @@ def plot_full_mission_aero_loads(ascent_log, orbiter_log, booster_log,
 
                              textcoords='offset points', fontsize=8,
 
-                             arrowprops=dict(arrowstyle='->', lw=0.8))
+                             arrowprops={"arrowstyle": '->', "lw": 0.8})
 
         if len(alt) == len(q) and len(q) > 0:
 
@@ -1967,9 +1778,6 @@ def plot_full_mission_aero_loads(ascent_log, orbiter_log, booster_log,
     return path
 
 
-
-
-
 def plot_rtls_landing_error(booster_log, separation_time: float, output_dir: str,
 
                             config=None) -> str:
@@ -1977,8 +1785,6 @@ def plot_rtls_landing_error(booster_log, separation_time: float, output_dir: str
     """Precise RTLS landing error in metres, not rounded kilometre wording."""
 
     from .config_factory import create_default_config
-
-
 
 
     cfg = config or create_default_config()
@@ -2056,9 +1862,9 @@ def plot_rtls_landing_error(booster_log, separation_time: float, output_dir: str
 
             textcoords='offset points',
 
-            bbox=dict(boxstyle='round', facecolor='white', alpha=0.92),
+            bbox={"boxstyle": 'round', "facecolor": 'white', "alpha": 0.92},
 
-            arrowprops=dict(arrowstyle='->', lw=1.0),
+            arrowprops={"arrowstyle": '->', "lw": 1.0},
 
             fontsize=9,
 
@@ -2085,15 +1891,11 @@ def plot_rtls_landing_error(booster_log, separation_time: float, output_dir: str
     return path
 
 
-
-
-
 def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
                            separation_time: float, output_dir: str) -> str:
 
     """Full Mission Arc schematic â€” S1 ascent, RTLS flyback, and S2 orbital trajectory.
-
 
 
     Replicates the three-arc mission overview diagram showing stage separation,
@@ -2104,9 +1906,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
     fig, ax = plt.subplots(figsize=(14, 7))
 
-
-
-                                                                                 
 
     dr_a = _extract_series(ascent_log,  "downrange_ground")
 
@@ -2125,9 +1924,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
     ph_o = list(getattr(orbiter_log,  "phase_name", []))
 
 
-
-                                                                    
-
     if len(dr_a) == 0:
 
         dr_a = _extract_series(ascent_log, "downrange")
@@ -2141,10 +1937,7 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
         dr_o = _extract_series(orbiter_log, "downrange")
 
 
-
-                                                                                     
-
-    MAX_S2_DOWNRANGE = 800.0      
+    MAX_S2_DOWNRANGE = 800.0
 
     if len(dr_o) > 0:
 
@@ -2167,14 +1960,10 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
         h_o  = h_o[:last + 1]
 
 
-
     sep_dr = float(dr_a[-1]) if len(dr_a) > 0 else 0.0
 
     sep_h  = float(h_a[-1])  if len(dr_a) > 0 else 0.0
 
-
-
-                          
 
     if len(dr_a) > 0:
 
@@ -2182,9 +1971,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
                 label='Stage 1 Ascent (stacked)', zorder=4)
 
-
-
-                                                                         
 
     if len(dr_o) > 0:
 
@@ -2197,9 +1983,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
                 label='Stage 2 trajectory (to orbit)', zorder=4)
 
 
-
-                                                                  
-
     if len(dr_b) > 0:
 
         dr_b2 = np.concatenate([[sep_dr], dr_b])
@@ -2210,9 +1993,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
                 label='Booster RTLS flyback', zorder=4)
 
-
-
-                                          
 
     all_x = []
 
@@ -2227,18 +2007,12 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
     x_max = (max(all_x) + 15) if all_x else 200
 
 
-
-                   
-
     ax.axhline(100, color='gray', linestyle='--', linewidth=1.2, alpha=0.7, zorder=2)
 
     ax.text(x_max - 5, 101.5, "100 km KÃ¡rmÃ¡n line",
 
             fontsize=9, ha='right', va='bottom', color='gray')
 
-
-
-               
 
     ax.axhline(0, color='saddlebrown', linewidth=1.5, alpha=0.6, zorder=2)
 
@@ -2247,9 +2021,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
                     color='saddlebrown', alpha=0.10, zorder=1)
 
 
-
-                 
-
     if len(dr_a) > 0:
 
         ax.scatter([dr_a[0]], [0.0], color='black', s=80, marker='^', zorder=7)
@@ -2257,13 +2028,9 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
         ax.text(float(dr_a[0]) + 1.5, 2.5, "launch site", fontsize=9)
 
 
-
-                      
-
     ax.scatter([sep_dr], [sep_h], color='#CC2222', s=100, marker='D', zorder=7)
 
     ax.text(sep_dr + 1.5, sep_h - 5, "stage sep", fontsize=9, color='#CC2222')
-
 
 
     def _first_idx(phases, target):
@@ -2277,16 +2044,12 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
         return None
 
 
-
     boostback_idx = _first_idx(ph_b, "BOOSTER_BOOSTBACK")
 
     entry_idx     = _first_idx(ph_b, "BOOSTER_ENTRY")
 
     landing_idx   = _first_idx(ph_b, "BOOSTER_LANDING")
 
-
-
-                                  
 
     if boostback_idx is not None:
 
@@ -2303,9 +2066,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
                     color='#2244CC')
 
 
-
-                      
-
     if entry_idx is not None:
 
         ax.scatter([dr_b[entry_idx]], [h_b[entry_idx]],
@@ -2320,11 +2080,8 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
                     color='#2244CC',
 
-                    arrowprops=dict(arrowstyle='->', color='#2244CC', lw=1.0))
+                    arrowprops={"arrowstyle": '->', "color": '#2244CC', "lw": 1.0})
 
-
-
-                      
 
     if landing_idx is not None:
 
@@ -2340,11 +2097,8 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
                     color='#2244CC',
 
-                    arrowprops=dict(arrowstyle='->', color='#2244CC', lw=1.0))
+                    arrowprops={"arrowstyle": '->', "color": '#2244CC', "lw": 1.0})
 
-
-
-                    
 
     if len(dr_b) > 0:
 
@@ -2352,9 +2106,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
                    color='black', s=110, marker='*', zorder=8)
 
-
-
-                              
 
     if len(dr_b) > 0:
 
@@ -2377,7 +2128,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
                 style='italic', color='#2244CC')
 
 
-
     if len(dr_o) > 0:
 
         mid_o = len(dr_o) // 2
@@ -2385,7 +2135,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
         ax.text(float(dr_o[mid_o]) + 3, float(h_o[mid_o]) + 2,
 
                 "stage 2 trajectory", fontsize=9, style='italic', color='#228833')
-
 
 
     all_h = []
@@ -2397,7 +2146,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
             all_h.append(float(np.max(arr)))
 
     h_top = max(all_h) * 1.12 if all_h else 200
-
 
 
     ax.set_xlim(x_min, x_max)
@@ -2417,7 +2165,6 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
     ax.grid(True, alpha=0.3)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '77_full_mission_arc.png')
@@ -2429,25 +2176,11 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
     return path
 
 
-
-
-
-                                                                               
-
-                                               
-
-                                                                               
-
-
-
 def _has_s2_recovery(orbiter_log) -> bool:
 
     """True when the orbiter telemetry includes the Stage-2 recovery phases."""
 
     return _find_phase_time(orbiter_log, "S2_LANDING") is not None
-
-
-
 
 
 def _collect_s2_recovery_events(orbiter_log) -> list[PlotEvent]:
@@ -2489,9 +2222,6 @@ def _collect_s2_recovery_events(orbiter_log) -> list[PlotEvent]:
     return sorted(events, key=lambda event: event.time)
 
 
-
-
-
 def plot_s2_recovery_profile(orbiter_log, output_dir: str) -> str:
 
     """Stage-2 altitude and surface-relative speed from orbit to drone-ship touchdown."""
@@ -2503,7 +2233,6 @@ def plot_s2_recovery_profile(orbiter_log, output_dir: str) -> str:
     h = _extract_series(orbiter_log, "altitude")
 
     v_rel = _extract_series(orbiter_log, "velocity_rel")
-
 
 
     if len(t) == 0:
@@ -2521,7 +2250,6 @@ def plot_s2_recovery_profile(orbiter_log, output_dir: str) -> str:
         ax1.tick_params(axis='y', labelcolor='tab:green')
 
 
-
         ax2 = ax1.twinx()
 
         if len(v_rel) == len(t):
@@ -2535,7 +2263,6 @@ def plot_s2_recovery_profile(orbiter_log, output_dir: str) -> str:
         ax2.tick_params(axis='y', labelcolor='tab:blue')
 
 
-
         td = _booster_touchdown_speed(orbiter_log)
 
         ax1.scatter([t[-1]], [max(float(h[-1]), 0.0)], marker='*', color='black', s=70, zorder=6)
@@ -2546,14 +2273,12 @@ def plot_s2_recovery_profile(orbiter_log, output_dir: str) -> str:
 
                      textcoords='offset points', fontsize=9,
 
-                     arrowprops=dict(arrowstyle='->', alpha=0.8))
-
+                     arrowprops={"arrowstyle": '->', "alpha": 0.8})
 
 
         lines = ax1.get_lines() + ax2.get_lines()
 
         ax1.legend(lines, [l.get_label() for l in lines], loc='center right', framealpha=0.95)
-
 
 
     _add_timeline_event_markers(ax1, _collect_s2_recovery_events(orbiter_log))
@@ -2567,7 +2292,6 @@ def plot_s2_recovery_profile(orbiter_log, output_dir: str) -> str:
     ax1.grid(True, alpha=0.3)
 
 
-
     plt.tight_layout()
 
     path = os.path.join(output_dir, '78_s2_recovery_profile.png')
@@ -2577,9 +2301,6 @@ def plot_s2_recovery_profile(orbiter_log, output_dir: str) -> str:
     plt.close(fig)
 
     return path
-
-
-
 
 
 def plot_s2_entry_profile(orbiter_log, output_dir: str) -> str:
@@ -2593,7 +2314,6 @@ def plot_s2_entry_profile(orbiter_log, output_dir: str) -> str:
     v_rel = _extract_series(orbiter_log, "velocity_rel")
 
     phases = list(getattr(orbiter_log, "phase_name", []))
-
 
 
     descent_idx = [i for i, p in enumerate(phases) if p in ("S2_DEORBIT", "S2_ENTRY", "S2_LANDING")]
@@ -2639,7 +2359,6 @@ def plot_s2_entry_profile(orbiter_log, output_dir: str) -> str:
                    color='black', s=70, zorder=6)
 
 
-
     ax.set_xlabel('Surface-Relative Speed (m/s)')
 
     ax.set_ylabel('Altitude (km)')
@@ -2649,7 +2368,6 @@ def plot_s2_entry_profile(orbiter_log, output_dir: str) -> str:
                  fontweight='bold')
 
     ax.grid(True, alpha=0.3)
-
 
 
     plt.tight_layout()
@@ -2663,9 +2381,6 @@ def plot_s2_entry_profile(orbiter_log, output_dir: str) -> str:
     return path
 
 
-
-
-
 def plot_s2_landing_zoom(orbiter_log, output_dir: str, window_s: float = 320.0) -> str:
 
     """Zoom into the Stage-2 terminal landing burn: altitude + descent rate."""
@@ -2677,7 +2392,6 @@ def plot_s2_landing_zoom(orbiter_log, output_dir: str, window_s: float = 320.0) 
     h = _extract_series(orbiter_log, "altitude")
 
     v_rel = _extract_series(orbiter_log, "velocity_rel")
-
 
 
     if len(t) == 0:
@@ -2697,13 +2411,11 @@ def plot_s2_landing_zoom(orbiter_log, output_dir: str, window_s: float = 320.0) 
         vz = v_rel[mask] if len(v_rel) == len(t) else np.array([])
 
 
-
         ax1.plot(tz, hz, color='tab:green', linewidth=2.0, label='Altitude')
 
         ax1.set_ylabel('Altitude (km)', color='tab:green')
 
         ax1.tick_params(axis='y', labelcolor='tab:green')
-
 
 
         ax2 = ax1.twinx()
@@ -2717,7 +2429,6 @@ def plot_s2_landing_zoom(orbiter_log, output_dir: str, window_s: float = 320.0) 
         ax2.tick_params(axis='y', labelcolor='tab:blue')
 
 
-
         td = _booster_touchdown_speed(orbiter_log)
 
         ax1.scatter([tz[-1]], [max(float(hz[-1]), 0.0)], marker='*', color='black', s=60, zorder=5)
@@ -2726,8 +2437,7 @@ def plot_s2_landing_zoom(orbiter_log, output_dir: str, window_s: float = 320.0) 
 
                      xytext=(-100, 30), textcoords='offset points', fontsize=9,
 
-                     arrowprops=dict(arrowstyle='->', alpha=0.8))
-
+                     arrowprops={"arrowstyle": '->', "alpha": 0.8})
 
 
         lines = ax1.get_lines() + ax2.get_lines()
@@ -2735,13 +2445,11 @@ def plot_s2_landing_zoom(orbiter_log, output_dir: str, window_s: float = 320.0) 
         ax1.legend(lines, [l.get_label() for l in lines], loc='upper right', framealpha=0.95)
 
 
-
     ax1.set_xlabel('Time (s)')
 
     ax1.set_title('Stage 2 Landing Burn Segment (Zoomed)', fontweight='bold')
 
     ax1.grid(True, alpha=0.3)
-
 
 
     plt.tight_layout()
@@ -2755,9 +2463,6 @@ def plot_s2_landing_zoom(orbiter_log, output_dir: str, window_s: float = 320.0) 
     return path
 
 
-
-
-
 def plot_s2_phase_fuel_budget(orbiter_log, output_dir: str) -> str:
 
     """Propellant consumed in each Stage-2 phase (insertion, deorbit, entry, landing)."""
@@ -2769,7 +2474,6 @@ def plot_s2_phase_fuel_budget(orbiter_log, output_dir: str) -> str:
     m = _extract_series(orbiter_log, "mass")
 
     phases = list(getattr(orbiter_log, "phase_name", []))
-
 
 
     usage: dict[str, float] = {}
@@ -2787,7 +2491,6 @@ def plot_s2_phase_fuel_budget(orbiter_log, output_dir: str) -> str:
                 start = i
 
         usage[phases[start]] = usage.get(phases[start], 0.0) + max(0.0, m[start] - m[-1])
-
 
 
     usage = {k: v for k, v in usage.items() if v > 1.0}
@@ -2815,13 +2518,11 @@ def plot_s2_phase_fuel_budget(orbiter_log, output_dir: str) -> str:
         plt.setp(ax.get_xticklabels(), rotation=20, ha='right')
 
 
-
     ax.set_ylabel('Propellant Used (kg)')
 
     ax.set_title('Stage 2 Phase Fuel Budget', fontweight='bold')
 
     ax.grid(True, axis='y', alpha=0.3)
-
 
 
     plt.tight_layout()
@@ -2835,13 +2536,9 @@ def plot_s2_phase_fuel_budget(orbiter_log, output_dir: str) -> str:
     return path
 
 
-
-
-
 def plot_s2_trajectory_path(orbiter_log, output_dir: str) -> str:
 
     """Stage-2 spatial trajectory in its orbital plane, drawn around Earth.
-
 
 
     Projects the ECI position history onto the orbital plane (true scale) so the
@@ -2853,7 +2550,6 @@ def plot_s2_trajectory_path(orbiter_log, output_dir: str) -> str:
     """
 
     from .constants import R_EARTH
-
 
 
     fig, ax = plt.subplots(figsize=(9, 9))
@@ -2871,7 +2567,6 @@ def plot_s2_trajectory_path(orbiter_log, output_dir: str) -> str:
     vz = _extract_series(orbiter_log, "velocity_z")
 
     t = _extract_series(orbiter_log, "time")
-
 
 
     n = len(px)
@@ -2909,7 +2604,6 @@ def plot_s2_trajectory_path(orbiter_log, output_dir: str) -> str:
         e2 = e2 / max(np.linalg.norm(e2), 1.0)
 
 
-
         x_km = (pos @ e1) / 1000.0
 
         y_km = (pos @ e2) / 1000.0
@@ -2917,13 +2611,11 @@ def plot_s2_trajectory_path(orbiter_log, output_dir: str) -> str:
         r_e_km = R_EARTH / 1000.0
 
 
-
         ax.add_patch(plt.Circle((0, 0), r_e_km, facecolor='#aac4e6', edgecolor='#5577aa',
 
                                 alpha=0.45, zorder=1, label='Earth'))
 
         ax.plot(x_km, y_km, color='tab:green', linewidth=1.6, zorder=3, label='Stage 2 path')
-
 
 
         def _mark(phase: str, label: str, color: str) -> None:
@@ -2939,7 +2631,6 @@ def plot_s2_trajectory_path(orbiter_log, output_dir: str) -> str:
                 ax.annotate(label, (x_km[j], y_km[j]), textcoords='offset points',
 
                             xytext=(7, 7), fontsize=9, color=color, fontweight='bold')
-
 
 
         ax.scatter([x_km[0]], [y_km[0]], color='black', s=70, marker='D', zorder=6)
@@ -2961,7 +2652,6 @@ def plot_s2_trajectory_path(orbiter_log, output_dir: str) -> str:
                     xytext=(8, 8), fontsize=9, color='red', fontweight='bold')
 
 
-
         ax.set_aspect('equal', adjustable='datalim')
 
         ax.set_xlabel('Orbital-plane X (km)')
@@ -2971,13 +2661,11 @@ def plot_s2_trajectory_path(orbiter_log, output_dir: str) -> str:
         ax.legend(loc='upper right', framealpha=0.95)
 
 
-
     ax.set_title('Stage 2 Trajectory Path: Separation -> Orbit -> Deorbit -> Landing',
 
                  fontweight='bold')
 
     ax.grid(True, alpha=0.25)
-
 
 
     plt.tight_layout()
@@ -3020,9 +2708,6 @@ def write_plot_manifest(saved_files: list[str], output_dir: str | os.PathLike = 
     return manifest_path
 
 
-
-
-
 def generate_mission_segment_plots(
 
     ascent_log, orbiter_log, booster_log, separation_time: float, output_dir: str = "plots", config=None
@@ -3046,7 +2731,6 @@ def generate_mission_segment_plots(
             os.remove(deprecated)
 
     configure_plot_style()
-
 
 
     plots = [
@@ -3092,9 +2776,6 @@ def generate_mission_segment_plots(
     ]
 
 
-
-                                                                               
-
     if _has_s2_recovery(orbiter_log):
 
         plots += [
@@ -3112,11 +2793,7 @@ def generate_mission_segment_plots(
         ]
 
 
-
     return plots
-
-
-
 
 
 def generate_all_plots(log, output_dir: str = "plots") -> list[str]:
@@ -3124,7 +2801,6 @@ def generate_all_plots(log, output_dir: str = "plots") -> list[str]:
     """Generate all trajectory and telemetry plots."""
 
     os.makedirs(output_dir, exist_ok=True)
-
 
 
     deprecated_outputs = [
@@ -3140,11 +2816,9 @@ def generate_all_plots(log, output_dir: str = "plots") -> list[str]:
             os.remove(deprecated)
 
 
-
     configure_plot_style()
 
     data = extract_log_data(log)
-
 
 
     saved_files = []
@@ -3268,7 +2942,6 @@ def generate_all_plots(log, output_dir: str = "plots") -> list[str]:
     ]
 
 
-
     failures = []
 
     for plot_func in plot_functions:
@@ -3279,10 +2952,9 @@ def generate_all_plots(log, output_dir: str = "plots") -> list[str]:
 
             saved_files.append(filepath)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - collect every plot failure, raise once below  # noqa: BLE001 - collect every plot failure, raise once below
 
             failures.append(f"{plot_func.__name__}: {e}")
-
 
 
     if failures:
@@ -3296,11 +2968,7 @@ def generate_all_plots(log, output_dir: str = "plots") -> list[str]:
         )
 
 
-
     return saved_files
-
-
-
 
 
 def main() -> None:
@@ -3318,11 +2986,9 @@ def main() -> None:
     print("=" * 70)
 
 
-
     print("\nRunning full mission simulation (ascent + orbiter + booster)...")
 
     mission = run_full_mission(dt=0.05, verbose=True)
-
 
 
     print(f"\nAscent complete: {mission.ascent_reason}")
@@ -3356,7 +3022,6 @@ def main() -> None:
     print(f"Booster final:   {_bst.altitude/1000:.1f} km | "
 
           f"{_bst_v_rel:.1f} m/s (surface-relative)")
-
 
 
     print("\nGenerating publication-quality plots...")
@@ -3396,7 +3061,6 @@ def main() -> None:
     summary_files = write_mission_summary(mission, create_default_config(), output_dir)
 
 
-
     print(f"\n{'=' * 70}")
 
     print(f"  Generated {len(saved_files)} publication-quality plots in '{output_dir}/'")
@@ -3416,9 +3080,6 @@ def main() -> None:
     print("  All plots saved at 300 DPI - ready for research paper submission.")
 
     print(f"{'=' * 70}")
-
-
-
 
 
 if __name__ == "__main__":

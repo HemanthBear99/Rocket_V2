@@ -173,7 +173,7 @@ def _print_mission_summary(separation_time, orbiter_state, orbiter_reason,
     print("=" * 90)
 
 
-def run_full_mission(dt: float = None, max_time: float = None,
+def run_full_mission(dt: float | None = None, max_time: float | None = None,
                      verbose: bool = True,
                      config: SimulationConfig = None,
                      *,
@@ -232,9 +232,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
 
     _apply_wind = _make_wind_applier(config)
 
-                                                                             
-                                        
-                                                                             
+
     if verbose:
         print("\n" + "=" * 90)
         print("FULL MISSION SIMULATION  (Ascent + Orbiter + Booster)")
@@ -276,15 +274,11 @@ def run_full_mission(dt: float = None, max_time: float = None,
             ascent_reason = f"Validation failure during ascent: {e}"
             break
 
-                                         
+
         phase_before = mission_mgr.get_phase()
         step_dt = _remaining_step_dt(state, dt, max_time)
-                                                                                
-                                                                                 
-                                                                           
-                                                                                
-                                                                                 
-                                                                        
+
+
         step_dt = min(step_dt, C.STACKED_ASCENT_MAX_DT)
         if step_dt <= 0.0:
             ascent_reason = "Maximum simulation time reached (no separation)"
@@ -312,7 +306,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
                 separation_time = _separation_time(mission_mgr, state)
             break
 
-                                
+
         if state.t >= max_time:
             ascent_reason = "Maximum simulation time reached (no separation)"
             break
@@ -320,7 +314,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
             ascent_reason = "CRASH during ascent"
             break
 
-                          
+
         step_config = _apply_wind(config)
         state, guid_out, ctrl_out, actuator, gs_ascent = simulation_step(
             state, actuator, mission_mgr, step_dt,
@@ -363,7 +357,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
     ascent_final = state.copy()
 
     if separation_time is None:
-                                                        
+
         empty_log = SimulationLog()
         return FullMissionResult(
             ascent_log=ascent_log, ascent_final_state=ascent_final,
@@ -376,9 +370,6 @@ def run_full_mission(dt: float = None, max_time: float = None,
             booster_landing_success=False,
         )
 
-                                                                             
-                                                        
-                                                                             
 
     s2_wet_mass = float(config.stage2_dry_mass) + float(config.stage2_prop_mass) + float(config.payload_mass)
     s2_dry_mass = float(config.stage2_dry_mass) + float(config.payload_mass)
@@ -392,7 +383,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
         config=config,
     )
 
-                                 
+
     orbiter_state = _inherit_separation_state(
         state,
         s2_wet_mass,
@@ -401,16 +392,14 @@ def run_full_mission(dt: float = None, max_time: float = None,
         dry_mass_kg=s2_dry_mass,
     )
     gs_orbiter = create_guidance_state()
-                                                                        
+
     gs_orbiter.last_ascent_direction = gs_ascent.last_ascent_direction
     orbiter_actuator = ActuatorState(thrust_dir=actuator.thrust_dir.copy())
     orbiter_mgr = MissionManager(vehicle_type="orbiter", initial_mass=s2_wet_mass, config=config)
-                                                                 
+
     orbiter_mgr.update(orbiter_state, min(dt, max(0.0, max_time - orbiter_state.t)))
 
-                                 
-                                                                               
-                                                   
+
     booster_state = _inherit_separation_state(
         state,
         booster_mass,
@@ -421,10 +410,10 @@ def run_full_mission(dt: float = None, max_time: float = None,
     gs_booster = create_guidance_state()
     booster_actuator = ActuatorState(thrust_dir=actuator.thrust_dir.copy())
     booster_mgr = MissionManager(vehicle_type="booster", initial_mass=booster_mass, config=config)
-                                                                                   
-                                                                                    
+
+
     booster_mgr.set_phase_entry_time(booster_state.t)
-                                           
+
     booster_mgr.update(booster_state, min(dt, max(0.0, max_time - booster_state.t)))
 
     orbiter_log = SimulationLog()
@@ -441,9 +430,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
     orbiter_energy_tracker = _EnergyValidationTracker()
     booster_energy_tracker = _EnergyValidationTracker()
 
-                                                                             
-                                                
-                                                                             
+
     if verbose:
         print("--- PHASE B: Dual Vehicle Tracking (Orbiter + Booster) ---")
         print(f"{'Time (s)':^10} | {'Orb Alt km':^10} | {'Orb V m/s':^10} | "
@@ -459,7 +446,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
             orbiter_reason = "User stopped"
             booster_reason = "User stopped"
             break
-                            
+
         if not orbiter_done:
             orbiter_request_dt = dt
             if (
@@ -522,7 +509,7 @@ def run_full_mission(dt: float = None, max_time: float = None,
         else:
             booster_energy_tracker.reset()
 
-                         
+
         if verbose and dual_step % 2000 == 0:
             _print_dual_status(
                 orbiter_state, orbiter_done, orbiter_reason, orb_guid,

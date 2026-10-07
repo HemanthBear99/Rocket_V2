@@ -21,10 +21,10 @@ if TYPE_CHECKING:
 class State:
     """
     Global state vector for the RLV simulation.
-    
+
     All state variables are stored in a single location to ensure consistency
     and prevent duplication.
-    
+
     Attributes:
         r: Position vector in inertial frame (m) [3]
         v: Velocity vector in inertial frame (m/s) [3]
@@ -33,45 +33,42 @@ class State:
         m: Total vehicle mass (kg)
         t: Simulation time (s)
     """
-    
-                                    
+
+
     r: np.ndarray = field(default_factory=lambda: np.zeros(3))
-    
-                                      
+
+
     v: np.ndarray = field(default_factory=lambda: np.zeros(3))
-    
-                                         
+
+
     q: np.ndarray = field(default_factory=lambda: np.array([1.0, 0.0, 0.0, 0.0]))
-    
-                                            
+
+
     omega: np.ndarray = field(default_factory=lambda: np.zeros(3))
-    
-                     
+
+
     m: float = 0.0
-    
-                         
+
+
     t: float = 0.0
 
-                                                                      
+
     sim_config: Optional['SimulationConfig'] = field(default=None, repr=False)
     dry_mass_kg: float | None = field(default=None, repr=False)
-    
+
     def __post_init__(self):
         """Ensure arrays are numpy arrays with correct dtype and q is unit-length."""
         for attr in ['r', 'v', 'q', 'omega']:
             setattr(self, attr, np.asarray(getattr(self, attr), dtype=np.float64))
-                                                                                
-                                                                          
-                                                                                
-                                                                               
-                                                                               
+
+
         q_norm = float(vec_norm(self.q))
         if np.isfinite(q_norm) and abs(q_norm - 1.0) > C.QUATERNION_NORM_TOL:
             raise ValueError(
                 f"State quaternion must be unit length (norm={q_norm:.8f}); "
                 "normalize the quaternion before constructing State."
             )
-    
+
     def copy(self) -> 'State':
         """Create a deep copy of the state."""
         return State(
@@ -84,13 +81,13 @@ class State:
             sim_config=self.sim_config,
             dry_mass_kg=self.dry_mass_kg,
         )
-    
+
     def to_vector(self) -> np.ndarray:
         """Convert state to a flat numpy array check [r, v, q, omega, m]."""
         return np.concatenate([
             self.r, self.v, self.q, self.omega, [self.m]
         ])
-    
+
     @classmethod
     def from_vector(
         cls,
@@ -102,7 +99,7 @@ class State:
     ) -> 'State':
         """
         Create a State from a flat numpy array.
-        
+
         Args:
             vec: State vector [r(3), v(3), q(4), omega(3), m(1)]
             t: Current simulation time
@@ -120,18 +117,18 @@ class State:
             sim_config=sim_config,
             dry_mass_kg=dry_mass_kg,
         )
-    
+
     @property
     def altitude(self) -> float:
         """Altitude above the configured Earth surface (m)."""
         from .forces import _altitude_from_r
         return float(_altitude_from_r(self.r, self.sim_config))
-    
+
     @property
     def speed(self) -> float:
         """Magnitude of velocity (m/s)."""
         return vec_norm(self.v)
-    
+
     @property
     def propellant_remaining(self) -> float:
         """Remaining propellant mass (kg)."""
@@ -146,7 +143,7 @@ class State:
         else:
             dry_mass = C.DRY_MASS
         return max(0.0, self.m - dry_mass)
-    
+
     def __str__(self) -> str:
         """Human-readable state summary."""
         return (
@@ -172,7 +169,7 @@ def _configured_launch_position(config=None) -> np.ndarray:
 def create_initial_state(config=None) -> State:
     """
     Create the initial state for the simulation.
-    
+
     Returns:
         State object initialized with launch conditions.
     """

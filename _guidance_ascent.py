@@ -119,11 +119,11 @@ def compute_desired_thrust_direction(
     )
     wind_offset = float(config.runtime_wind_offset_mps) if config is not None else 0.0
 
-                                               
+
     gamma_target = gamma_profile_from_altitude(altitude, config=config)
     gamma_target_deg = float(np.degrees(gamma_target))
 
-                                     
+
     v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset)
     v_rel_norm = float(vec_norm(v_rel))
 
@@ -139,13 +139,13 @@ def compute_desired_thrust_direction(
     error = gamma_target_deg - gamma_meas_deg
     gamma_rate = (gamma_meas_deg - gs.prev_gamma_meas) / max(dt, 1e-3)
 
-               
+
     kp, ki, kd = 0.85, 0.05, 0.12
     gs.gamma_int += error * dt
     gs.gamma_int = float(np.clip(gs.gamma_int, -20.0, 20.0))
     gamma_raw = gamma_target_deg + kp * error + ki * gs.gamma_int - kd * gamma_rate
 
-                                                              
+
     _, _, rho, _ = compute_configured_atmosphere_properties(altitude, config)
     q_dyn = 0.5 * rho * v_rel_norm**2
 
@@ -181,19 +181,15 @@ def compute_desired_thrust_direction(
     guidance_dir = np.cos(pitch_cmd_rad) * vertical + np.sin(pitch_cmd_rad) * horiz_axis
     guidance_dir /= vec_norm(guidance_dir)
 
-                                                                              
-                                                                          
-                                        
+
     if pitchover_active:
         pitchover_axis = (
             np.cos(C.PITCHOVER_AZIMUTH) * north
             + np.sin(C.PITCHOVER_AZIMUTH) * east
         )
         pitchover_axis /= vec_norm(pitchover_axis)
-                                                                             
-                                                                              
-                                                                               
-                                                                        
+
+
         kick_peak_alt = min(pitchover_start_alt + 500.0, pitchover_end_alt)
         kick_end_alt = min(pitchover_end_alt, pitchover_start_alt + 1000.0)
         kick_peak_angle = pitchover_angle_cfg
@@ -219,12 +215,7 @@ def compute_desired_thrust_direction(
             pitchover_dir /= vec_norm(pitchover_dir)
             guidance_dir = pitchover_dir
 
-                                                                       
-                                                                         
-                                                                          
-                                                                          
-                                                                        
-                                                     
+
     blend_alpha = compute_blend_parameter(
         altitude,
         velocity_mag=v_rel_norm,
@@ -251,7 +242,7 @@ def compute_desired_thrust_direction(
 
     thrust_dir = thrust_dir_mixed
 
-                     
+
     if q_dyn > 5000.0:
         max_aoa = np.radians(3.0)
     elif altitude < 50000.0:
@@ -272,7 +263,7 @@ def compute_desired_thrust_direction(
 
 def compute_guidance_output(
     r: np.ndarray, v: np.ndarray, t: float, m: float,
-    meco_mass: float = None,
+    meco_mass: float | None = None,
     gs: GuidanceState | None = None,
     dt: float = C.DT,
     config: SimulationConfig | None = None,
@@ -335,8 +326,7 @@ def compute_guidance_output(
 
     thrust_on = (m > meco_mass)
 
-                                                                              
-                                                                                
+
     _, _, rho, _ = compute_configured_atmosphere_properties(altitude, config)
     q_dyn = 0.5 * rho * (v_rel_norm ** 2)
     q_rate = (
@@ -352,7 +342,7 @@ def compute_guidance_output(
     else:
         prograde = v_rel / v_rel_norm
 
-                                                                             
+
     gs.last_ascent_direction = thrust_dir.copy()
 
     vertical = compute_local_vertical(r)

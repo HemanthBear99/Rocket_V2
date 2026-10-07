@@ -20,8 +20,8 @@ east_m = float(np.dot(d, east))
 total_m = float(np.linalg.norm(d))
 
 print("booster:", res.booster_reason)
-print("miss magnitude = %.1f m" % total_m)
-print("east component (downrange) = %+.1f m" % east_m)
+print(f"miss magnitude = {total_m:.1f} m")
+print(f"east component (downrange) = {east_m:+.1f} m")
 print()
 if east_m > 0:
     print("=> vehicle landed EAST (downrange) of target: OVERSHOT.")

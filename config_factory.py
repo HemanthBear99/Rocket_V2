@@ -37,15 +37,11 @@ def create_default_config(**overrides: Any) -> SimulationConfig:
     ), **overrides)
 
 
-                                                     
-                                                                   
-
-
 def create_demo_config(**overrides: Any) -> SimulationConfig:
     """Create a faster research-profile configuration for live demos."""
     return create_default_config(
-                                                                          
-                                                                            
+
+
         dt=0.1,
         enable_demo_mode=True,
         demo_coast_max_dt=2.0,

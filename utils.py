@@ -43,15 +43,15 @@ def _wind_vector(r: np.ndarray, wind_offset_mps: float = 0.0) -> np.ndarray:
     alt = r_norm - C.R_EARTH
     if alt <= 0.0:
         return np.zeros(3)
-                                                             
-                                                               
+
+
     speed = C.WIND_REF_SPEED * (alt / C.WIND_REF_ALT) ** C.WIND_EXPONENT
     speed += float(wind_offset_mps)
     if alt < 5000.0:
-                                                                         
+
         x = alt / 5000.0
         speed *= x * x * (3.0 - 2.0 * x)
-                                                                         
+
     up = r / max(r_norm, 1e-9)
     east = cross3(_K_AXIS, up)
     east_norm = vec_norm(east)

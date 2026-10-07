@@ -1,10 +1,6 @@
 """Shared plotting utilities: data extraction, time-series helpers, mission markers."""
 
 
-
-
-
-
 import os
 from dataclasses import dataclass
 from typing import NamedTuple
@@ -34,7 +30,7 @@ try:
 
     import matplotlib
 
-    matplotlib.use("Agg")                                                
+    matplotlib.use("Agg")
 
     import matplotlib.pyplot as plt
 
@@ -45,27 +41,11 @@ except ModuleNotFoundError:
     plt = None
 
 
-
-
-
-
-
-
-
-                                                                               
-
-                 
-
-                                                                               
-
-
-
 @dataclass
 
 class TrajectoryData:
 
     """Container for processed trajectory data used in plotting.
-
 
 
     Attributes:
@@ -182,9 +162,8 @@ class TrajectoryData:
 
     dynamic_pressure: np.ndarray
 
-    thrust_force: np.ndarray                                
+    thrust_force: np.ndarray
 
-                     
 
     omega_x: np.ndarray = None
 
@@ -225,9 +204,6 @@ class TrajectoryData:
     downrange_ground: np.ndarray = None
 
 
-
-
-
 class PlotEvent(NamedTuple):
 
     """Lightweight timeline marker for annotated mission plots."""
@@ -239,17 +215,6 @@ class PlotEvent(NamedTuple):
     color: str = '0.35'
 
     linestyle: str = '--'
-
-
-
-
-
-                                                                               
-
-               
-
-                                                                               
-
 
 
 def configure_plot_style() -> None:
@@ -264,7 +229,7 @@ def configure_plot_style() -> None:
 
         'figure.figsize': (10, 6),
 
-        'figure.dpi': 300,                                    
+        'figure.dpi': 300,
 
         'savefig.dpi': 300,
 
@@ -307,34 +272,20 @@ def configure_plot_style() -> None:
     })
 
 
-
-
-
-                                                                               
-
-                 
-
-                                                                               
-
-
-
 def extract_log_data(log) -> TrajectoryData:
 
     """Extract and process simulation log data for plotting.
 
-    
 
     Args:
 
         log: Simulation log object with trajectory data
 
-        
 
     Returns:
 
         TrajectoryData object with processed arrays
 
-        
 
     Raises:
 
@@ -361,26 +312,20 @@ def extract_log_data(log) -> TrajectoryData:
         return arr
 
 
-
-                        
-
     time = np.array(log.time)
 
-    altitude = np.array(log.altitude)      
+    altitude = np.array(log.altitude)
 
-    velocity = np.array(log.velocity)                  
+    velocity = np.array(log.velocity)
 
-    mass = np.array(log.mass)      
+    mass = np.array(log.mass)
 
-    pitch_angle = np.array(log.pitch_angle)                     
+    pitch_angle = np.array(log.pitch_angle)
 
-    attitude_error = np.array(log.attitude_error)       
+    attitude_error = np.array(log.attitude_error)
 
-    torque = np.array(log.torque_magnitude)        
+    torque = np.array(log.torque_magnitude)
 
-    
-
-                                   
 
     pos_x = np.array(log.position_x)
 
@@ -394,9 +339,6 @@ def extract_log_data(log) -> TrajectoryData:
 
     vel_z = np.array(log.velocity_z)
 
-    
-
-                   
 
     th_x = np.array(log.inertial_thrust_x)
 
@@ -408,42 +350,15 @@ def extract_log_data(log) -> TrajectoryData:
 
     thrust_mag = np.linalg.norm(thrust_vec, axis=1)
 
-    
 
     position = np.column_stack((pos_x, pos_y, pos_z))
 
     velocity_vec = np.column_stack((vel_x, vel_y, vel_z))
 
-    
-
-                                                                
-
-
-    
-
-                                                 
-
-                                                                                     
-
-                                                             
-
-                                                                             
-
-                                                                
-
-                                                  
-
-                                                                               
-
-                                                          
-
-                                                   
-
-    
 
     velocity_rel_vec = np.array([
 
-        compute_relative_velocity(p, v) 
+        compute_relative_velocity(p, v)
 
         for p, v in zip(position, velocity_vec)
 
@@ -451,17 +366,11 @@ def extract_log_data(log) -> TrajectoryData:
 
     velocity_rel = np.linalg.norm(velocity_rel_vec, axis=1)
 
-    
-
-                                    
 
     r_mag = np.linalg.norm(position, axis=1)
 
     r_hat = position / r_mag[:, np.newaxis]
 
-    
-
-                                                  
 
     v_rel_radial = np.sum(velocity_rel_vec * r_hat, axis=1)
 
@@ -469,33 +378,17 @@ def extract_log_data(log) -> TrajectoryData:
 
     gamma_rel = np.degrees(np.arcsin(sin_gamma_rel))
 
-    
-
-                                
 
     gamma_cmd = required_array('gamma_command_deg')
 
     gamma_actual = required_array('gamma_actual_deg')
 
-    
-
-                           
 
     downrange = np.sqrt((pos_x - pos_x[0])**2 + (pos_y - pos_y[0])**2) / 1000.0
 
-    
-
-                        
 
     actual_pitch = required_array('actual_pitch_angle')
 
-    
-
-                                                                               
-
-                                                            
-
-                                                                               
 
     omega_x = required_array('omega_x')
 
@@ -506,20 +399,15 @@ def extract_log_data(log) -> TrajectoryData:
     quaternion_norm = required_array('quaternion_norm')
 
 
-
     velocity_horizontal = required_array('velocity_horizontal')
 
     velocity_vertical = required_array('velocity_vertical')
-
 
 
     throttle_arr = required_array('throttle')
 
     thrust_on_arr = required_array('thrust_on')
 
-
-
-                                      
 
     cq_w = required_array('commanded_quat_w')
 
@@ -542,11 +430,7 @@ def extract_log_data(log) -> TrajectoryData:
     actual_quat = np.column_stack((aq_w, aq_x, aq_y, aq_z))
 
 
-
-                                             
-
     from .forces import compute_atmosphere_properties
-
 
 
     atm_temp = np.zeros(len(time))
@@ -576,9 +460,7 @@ def extract_log_data(log) -> TrajectoryData:
     dynamic_pressure = 0.5 * atm_density * velocity_rel**2
 
 
-
     downrange_ground = required_array('downrange_ground')
-
 
 
     return TrajectoryData(
@@ -619,7 +501,6 @@ def extract_log_data(log) -> TrajectoryData:
 
         thrust_force=thrust_mag,
 
-                  
 
         omega_x=omega_x,
 
@@ -662,14 +543,10 @@ def extract_log_data(log) -> TrajectoryData:
     )
 
 
-
-
-
 def compute_gravity_turn_start(data: TrajectoryData, threshold: float = 0.1) -> float:
 
     """Determine the start time of the gravity turn maneuver.
 
-    
 
     Args:
 
@@ -677,7 +554,6 @@ def compute_gravity_turn_start(data: TrajectoryData, threshold: float = 0.1) -> 
 
         threshold: Pitch rate threshold in deg/s to detect gravity turn
 
-        
 
     Returns:
 
@@ -689,26 +565,20 @@ def compute_gravity_turn_start(data: TrajectoryData, threshold: float = 0.1) -> 
 
         return 0.0
 
-    
 
     dt = np.diff(data.time)
 
-                                                                         
 
     pitch_rate = np.abs(np.diff(data.pitch_angle) / np.maximum(dt, 1e-9))
 
     indices = np.where(pitch_rate > threshold)[0]
 
-    
 
     if len(indices) > 0:
 
         return float(data.time[indices[0]])
 
     return float(data.time[min(20, len(data.time) - 1)])
-
-
-
 
 
 def _compute_engine_on_mask(data: TrajectoryData) -> np.ndarray:
@@ -726,17 +596,12 @@ def _compute_engine_on_mask(data: TrajectoryData) -> np.ndarray:
             return thrust > threshold
 
 
-
     if data.thrust_on is not None:
 
         return np.asarray(data.thrust_on) > 0.5
 
 
-
     return np.ones(len(data.time), dtype=bool)
-
-
-
 
 
 def _find_stage_separation_index(
@@ -754,7 +619,6 @@ def _find_stage_separation_index(
         return None
 
 
-
     dm = np.diff(np.asarray(data.mass))
 
     idx = int(np.argmin(dm))
@@ -764,9 +628,6 @@ def _find_stage_separation_index(
         return idx + 1
 
     return None
-
-
-
 
 
 def _find_stage1_meco_index(
@@ -790,13 +651,11 @@ def _find_stage1_meco_index(
         return 0
 
 
-
     t = np.asarray(data.time)
 
     on_mask = _compute_engine_on_mask(data)
 
     off_mask = ~on_mask
-
 
 
     i = 0
@@ -814,7 +673,6 @@ def _find_stage1_meco_index(
             seg_end = i
 
 
-
             off_duration = float(t[seg_end] - t[seg_start]) if seg_end > seg_start else 0.0
 
             if seg_start > 0 and np.any(on_mask[:seg_start]) and off_duration >= min_off_duration_s:
@@ -824,13 +682,11 @@ def _find_stage1_meco_index(
         i += 1
 
 
-
     edges = np.where(on_mask[:-1] & (~on_mask[1:]))[0]
 
     if len(edges) > 0:
 
         return int(edges[0] + 1)
-
 
 
     sep_idx = _find_stage_separation_index(data)
@@ -840,11 +696,7 @@ def _find_stage1_meco_index(
         return sep_idx - 1
 
 
-
     return n - 1
-
-
-
 
 
 def _find_stage2_ignition_index(data: TrajectoryData, meco_idx: int) -> int | None:
@@ -858,7 +710,6 @@ def _find_stage2_ignition_index(data: TrajectoryData, meco_idx: int) -> int | No
         return None
 
 
-
     candidates = np.where(on_mask[meco_idx + 1:])[0]
 
     if len(candidates) == 0:
@@ -866,11 +717,7 @@ def _find_stage2_ignition_index(data: TrajectoryData, meco_idx: int) -> int | No
         return None
 
 
-
     return int(meco_idx + 1 + candidates[0])
-
-
-
 
 
 def _compute_ground_track_enu(data: TrajectoryData) -> tuple[np.ndarray, np.ndarray]:
@@ -886,7 +733,6 @@ def _compute_ground_track_enu(data: TrajectoryData) -> tuple[np.ndarray, np.ndar
     z_eci = data.position[:, 2]
 
 
-
     theta = C.EARTH_ROTATION_RATE * t
 
     cos_t = np.cos(theta)
@@ -894,15 +740,11 @@ def _compute_ground_track_enu(data: TrajectoryData) -> tuple[np.ndarray, np.ndar
     sin_t = np.sin(theta)
 
 
-
-                                              
-
     x_ecef = x_eci * cos_t + y_eci * sin_t
 
     y_ecef = -x_eci * sin_t + y_eci * cos_t
 
     z_ecef = z_eci
-
 
 
     r_ecef = np.column_stack((x_ecef, y_ecef, z_ecef))
@@ -912,7 +754,6 @@ def _compute_ground_track_enu(data: TrajectoryData) -> tuple[np.ndarray, np.ndar
     r_hat = r_ecef / np.maximum(r_norm[:, np.newaxis], 1.0)
 
     r_ground = C.R_EARTH * r_hat
-
 
 
     launch_up = C.INITIAL_POSITION / np.linalg.norm(C.INITIAL_POSITION)
@@ -936,7 +777,6 @@ def _compute_ground_track_enu(data: TrajectoryData) -> tuple[np.ndarray, np.ndar
     launch_north /= np.linalg.norm(launch_north)
 
 
-
     r0 = C.INITIAL_POSITION
 
     delta = r_ground - r0
@@ -946,14 +786,6 @@ def _compute_ground_track_enu(data: TrajectoryData) -> tuple[np.ndarray, np.ndar
     north_km = delta @ launch_north / 1000.0
 
     return east_km, north_km
-
-
-
-
-
-                                                                               
-                                                                            
-                                                                               
 
 
 @dataclass(frozen=True)
@@ -976,7 +808,6 @@ class HLine:
     alpha: float = 1.0
 
 
-                                                           
 ZERO_HLINE = HLine(0.0, alpha=0.5)
 
 
@@ -1026,7 +857,7 @@ def plot_time_series(
                 kw["label"] = line.label
             ax.plot(x_arr, line.y, **kw)
     for hl in spec.hlines:
-                                                                                    
+
         hl_kw: dict = {
             "y": hl.y,
             "color": hl.color,
@@ -1133,7 +964,7 @@ def _add_timeline_event_markers(ax: Axes, events: list[PlotEvent]) -> None:
             ha="left",
             fontsize=8,
             color=event.color,
-            bbox=dict(boxstyle="round,pad=0.18", facecolor="white", edgecolor=event.color, alpha=0.8),
+            bbox={"boxstyle": "round,pad=0.18", "facecolor": "white", "edgecolor": event.color, "alpha": 0.8},
         )
 
 
@@ -1163,13 +994,5 @@ def plot_multi_vehicle_series(
     ax.legend(loc="best", framealpha=0.95)
     ax.grid(True, alpha=0.3)
     return _save_figure(fig, output_dir, spec.filename)
-
-
-
-
-
-
-
-
 
 

@@ -260,7 +260,7 @@ def _run_case(base: SimulationConfig, case: dict[str, Any]) -> dict[str, Any]:
             "orbiter_reason": result.orbiter_reason,
             "booster_reason": result.booster_reason,
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - a crashed case is recorded as an error row
         row = {
             "case_id": case["case_id"],
             "mode": case["mode"],
@@ -534,7 +534,7 @@ def main(argv: list[str] | None = None) -> int:
         runs = args.runs if args.runs is not None else _DEFAULT_MC_RUNS
         cases = sample_monte_carlo_cases(runs, seed)
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     output_dir = args.output_dir or f"plots/campaign_{timestamp}"
     print(
         f"Running {len(cases)} {args.mode} cases with seed={seed}, "

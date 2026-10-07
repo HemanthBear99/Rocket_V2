@@ -24,7 +24,7 @@ class TestShortAscentSmoke:
 
     def test_short_ascent_runs_without_exception(self):
         config = create_test_config(dt=0.5, max_time=20.0, verbose=False)
-        final_state, log, reason = run_simulation(
+        final_state, _log, reason = run_simulation(
             dt=0.5, max_time=20.0, verbose=False, vehicle_type="ascent", config=config
         )
         assert final_state is not None
@@ -34,14 +34,14 @@ class TestShortAscentSmoke:
         # 20s is far short of MECO for the default vehicle, so termination
         # should be driven by the max_time limit, not an anomaly/abort.
         config = create_test_config(dt=0.5, max_time=20.0, verbose=False)
-        final_state, log, reason = run_simulation(
+        final_state, _log, _reason = run_simulation(
             dt=0.5, max_time=20.0, verbose=False, vehicle_type="ascent", config=config
         )
         assert final_state.t == pytest.approx(20.0, abs=0.6)
 
     def test_final_state_is_physically_valid(self):
         config = create_test_config(dt=0.5, max_time=20.0, verbose=False)
-        final_state, log, reason = run_simulation(
+        final_state, _log, _reason = run_simulation(
             dt=0.5, max_time=20.0, verbose=False, vehicle_type="ascent", config=config
         )
         # Re-run the same invariant checks the hot path enforces; this
@@ -52,7 +52,7 @@ class TestShortAscentSmoke:
 
     def test_mass_decreases_from_liftoff(self):
         config = create_test_config(dt=0.5, max_time=20.0, verbose=False)
-        final_state, log, reason = run_simulation(
+        final_state, _log, _reason = run_simulation(
             dt=0.5, max_time=20.0, verbose=False, vehicle_type="ascent", config=config
         )
         assert final_state.m < config.stage1_dry_mass + config.stage2_dry_mass + config.payload_mass + (

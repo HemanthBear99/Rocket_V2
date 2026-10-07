@@ -305,12 +305,12 @@ def update_navigation_estimate(
     ):
         elapsed = max(float(state.t) - float(nav_state.estimate.time_s), float(dt), 1e-9)
         truth_elapsed = max(float(state.t) - float(nav_state.previous_truth_time_s), elapsed, 1e-9)
-                                                                          
+
         true_accel_eci = (
             np.asarray(state.v, dtype=float) - nav_state.previous_truth_velocity_eci_mps
         ) / truth_elapsed
-                                                                               
-                                                                       
+
+
         r_current = np.asarray(state.r, dtype=float)
         r_norm = float(vec_norm(r_current))
         g_accel = -C.MU_EARTH * r_current / max(r_norm ** 3, 1.0)
@@ -320,7 +320,7 @@ def update_navigation_estimate(
             config,
             elapsed,
         )
-                                                                        
+
         a_total_est = measured_specific_force + g_accel
         previous_position = np.asarray(nav_state.estimate.position_eci_m, dtype=float)
         previous_velocity = np.asarray(nav_state.estimate.velocity_eci_mps, dtype=float)

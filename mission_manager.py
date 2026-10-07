@@ -76,16 +76,11 @@ class MissionManager:
     """
 
 
-
     NEAR_PAD_HANDOFF_ALTITUDE_M = 7030.0
 
     # Extra lead time (s) added to the powered-descent lead when predicting the
     # boostback landing point; empirically tuned for the default vehicle.
     BOOSTBACK_TARGETING_LEAD_MARGIN_S = 22.4
-
-
-
-
 
 
     _RECOVERY_FINE_STEP_PHASES = frozenset({
@@ -95,7 +90,7 @@ class MissionManager:
         MissionPhase.BOOSTER_LANDING,
     })
 
-    def __init__(self, vehicle_type: str = "ascent", initial_mass: float = None,
+    def __init__(self, vehicle_type: str = "ascent", initial_mass: float | None = None,
                  config: SimulationConfig = None):
         self.vehicle_type = vehicle_type
         self.config = config or create_default_config()
@@ -245,8 +240,6 @@ class MissionManager:
                 self._phase_entry_time = state.t
 
 
-
-
         elif self.current_phase == MissionPhase.COAST:
             if self.meco_time is not None and (state.t - self.meco_time) > 3.0:
                 logger.info(f"Stage Separation at t={state.t:.2f}s, "
@@ -254,7 +247,6 @@ class MissionManager:
                 self.current_phase = MissionPhase.STAGE_SEPARATION
                 self.stage_separation_time = state.t
                 self._phase_entry_time = state.t
-
 
 
         elif self.current_phase == MissionPhase.STAGE_SEPARATION:
@@ -268,9 +260,6 @@ class MissionManager:
 
     def _update_coast_to_apogee(self, state: State, radial_velocity: float) -> bool:
         """Start orbit insertion; True when the transition happened this call."""
-
-
-
 
 
         above_atmosphere = (
@@ -341,7 +330,6 @@ class MissionManager:
             self._phase_entry_time = state.t
 
 
-
         elif (
             state.altitude < 80000.0
             and radial_velocity < -50.0
@@ -362,11 +350,6 @@ class MissionManager:
         elif (
             state.t - self._phase_entry_time
         ) > float(self.config.orbit_insertion_timeout_s):
-
-
-
-
-
 
 
             self.orbit_failure_reason = (
@@ -397,7 +380,6 @@ class MissionManager:
         elif self.current_phase == MissionPhase.S2_DEORBIT:
 
 
-
             if (
                 state.altitude < self.config.s2_entry_interface_altitude_m
                 and radial_velocity < 0.0
@@ -413,8 +395,6 @@ class MissionManager:
         elif self.current_phase == MissionPhase.S2_ENTRY:
 
 
-
-
             if radial_velocity < 0.0 and state.altitude < 15000.0:
                 self.current_phase = MissionPhase.S2_LANDING
                 self._phase_entry_time = state.t
@@ -425,9 +405,6 @@ class MissionManager:
 
     def _update_booster(self, state: State, radial_velocity: float) -> None:
         """Booster recovery: flip -> boostback -> coast -> entry -> landing."""
-
-
-
 
 
         if self.current_phase == MissionPhase.BOOSTER_FLIP:
@@ -448,24 +425,8 @@ class MissionManager:
                 self._phase_entry_time = state.t
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         elif self.current_phase == MissionPhase.BOOSTER_BOOSTBACK:
             self._update_boostback(state, radial_velocity)
-
-
 
 
         elif self.current_phase == MissionPhase.BOOSTER_COAST:
@@ -479,21 +440,6 @@ class MissionManager:
                 self._phase_entry_time = state.t
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         elif self.current_phase == MissionPhase.BOOSTER_ENTRY:
             self._update_booster_entry(state, radial_velocity)
 
@@ -502,9 +448,6 @@ class MissionManager:
         r_hat = state.r / max(vec_norm(state.r), 1.0)
         v_horiz = state.v - np.dot(state.v, r_hat) * r_hat
         v_horiz_mag = float(vec_norm(v_horiz))
-
-
-
 
 
         target_downrange_km = self.config.booster_landing_target_downrange_km
@@ -522,10 +465,6 @@ class MissionManager:
         t_coast_est = targeting.coast_time_s
 
 
-
-
-
-
         site_dist = targeting.site_distance_m
         v_toward_site = targeting.v_toward_site_mps
         v_return_needed = targeting.v_return_needed_mps
@@ -539,11 +478,6 @@ class MissionManager:
             mass_kg=state.m,
             aero_mode=self.current_phase.name,
         )
-
-
-
-
-
 
 
         landing_site_now = target_landing_site_eci(
@@ -568,31 +502,7 @@ class MissionManager:
         v_pad_needed = float(np.clip(pad_dist_now / t_return_ground, 20.0, 250.0))
 
 
-
-
-
-
-
-
-
-
-
-
-
-
         near_pad_rtls = is_near_pad_target(self.config)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
         impact_corridor_ready = (
@@ -629,7 +539,6 @@ class MissionManager:
         min_after_boostback = booster_min_propellant_after_boostback(self.config)
 
 
-
         propellant_used = max(0.0, self._initial_propellant - propellant_remaining)
         budget_used = propellant_used >= self.config.booster_boostback_budget_kg
         fuel_guard = propellant_remaining <= min_after_boostback
@@ -657,15 +566,6 @@ class MissionManager:
         """Hand off to BOOSTER_LANDING at suicide-burn ignition or near-pad capture."""
 
 
-
-
-
-
-
-
-
-
-
         burn = estimate_suicide_burn(
             state.r,
             state.v,
@@ -674,15 +574,6 @@ class MissionManager:
             safety_factor=self.config.booster_landing_ignition_safety_factor,
         )
         h_ignite = float(burn['burn_altitude'])
-
-
-
-
-
-
-
-
-
 
 
         ignition_corridor_top = self._ignition_corridor_top(state)

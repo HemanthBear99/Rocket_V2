@@ -15,6 +15,8 @@ no ambiguity about the right answer -- this is a stronger and more
 fundamental claim than "matches one particular real flight."
 """
 
+from typing import ClassVar
+
 import numpy as np
 import pytest
 
@@ -130,7 +132,7 @@ class TestKeplerianConservationCircularOrbit:
         )
         ctx = _two_body_ctx()
         dt = 1.0
-        n_steps = int(round(period / dt))
+        n_steps = round(period / dt)
         for _ in range(n_steps):
             state = rk4_step(state, torque=np.zeros(3), dt=dt, ctx=ctx)
 
@@ -296,7 +298,7 @@ class TestUS76AtmosphereReferenceTable:
     # (altitude_m, temperature_K, pressure_Pa) at each published US76 layer
     # base -- these are the standard tabulated breakpoint values, not
     # values re-derived from this codebase's own formula.
-    REFERENCE_POINTS = [
+    REFERENCE_POINTS: ClassVar[list] = [
         (0.0, 288.15, 101325.0),
         (11000.0, 216.65, 22632.1),
         (20000.0, 216.65, 5474.89),
@@ -308,12 +310,12 @@ class TestUS76AtmosphereReferenceTable:
 
     @pytest.mark.parametrize("altitude,expected_t,expected_p", REFERENCE_POINTS)
     def test_temperature_matches_published_table(self, altitude, expected_t, expected_p):
-        t, p, rho, a = compute_atmosphere_properties(altitude, enable_upper_atm=False)
+        t, _p, _rho, _a = compute_atmosphere_properties(altitude, enable_upper_atm=False)
         assert t == pytest.approx(expected_t, abs=0.05)
 
     @pytest.mark.parametrize("altitude,expected_t,expected_p", REFERENCE_POINTS)
     def test_pressure_matches_published_table(self, altitude, expected_t, expected_p):
-        t, p, rho, a = compute_atmosphere_properties(altitude, enable_upper_atm=False)
+        _t, p, _rho, _a = compute_atmosphere_properties(altitude, enable_upper_atm=False)
         assert p == pytest.approx(expected_p, rel=1e-3)
 
     def test_density_consistent_with_ideal_gas_law(self):
@@ -321,12 +323,12 @@ class TestUS76AtmosphereReferenceTable:
         # model's own (T, P) outputs -- an internal-consistency check, not
         # a comparison to an external table.
         for altitude, _, _ in self.REFERENCE_POINTS:
-            t, p, rho, a = compute_atmosphere_properties(altitude, enable_upper_atm=False)
+            t, p, rho, _a = compute_atmosphere_properties(altitude, enable_upper_atm=False)
             expected_rho = p / (C.R_GAS * t)
             assert rho == pytest.approx(expected_rho, rel=1e-6)
 
     def test_sea_level_speed_of_sound_is_standard_340_mps(self):
-        t, p, rho, a = compute_atmosphere_properties(0.0, enable_upper_atm=False)
+        _t, _p, _rho, a = compute_atmosphere_properties(0.0, enable_upper_atm=False)
         # Standard sea-level speed of sound, widely published as ~340.3 m/s.
         assert a == pytest.approx(340.3, abs=1.0)
 

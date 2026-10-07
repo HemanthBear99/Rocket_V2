@@ -39,7 +39,7 @@ class OrbitAssessment:
     propellant_remaining_kg: float | None
     velocity_deficit_mps: float | None
     failed_criteria: list[str]
-                                                                              
+
     target_altitude_km: float | None = None
     altitude_tolerance_km: float | None = None
     apogee_error_km: float | None = None
@@ -476,8 +476,7 @@ def _extract_s2_recovery(
     if not log.get_series("time"):
         return None
 
-                                                                            
-                                                                         
+
     orbit_idx = _s2_initial_orbit_index(log)
     s2_dry_mass = float(config.stage2_dry_mass) + float(config.payload_mass)
     orbit = (
@@ -538,7 +537,7 @@ def _assess_s2_initial_orbit(result: FullMissionResult, config: SimulationConfig
         return assess_orbit(result.orbiter_final_state, config, result.orbiter_reason)
     s2_dry_mass = float(config.stage2_dry_mass) + float(config.payload_mass)
     init_state = _state_from_log(log, orbit_idx, s2_dry_mass)
-                                                                                            
+
     return assess_orbit(init_state, config)
 
 
@@ -565,8 +564,7 @@ def assess_full_mission(
     terminal_attitude_error = _terminal_touchdown_tilt_deg(result)
     landing = _landing_with_contact_gates(landing, result, terminal_attitude_error)
 
-                                                                                                
-                                                                                                               
+
     _bst_alt = float(result.booster_final_state.altitude)
     _bst_reason_u = (result.booster_reason or "").upper()
     if result.separation_time is None or _bst_alt > 100.0 or "Q-ALPHA" in _bst_reason_u or ("ABORT" in _bst_reason_u and "TOUCHDOWN" not in _bst_reason_u and "LANDING" not in _bst_reason_u):
@@ -595,14 +593,12 @@ def assess_full_mission(
     separation_occurred = result.separation_time is not None
     if not separation_occurred:
         failed.append("separation")
-                                                                               
-                                                                               
-                                                                              
-                                                                            
+
+
     s2_recovery = bool(getattr(config, "enable_s2_recovery", False))
     if s2_recovery:
-                                                                                             
-                                                                                
+
+
         orbit = _assess_s2_initial_orbit(result, config)
         if not result.orbiter_success:
             failed.append("s2_recovery")
@@ -692,9 +688,11 @@ def _write_markdown_summary(assessment: MissionAssessment, path: Path) -> None:
         lines += [
             "## Stage 2 — Reusable Upper Stage",
             "",
-            f"- Orbit achieved: {s2['orbit_achieved']}  "
-            f"(perigee {s2['achieved_perigee_km']} km x apogee {s2['achieved_apogee_km']} km, "
-            f"e={s2['achieved_eccentricity']})",
+            (
+                f"- Orbit achieved: {s2['orbit_achieved']}  "
+                f"(perigee {s2['achieved_perigee_km']} km x apogee {s2['achieved_apogee_km']} km, "
+                f"e={s2['achieved_eccentricity']})"
+            ),
             f"- Orbit hold begins: {_fmt_time(s2['orbit_hold_time_s'])}",
             f"- Deorbit burn: {_fmt_time(s2['deorbit_burn_time_s'])}",
             f"- Entry interface (70 km): {_fmt_time(s2['entry_interface_time_s'])}",

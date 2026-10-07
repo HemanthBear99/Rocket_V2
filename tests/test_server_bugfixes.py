@@ -11,6 +11,7 @@
 """
 
 import pytest
+from pydantic import ValidationError
 
 from rlv_sim.api_models import (
     MissionSetup,
@@ -52,15 +53,15 @@ def _base_setup(**overrides) -> SimulationSetup:
         landing_legs=True,
     )
     physics = PhysicsSetup(j2=True, atmosphere=True, drag=True, lift=True, sensor_noise=False)
-    kwargs = dict(
-        vehicle=vehicle,
-        mission=mission,
-        recovery=recovery,
-        physics=physics,
-        realtime_mode=False,
-        demo_mode=False,
-        enable_s2_recovery=False,
-    )
+    kwargs = {
+        "vehicle": vehicle,
+        "mission": mission,
+        "recovery": recovery,
+        "physics": physics,
+        "realtime_mode": False,
+        "demo_mode": False,
+        "enable_s2_recovery": False,
+    }
     kwargs.update(overrides)
     return SimulationSetup(**kwargs)
 
@@ -88,9 +89,9 @@ class TestDemoModeDoesNotOverrideDt:
 
 class TestCampaignWorkersWired:
     def test_workers_field_still_validated_1_to_16(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             CampaignRequest(workers=0)
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             CampaignRequest(workers=17)
         assert CampaignRequest(workers=8).workers == 8
 

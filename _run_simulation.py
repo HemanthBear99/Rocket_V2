@@ -40,7 +40,7 @@ from .utils import vec_norm
 
 logger = logging.getLogger(__name__)
 
-def run_simulation(initial_state: State | None = None, dt: float = None, max_time: float = None,
+def run_simulation(initial_state: State | None = None, dt: float | None = None, max_time: float | None = None,
                    verbose: bool = True, vehicle_type: str = "ascent",
                    config: SimulationConfig = None) -> tuple:
     """
@@ -65,7 +65,7 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
     if config is None:
         config = create_default_config()
 
-                                                                     
+
     if dt is None:
         dt = config.dt
     if max_time is None:
@@ -76,14 +76,14 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
     if max_time <= 0:
         raise ValueError(f"max_time must be positive, got {max_time}")
 
-                      
+
     if initial_state is not None:
         state = initial_state.copy()
     else:
         state = _create_configured_initial_state(config)
     max_mass = _configured_max_mass(config)
 
-                                                                          
+
     gs = create_guidance_state()
 
     log = SimulationLog()
@@ -98,10 +98,10 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
         else None
     )
 
-                                                         
+
     energy_tracker = _EnergyValidationTracker()
 
-                      
+
     logger.info(f"Starting simulation: dt={dt}s, max_time={max_time}s, vehicle={vehicle_type}")
     logger.debug(f"Initial state: {state}")
 
@@ -116,31 +116,27 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
     step_count = 0
     last_print_time = 0
     meco_time = None
-    separation_mass_applied = False                                     
-                                                                             
-                                                                        
-                                                                                 
-                                                                                
+    separation_mass_applied = False
+
+
     cleared_pad = False
 
-                                       
-                                                  
-                                                 
+
     current_stage = 1
     current_vehicle_model = "stacked"
 
-                                                      
+
     if vehicle_type == "booster":
         current_dry_mass = float(config.stage1_dry_mass) if config is not None else C.STAGE1_DRY_MASS
         current_vehicle_model = "booster"
     elif vehicle_type == "orbiter":
-                                                                    
+
         current_dry_mass = (float(config.stage2_dry_mass) + float(config.payload_mass)) if config is not None else C.STAGE2_DRY_MASS
         current_stage = 2
         current_vehicle_model = "orbiter"
     else:
-                                                         
-                                                                                           
+
+
         if config is not None:
             stack_dry_mass = (
                 float(config.stage1_dry_mass)
@@ -152,13 +148,13 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
             stack_dry_mass = C.DRY_MASS
         current_dry_mass = stack_dry_mass + config.stage1_landing_fuel_reserve_kg
 
-                          
+
     while True:
-                                                                  
+
         if meco_time is None and is_propellant_exhausted(state.m, current_dry_mass):
             meco_time = state.t
 
-                           
+
         if not cleared_pad and state.altitude > C.LAUNCH_PAD_CLEAR_ALTITUDE:
             cleared_pad = True
         should_terminate, reason = check_termination(
@@ -170,7 +166,7 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
                 print(f"\nTermination: {reason}")
             return state, log, reason
 
-                        
+
         try:
             validate_state(
                 state,
@@ -185,7 +181,7 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
             reason = f"Validation failure: {e}"
             break
 
-                                
+
         phase_before = mission_mgr.get_phase()
         step_dt = _remaining_step_dt(state, dt, max_time)
         if step_dt <= 0.0:
@@ -204,12 +200,7 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
         mission_mgr.update(state, step_dt)
         phase_after = mission_mgr.get_phase()
 
-                                                 
-                                                                                   
-                                                                                       
-                                               
-                                                                                          
-                                                                               
+
         s2_phases = {MissionPhase.S2_COAST_TO_APOGEE, MissionPhase.ORBIT_INSERTION,
                      MissionPhase.ORBIT_ACHIEVED, MissionPhase.ORBIT_FAILED}
         pre_sep_phases = {MissionPhase.ASCENT, MissionPhase.COAST, MissionPhase.STAGE_SEPARATION}
@@ -219,8 +210,8 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
 
             mass_before = state.m
             booster_mass = float(config.stage1_dry_mass) + config.stage1_landing_fuel_reserve_kg
-                                                                                  
-                                                                               
+
+
             s2_mass = float(config.stage2_dry_mass) + float(config.stage2_prop_mass) + float(config.payload_mass)
             orbiter_dv, _, orbiter_domega, _ = _compute_separation_adjustments(
                 state,
@@ -236,7 +227,7 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
                 dry_mass_kg=float(config.stage2_dry_mass) + float(config.payload_mass),
             )
 
-                                            
+
             current_stage = 2
             current_dry_mass = float(config.stage2_dry_mass) + float(config.payload_mass)
             current_vehicle_model = "orbiter"
@@ -257,7 +248,7 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
                 print(f"  *** STAGE SEPARATION: {mass_before:.0f} -> {state.m:.0f} kg | "
                       f"Switched to S2 engine ({C.STAGE2_THRUST/1e3:.0f} kN, Isp={C.STAGE2_ISP_VAC}s)")
 
-                          
+
         state, guidance, control, actuator, gs = simulation_step(
             state, actuator, mission_mgr, step_dt,
             dry_mass=current_dry_mass, stage=current_stage,
@@ -265,7 +256,7 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
             config=config
         )
 
-                                                                     
+
         if mission_mgr.get_phase() == MissionPhase.ASCENT:
             gamma_err = abs(guidance.get('gamma_command_deg', 0.0) - guidance.get('gamma_measured_deg', 0.0))
             if state.t > 60.0 and gamma_err > 70.0:
@@ -273,7 +264,7 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
                 logger.error(reason)
                 break
 
-                  
+
         log.append(state, guidance, control)
         safety_reason = _check_runtime_safety_limits(
             state,
@@ -287,18 +278,17 @@ def run_simulation(initial_state: State | None = None, dt: float = None, max_tim
             logger.error(reason)
             break
 
-                                                    
+
         step_count += 1
         _update_energy_validation_tracker(energy_tracker, state, guidance)
 
-        if step_count % 100 == 0:
-            if verbose and state.t - last_print_time >= 10.0:
-                _print_status(state, guidance['phase'])
-                last_print_time = state.t
+        if step_count % 100 == 0 and verbose and state.t - last_print_time >= 10.0:
+            _print_status(state, guidance['phase'])
+            last_print_time = state.t
 
     elapsed = time.time() - start_time
 
-                       
+
     _log_completion(state, step_count, elapsed, verbose)
 
     return state, log, reason
@@ -376,7 +366,7 @@ def _should_validate_energy(state: State, guidance: dict) -> bool:
 
 def _print_status(state: State, phase: str):
     """Print a formatted status row."""
-                                             
+
     msg = (f"{state.t:10.1f} | {state.altitude/1000:10.1f} | "
            f"{state.speed:10.1f} | {state.m:12.1f} | {phase:<15}")
     print(msg)
@@ -387,7 +377,7 @@ def _log_completion(state: State, steps: int, elapsed: float, verbose: bool):
     """Log and print comparison statistics."""
     logger.info(f"Simulation complete: {steps} steps in {elapsed:.2f}s")
     logger.info(f"Final state: alt={state.altitude/1000:.2f}km, v={state.speed:.1f}m/s")
-    
+
     if verbose:
         print("-" * 80)
         print("SIMULATION COMPLETED")

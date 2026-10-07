@@ -69,7 +69,7 @@ def compute_rcs_mass_flow_rate(
     if max_torque <= 0.0:
         return 0.0
 
-                                          
+
     throttle = min(rcs_torque_n_m / max_torque, 1.0)
 
     # Normalize full-authority flow against the SAME thrust value used for
@@ -81,7 +81,7 @@ def compute_rcs_mass_flow_rate(
     # over-consumption), and demands above the hard-coded authority were
     # silently clamped and under-consumed.
 
-                                      
+
     mdot_full = (
         float(thrust_per_thruster)
         * int(num_thrusters)

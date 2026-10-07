@@ -27,14 +27,14 @@ from rlv_sim.state import State
 
 
 def _valid_state(**overrides):
-    defaults = dict(
-        r=np.array([C.R_EARTH + 400_000.0, 0.0, 0.0]),
-        v=np.array([0.0, 7669.0, 0.0]),
-        q=np.array([1.0, 0.0, 0.0, 0.0]),
-        omega=np.zeros(3),
-        m=C.DRY_MASS + 1000.0,
-        t=0.0,
-    )
+    defaults = {
+        "r": np.array([C.R_EARTH + 400_000.0, 0.0, 0.0]),
+        "v": np.array([0.0, 7669.0, 0.0]),
+        "q": np.array([1.0, 0.0, 0.0, 0.0]),
+        "omega": np.zeros(3),
+        "m": C.DRY_MASS + 1000.0,
+        "t": 0.0,
+    }
     defaults.update(overrides)
     return State(**defaults)
 
