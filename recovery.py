@@ -11,6 +11,7 @@ throttle commands are not a complete constrained optimal-guidance derivation.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 
 import numpy as np
@@ -436,7 +437,27 @@ def _propagate_2body_to_surface(
     return None
 
 
-def estimate_ballistic_impact_to_pad(
+_IMPACT_MEMO = threading.local()
+
+
+def estimate_ballistic_impact_to_pad(*args, **kwargs) -> BallisticImpactEstimate:
+    """Memoised wrapper: guidance and the mission manager ask for the same
+    prediction (identical state and arguments) in the same step, so the most
+    recent result is reused. Per-thread, keyed on the exact inputs."""
+    r, v = args[0], args[1]
+    key = (
+        np.asarray(r, dtype=float).tobytes(), np.asarray(v, dtype=float).tobytes(),
+        args[2:], tuple(sorted(kwargs.items())),
+    )
+    last = getattr(_IMPACT_MEMO, "last", None)
+    if last is not None and last[0] == key:
+        return last[1]
+    result = _estimate_ballistic_impact_to_pad(*args, **kwargs)
+    _IMPACT_MEMO.last = (key, result)
+    return result
+
+
+def _estimate_ballistic_impact_to_pad(
     r: np.ndarray,
     v: np.ndarray,
     t: float,

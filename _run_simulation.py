@@ -5,6 +5,7 @@ import time
 
 import numpy as np
 
+from . import _gfold
 from . import constants as C
 from ._guidance_common import compute_local_vertical, create_guidance_state
 from ._main_models import SimulationLog
@@ -71,6 +72,7 @@ def run_simulation(initial_state: State | None = None, dt: float | None = None, 
     if max_time is None:
         max_time = config.max_time
     config.validate()
+    _gfold.require_available(config)
     if dt <= 0:
         raise ValueError(f"dt must be positive, got {dt}")
     if max_time <= 0:

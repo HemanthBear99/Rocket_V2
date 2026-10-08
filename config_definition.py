@@ -591,16 +591,15 @@ class SimulationConfig:
                 "booster_landing_guidance must be 'heuristic' or 'gfold', "
                 f"got {self.booster_landing_guidance!r}"
             )
-        if self.gfold_replan_period_s <= 0:
-            errors.append(f"gfold_replan_period_s must be positive, got {self.gfold_replan_period_s}")
-        if not (5 <= int(self.gfold_nodes) <= 200):
-            errors.append(f"gfold_nodes must be in [5, 200], got {self.gfold_nodes}")
-        if self.gfold_terminal_altitude_m < 0:
-            errors.append(f"gfold_terminal_altitude_m must be >= 0, got {self.gfold_terminal_altitude_m}")
+        errors += _field_errors(self, (
+            ("gfold_replan_period_s", "positive"),
+            ("gfold_terminal_altitude_m", "nonneg"),
+            ("orbit_coast_max_dt", "positive"),
+        ))
+        if not (float(self.gfold_nodes).is_integer() and 5 <= int(self.gfold_nodes) <= 200):
+            errors.append(f"gfold_nodes must be an integer in [5, 200], got {self.gfold_nodes}")
         if not (0.0 < self.gfold_glideslope_deg < 90.0):
             errors.append(f"gfold_glideslope_deg must be in (0, 90), got {self.gfold_glideslope_deg}")
-        if self.orbit_coast_max_dt <= 0:
-            errors.append(f"orbit_coast_max_dt must be positive, got {self.orbit_coast_max_dt}")
         errors += _field_errors(self, (
             ("max_time", "positive"),
             ("separation_delta_v", "nonneg"),

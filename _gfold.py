@@ -29,6 +29,7 @@ Requires the optional ``cvxpy`` package (``gfold`` extra). Without it
 from __future__ import annotations
 
 import math
+import threading
 from dataclasses import dataclass
 
 import numpy as np
@@ -160,7 +161,9 @@ class _DescentProblem:
         self.z_min.value = z0
         self.z_max.value = np.log(m_high)
         try:
-            self.problem.solve(solver=cp.CLARABEL)
+            # Cold start every solve: warm starts made results depend on the
+            # previous solve, so identical missions differed run to run.
+            self.problem.solve(solver=cp.CLARABEL, warm_start=False)
         except cp.SolverError:
             return None
         if self.problem.status not in (cp.OPTIMAL, cp.OPTIMAL_INACCURATE):
@@ -168,14 +171,29 @@ class _DescentProblem:
         return np.asarray(self.u.value), float(math.exp(self.z.value[n])), dt
 
 
-_PROBLEMS: dict = {}
+# Compiled problems are cached per thread: solve() writes cvxpy Parameter
+# values before solving, so sharing one instance across the server's
+# concurrent mission threads would let runs overwrite each other's inputs.
+_THREAD_LOCAL = threading.local()
 
 
 def _problem(nodes: int, max_tilt_deg: float, glideslope_deg: float) -> _DescentProblem:
     key = (nodes, round(max_tilt_deg, 6), round(glideslope_deg, 6))
-    if key not in _PROBLEMS:
-        _PROBLEMS[key] = _DescentProblem(nodes, max_tilt_deg, glideslope_deg)
-    return _PROBLEMS[key]
+    problems = getattr(_THREAD_LOCAL, "problems", None)
+    if problems is None:
+        problems = _THREAD_LOCAL.problems = {}
+    if key not in problems:
+        problems[key] = _DescentProblem(nodes, max_tilt_deg, glideslope_deg)
+    return problems[key]
+
+
+def require_available(config) -> None:
+    """Raise if G-FOLD guidance is selected but cvxpy is not installed."""
+    if getattr(config, "booster_landing_guidance", "heuristic") == "gfold" and not AVAILABLE:
+        raise ValueError(
+            "booster_landing_guidance='gfold' needs the optional 'cvxpy' package "
+            "(install the 'gfold' extra)"
+        )
 
 
 def local_frame(site_eci: np.ndarray) -> np.ndarray:

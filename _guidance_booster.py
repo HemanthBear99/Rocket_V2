@@ -781,7 +781,8 @@ def _gfold_command(ctx: _BoosterContext, gs: GuidanceState, t_go: float,
     )
     # Hold the final plan through the last ~1.5 s; very short horizons are
     # numerically degenerate and the plan already ends at the pad.
-    if due and (remaining is None or remaining > 1.5):
+    expired = remaining is not None and remaining <= 0.0
+    if expired or (due and (remaining is None or remaining > 1.5)):
         limits = _gfold.DescentLimits(
             thrust_min_n=float(cfg.min_engine_throttle_fraction) * thrust_max,
             thrust_max_n=float(cfg.max_engine_throttle_fraction) * thrust_max,
@@ -796,7 +797,7 @@ def _gfold_command(ctx: _BoosterContext, gs: GuidanceState, t_go: float,
         )
         new_plan = _gfold.plan_descent(
             ctx.r, ctx.v_ground, ctx.m, ctx.t, ctx.landing_site_now, limits,
-            tf_guess_s=float(remaining) if remaining is not None else float(t_go),
+            tf_guess_s=float(remaining) if remaining is not None and remaining > 1.5 else float(t_go),
             nodes=int(cfg.gfold_nodes),
             gate_altitude_m=float(cfg.gfold_terminal_altitude_m),
             gate_descent_rate_mps=float(gate_descent_rate),
@@ -810,6 +811,46 @@ def _gfold_command(ctx: _BoosterContext, gs: GuidanceState, t_go: float,
     if gs.gfold_plan is None:
         return None
     return _gfold.command_from_plan(gs.gfold_plan, ctx.t, ctx.m, thrust_max)
+
+
+def _lateral_divert(v_horiz_site, t_stop, h, t_go, a_divert_zev, a_divert_zem_zev,
+                    a_horiz_budget, *, terminal_horizontal_capture,
+                    terminal_inside_pad_capture, pad_reachable):
+    """Horizontal divert acceleration for the landing burn, budget-limited."""
+    if terminal_horizontal_capture:
+        a_divert = -v_horiz_site / max(t_stop, 1e-6)
+    elif terminal_inside_pad_capture:
+        a_divert = a_divert_zev
+    elif h < 150.0 or t_go < 5.0:
+        # Final approach: null horizontal velocity only. ZEM/ZEV's position
+        # term grows as 1/t_go^2 and, with the thrust pinned at the tilt
+        # limit, kept accelerating toward an off-pad target instead of
+        # braking (tailwind cases touched down at ~30 m/s sideways).
+        a_divert = a_divert_zev
+    else:
+        a_divert = a_divert_zem_zev if pad_reachable else a_divert_zev
+
+    a_divert_mag = float(vec_norm(a_divert))
+    if a_divert_mag > a_horiz_budget and a_divert_mag > 1e-6:
+        a_divert = a_divert * (a_horiz_budget / a_divert_mag)
+    return a_divert
+
+
+def _apply_landing_guidance_mode(ctx, gs, desired_dir, throttle, t_go, g_loc,
+                                 full_throttle_mdot, gate_descent_rate):
+    """Replace the heuristic command with G-FOLD's when that mode is selected.
+
+    Returns (desired_dir, throttle, mode label for telemetry).
+    """
+    cfg = ctx.cfg
+    if cfg.booster_landing_guidance != "gfold":
+        return desired_dir, throttle, "heuristic"
+    gfold_cmd = _gfold_command(ctx, gs, t_go, g_loc, full_throttle_mdot, gate_descent_rate)
+    if gfold_cmd is not None:
+        return gfold_cmd[0], gfold_cmd[1], "gfold"
+    if ctx.altitude <= float(cfg.gfold_terminal_altitude_m):
+        return desired_dir, throttle, "gfold_terminal"
+    return desired_dir, throttle, "gfold_fallback"
 
 
 def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
@@ -969,22 +1010,12 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         float(cfg.booster_terminal_hcapture_tstop_min_s),
         float(cfg.booster_terminal_hcapture_tstop_max_s),
     ))
-    if terminal_horizontal_capture:
-        a_divert = -v_horiz_site / max(t_stop, 1e-6)
-    elif terminal_inside_pad_capture:
-        a_divert = a_divert_zev
-    elif h < 150.0 or t_go < 5.0:
-        # Final approach: null horizontal velocity only. ZEM/ZEV's position
-        # term grows as 1/t_go^2 and, with the thrust pinned at the tilt
-        # limit, kept accelerating toward an off-pad target instead of
-        # braking (tailwind cases touched down at ~30 m/s sideways).
-        a_divert = a_divert_zev
-    else:
-        a_divert = a_divert_zem_zev if pad_reachable else a_divert_zev
-
-    a_divert_mag = float(vec_norm(a_divert))
-    if a_divert_mag > a_horiz_budget and a_divert_mag > 1e-6:
-        a_divert = a_divert * (a_horiz_budget / a_divert_mag)
+    a_divert = _lateral_divert(
+        v_horiz_site, t_stop, h, t_go, a_divert_zev, a_divert_zem_zev, a_horiz_budget,
+        terminal_horizontal_capture=terminal_horizontal_capture,
+        terminal_inside_pad_capture=terminal_inside_pad_capture,
+        pad_reachable=pad_reachable,
+    )
 
     if v_descent < 1.0 and v_horiz_mag < 1.0:
         throttle = 0.0
@@ -998,20 +1029,10 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         a_cmd_mag = float(vec_norm(a_cmd))
         desired_dir = a_cmd / max(a_cmd_mag, 1e-6)
         throttle = float(np.clip(a_cmd_mag / max(t_accel, 1e-6), 0.0, 1.0))
-    landing_guidance_mode = "heuristic"
-    if cfg.booster_landing_guidance == "gfold":
-        gfold_cmd = _gfold_command(
-            ctx, gs, t_go, g_loc, full_throttle_mdot, landing_target_descent_rate,
-        )
-        if gfold_cmd is None:
-            landing_guidance_mode = (
-                "gfold_terminal"
-                if ctx.altitude <= float(cfg.gfold_terminal_altitude_m)
-                else "gfold_fallback"
-            )
-        else:
-            desired_dir, throttle = gfold_cmd
-            landing_guidance_mode = "gfold"
+    desired_dir, throttle, landing_guidance_mode = _apply_landing_guidance_mode(
+        ctx, gs, desired_dir, throttle, t_go, g_loc, full_throttle_mdot,
+        landing_target_descent_rate,
+    )
 
     if h < 10.0 and v_descent < landing_target_descent_rate:
         desired_dir = vertical
