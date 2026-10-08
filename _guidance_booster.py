@@ -408,8 +408,18 @@ def _compute_boostback_direction(
 
 
     v_desired_h = v_return * toward_site
-
-
+    if is_near_pad_target(_cfg):
+        # Impact-point feedback: the ballistic predictor includes wind and
+        # drag, so adding (predicted miss / time to impact) to the desired
+        # return velocity steers the burn until the predicted touchdown is
+        # on the pad. The fixed return-speed estimate alone ignores wind and
+        # under a headwind never brought the impact inside the corridor.
+        impact = estimate_ballistic_impact_to_pad(
+            r, v, t, target_downrange_km, _cfg,
+            lead_time_s=0.0, mass_kg=m, aero_mode="BOOSTER_BOOSTBACK",
+        )
+        miss_h = impact.miss_vector_m - float(np.dot(impact.miss_vector_m, vertical)) * vertical
+        v_desired_h = v_desired_h + miss_h / max(float(impact.time_to_impact_s), 30.0)
     v_guidance_h = v_horiz_vec
     v_error = v_desired_h - v_guidance_h
     v_error_mag = float(vec_norm(v_error))

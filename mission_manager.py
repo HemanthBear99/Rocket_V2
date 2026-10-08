@@ -70,6 +70,10 @@ class MissionPhase(Enum):
     BOOSTER_LANDING = auto()
 
 
+# Near-pad boostback ends once the predicted ballistic impact is this close.
+BOOSTBACK_TARGET_MISS_M = 2000.0
+
+
 class MissionManager:
     """
     Manages the current mission phase and transitions using physics-based criteria.
@@ -523,10 +527,11 @@ class MissionManager:
             and v_toward_site <= v_return_needed * upper_return_ratio
         )
         if near_pad_rtls:
-            boostback_complete = (
-                velocity_on_target
-                and impact_corridor_ready
-                and boostback_min_time_met
+            # Boostback steering uses impact-point feedback, so cut off once
+            # the predicted touchdown is close to the pad (wind included).
+            impact_on_target = impact.miss_distance_m <= BOOSTBACK_TARGET_MISS_M
+            boostback_complete = boostback_min_time_met and (
+                impact_on_target or (velocity_on_target and impact_corridor_ready)
             )
         else:
             ground_return_ready = v_pad_closure >= 1.50 * v_pad_needed
