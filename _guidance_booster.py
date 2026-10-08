@@ -494,6 +494,11 @@ def _ballistic_impact(ctx: _BoosterContext):
     )
 
 
+# Weight of the straight-line ZEV term in entry terminal capture (see note in
+# _entry_guidance). 1.0 is classic ZEM/ZEV; 0.0 is ZEM-only.
+ENTRY_CAPTURE_ZEV_GAIN = 0.5
+
+
 def _entry_guidance(ctx: _BoosterContext) -> dict:
     """BOOSTER_ENTRY: retrograde entry burn plus terminal pad capture."""
     cfg = ctx.cfg
@@ -659,9 +664,14 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
                 8.0,
                 180.0,
             ))
+            # Reduced ZEV: impact_miss comes from the drag-aware ballistic
+            # predictor, which already accounts for the current motion. The
+            # classic +2v/t ZEV term assumes straight-line propagation; mixed
+            # with the (much smaller) drag-aware ZEM it accelerated the booster
+            # along its horizontal velocity and grew the miss during entry.
             a_divert = (
                 (6.0 / (t_go_capture ** 2)) * impact_miss
-                + (2.0 / t_go_capture) * v_horiz_site
+                + ENTRY_CAPTURE_ZEV_GAIN * (2.0 / t_go_capture) * v_horiz_site
             )
             a_divert_mag = float(vec_norm(a_divert))
             if a_divert_mag > 1e-9:
