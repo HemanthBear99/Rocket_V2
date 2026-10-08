@@ -162,7 +162,7 @@ class SimulationConfig:
     pitchover_start_altitude: float = C.PITCHOVER_START_ALTITUDE
     pitchover_end_altitude: float = C.PITCHOVER_END_ALTITUDE
     pitchover_angle: float = C.PITCHOVER_ANGLE
-    ascent_max_q_target_pa: float = 30000.0
+    ascent_max_q_target_pa: float = 27000.0
     ascent_max_q_prediction_horizon_s: float = 1.0
     stage1_landing_fuel_reserve_kg: float = C.STAGE1_LANDING_FUEL_RESERVE
     launch_site_lat_deg: float = C.DEFAULT_LAUNCH_SITE_LAT_DEG
