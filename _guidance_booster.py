@@ -963,6 +963,12 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         a_divert = -v_horiz_site / max(t_stop, 1e-6)
     elif terminal_inside_pad_capture:
         a_divert = a_divert_zev
+    elif h < 150.0 or t_go < 5.0:
+        # Final approach: null horizontal velocity only. ZEM/ZEV's position
+        # term grows as 1/t_go^2 and, with the thrust pinned at the tilt
+        # limit, kept accelerating toward an off-pad target instead of
+        # braking (tailwind cases touched down at ~30 m/s sideways).
+        a_divert = a_divert_zev
     else:
         a_divert = a_divert_zem_zev if pad_reachable else a_divert_zev
 
