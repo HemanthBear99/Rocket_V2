@@ -612,14 +612,18 @@ def _thrust_magnitude(mission_mgr, phase, stage: int, vehicle_model: str,
     override = None
     if mission_mgr.vehicle_type == "booster" and stage == 1 and vehicle_model == "booster":
         override = {
-            MissionPhase.BOOSTER_BOOSTBACK: C.BOOSTBACK_THRUST,
-            MissionPhase.BOOSTER_ENTRY: C.ENTRY_THRUST,
-            MissionPhase.BOOSTER_LANDING: C.LANDING_THRUST,
+            MissionPhase.BOOSTER_BOOSTBACK: config.boostback_thrust_n,
+            MissionPhase.BOOSTER_ENTRY: config.entry_thrust_n,
+            MissionPhase.BOOSTER_LANDING: config.landing_thrust_n,
         }.get(phase)
+    if override is None and stage == 1:
+        # Stage-1 thrust (and so its mass flow) always comes from the vehicle
+        # definition, so a different engine cluster burns fuel accordingly.
+        override = config.stage1_thrust_n
     base = (
         float(override)
         if override is not None
-        else float(config.stage2_thrust_vac if stage == 2 else C.THRUST_MAGNITUDE)
+        else float(config.stage2_thrust_vac if stage == 2 else config.stage1_thrust_n)
     )
     return override, base * float(config.runtime_thrust_scale)
 

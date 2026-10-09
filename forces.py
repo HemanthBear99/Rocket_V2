@@ -613,6 +613,15 @@ def _get_aero_db(path: str | None) -> AeroDatabase | None:
     return _load_aero_db_cached(path)
 
 
+def _ref_area(config) -> float:
+    """Aerodynamic reference area: from the vehicle diameter when configured."""
+    return float(config.reference_area_m2) if config is not None else C.REFERENCE_AREA
+
+
+def _ref_diameter(config) -> float:
+    return float(config.vehicle_diameter_m) if config is not None else C.REFERENCE_DIAMETER
+
+
 def compute_drag_force(
     r: np.ndarray,
     v: np.ndarray,
@@ -654,7 +663,7 @@ def compute_drag_force(
         cd = np.interp(mach, C.MACH_BREAKPOINTS, C.CD_VALUES)
 
     v_rel_hat = v_rel / v_rel_norm
-    drag_magnitude = 0.5 * rho * cd * C.REFERENCE_AREA * v_rel_norm ** 2
+    drag_magnitude = 0.5 * rho * cd * _ref_area(config) * v_rel_norm ** 2
 
     return -drag_magnitude * v_rel_hat
 
@@ -710,7 +719,7 @@ def compute_lift_force(
             max_coefficient=1.2,
         )
 
-    lift_mag = q_dyn * cl * C.REFERENCE_AREA
+    lift_mag = q_dyn * cl * _ref_area(config)
 
     body_z_inertial = R[:, 2]
     cross_intermediate = cross3(v_rel, body_z_inertial)
@@ -884,7 +893,7 @@ def compute_thrust_force(q: np.ndarray, r: np.ndarray, thrust_on: bool = True, t
         thrust_sl = (
             float(thrust_magnitude_override)
             if thrust_magnitude_override is not None
-            else C.THRUST_MAGNITUDE
+            else (float(config.stage1_thrust_n) if config is not None else C.THRUST_MAGNITUDE)
         )
         thrust_sl *= float(thrust_scale)
         pressure_thrust_scale = thrust_sl / max(C.THRUST_MAGNITUDE, 1e-9)
@@ -979,14 +988,14 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         # Sign convention matches the analytic branch: positive Cm is
         # destabilizing (nose-up for a CP-ahead-of-CG vehicle), which is the
         # -Fn*u_trans normal force crossed with a +z arm.
-        torque_aero = cm_axis * (q_dyn * C.REFERENCE_AREA * C.REFERENCE_DIAMETER * cm)
+        torque_aero = cm_axis * (q_dyn * _ref_area(config) * _ref_diameter(config) * cm)
     else:
         cn = compute_post_stall_normal_coefficient(
             alpha,
             C.C_N_ALPHA,
             max_coefficient=1.6,
         )
-        Fn_mag = q_dyn * C.REFERENCE_AREA * cn
+        Fn_mag = q_dyn * _ref_area(config) * cn
         F_normal_body = -Fn_mag * u_trans
 
         if cp_pos_z is None:
@@ -1013,8 +1022,8 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
 
     if omega is not None:
         damp_coeff = (
-            C.C_M_DAMPING * q_dyn * C.REFERENCE_AREA
-            * C.REFERENCE_DIAMETER ** 2 / (2.0 * max(v_rel_norm, 1.0))
+            C.C_M_DAMPING * q_dyn * _ref_area(config)
+            * _ref_diameter(config) ** 2 / (2.0 * max(v_rel_norm, 1.0))
         )
         torque_aero[0] += damp_coeff * omega[0]
         torque_aero[1] += damp_coeff * omega[1]
@@ -1051,7 +1060,7 @@ def _booster_recovery_aero_scale(
         (drag_scale, moment_scale) tuple
     """
     if reference_area is None:
-        reference_area = C.REFERENCE_AREA
+        reference_area = _ref_area(config)
 
     normalized = (mode or "").upper()
 

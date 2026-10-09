@@ -38,7 +38,7 @@ try:
     import cvxpy as cp
 
     AVAILABLE = True
-except Exception:  # pragma: no cover - cvxpy missing or broken (e.g. frozen build)
+except Exception:  # noqa: BLE001  # pragma: no cover - cvxpy missing or broken (frozen build)
     # Any import failure disables G-FOLD instead of crashing the app; the
     # option is hidden in the UI and selecting it raises a clear error.
     cp = None

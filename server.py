@@ -327,10 +327,17 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
 
 
     v = setup.vehicle.model_dump()
-    default_thrust = C.THRUST_MAGNITUDE
     default_isp    = C.ISP
+    engines = int(v.get("stage1_engines", C.STAGE1_ENGINE_COUNT))
+    overrides["stage1_engine_count"] = engines
+    overrides["boostback_engine_count"] = int(v.get("boostback_engines", C.BOOSTBACK_ENGINE_COUNT))
+    overrides["entry_engine_count"] = int(v.get("entry_engines", C.ENTRY_ENGINE_COUNT))
+    overrides["landing_engine_count"] = int(v.get("landing_engines", C.LANDING_ENGINE_COUNT))
+    overrides["vehicle_diameter_m"] = float(v.get("diameter_m", C.REFERENCE_DIAMETER))
     if "thrust_sl" in v and float(v["thrust_sl"]) > 0:
-        overrides["runtime_thrust_scale"] = float(v["thrust_sl"]) / default_thrust
+        # Total liftoff thrust is split evenly over the engine cluster; every
+        # recovery burn's thrust then follows from its engine count.
+        overrides["stage1_engine_thrust_n"] = float(v["thrust_sl"]) / max(engines, 1)
     if "isp_sl" in v and float(v["isp_sl"]) > 0:
         overrides["runtime_isp_scale"] = float(v["isp_sl"]) / default_isp
     if "stage1_prop_mass" in v and float(v["stage1_prop_mass"]) > 0:
@@ -472,13 +479,18 @@ async def frontend_config_defaults() -> dict[str, Any]:
             "stage2_dry_mass": config.stage2_dry_mass,
             "stage2_prop_mass": config.stage2_prop_mass,
             "payload_mass": config.payload_mass,
-            "thrust_sl": C.THRUST_MAGNITUDE * config.runtime_thrust_scale,
+            "thrust_sl": config.stage1_thrust_n * config.runtime_thrust_scale,
             "thrust_vac": config.stage2_thrust_vac,
             "isp_sl": C.ISP * config.runtime_isp_scale,
             "isp_vac": config.stage2_isp_vac,
             "max_gimbal_deg": config.max_gimbal_angle_deg,
             "throttle_min": config.min_engine_throttle_fraction,
             "throttle_max": config.max_engine_throttle_fraction,
+            "stage1_engines": config.stage1_engine_count,
+            "boostback_engines": config.boostback_engine_count,
+            "entry_engines": config.entry_engine_count,
+            "landing_engines": config.landing_engine_count,
+            "diameter_m": config.vehicle_diameter_m,
         },
         "mission": {
             "target_alt_km": config.orbit_target_altitude_m / 1000.0,

@@ -33,6 +33,11 @@
       max_gimbal_deg: { label: 'Max Gimbal Angle', unit: 'deg', step: 0.5 },
       throttle_min: { label: 'Min Throttle', unit: 'frac', step: 0.01 },
       throttle_max: { label: 'Max Throttle', unit: 'frac', step: 0.01 },
+      stage1_engines: { label: 'Stage 1 Engines', unit: 'count', step: 1 },
+      boostback_engines: { label: 'Boostback Engines', unit: 'count', step: 1 },
+      entry_engines: { label: 'Entry Burn Engines', unit: 'count', step: 1 },
+      landing_engines: { label: 'Landing Engines', unit: 'count', step: 1 },
+      diameter_m: { label: 'Vehicle Diameter', unit: 'm', step: 0.1 },
     },
     mission: {
       target_alt_km: { label: 'Target Orbit Altitude', unit: 'km', step: 1 },
@@ -278,6 +283,8 @@
     'launch_site_lon_deg', 'enable_grid_fins', 'enable_landing_legs', 'enable_j2',
     'enable_atmosphere', 'enable_drag', 'enable_lift', 'enable_imu', 'enable_gps',
     'enable_landing_altimeter', 'enable_s2_recovery', 'booster_landing_guidance',
+    'stage1_engine_count', 'stage1_engine_thrust_n', 'boostback_engine_count',
+    'entry_engine_count', 'landing_engine_count', 'vehicle_diameter_m',
   ]);
 
   $('#btn-export-config').addEventListener('click', () => {
@@ -346,8 +353,11 @@
   const REFERENCE_ISP_SL_S = 282.0;
 
   function populateFromFullConfig(cfg) {
+    const engineThrust = Number.isFinite(cfg.stage1_engine_thrust_n) && Number.isFinite(cfg.stage1_engine_count)
+      ? cfg.stage1_engine_thrust_n * cfg.stage1_engine_count
+      : REFERENCE_THRUST_SL_N;
     const thrustSl = Number.isFinite(cfg.runtime_thrust_scale)
-      ? REFERENCE_THRUST_SL_N * cfg.runtime_thrust_scale
+      ? engineThrust * cfg.runtime_thrust_scale
       : state.formValues.vehicle.thrust_sl;
     const ispSl = Number.isFinite(cfg.runtime_isp_scale)
       ? REFERENCE_ISP_SL_S * cfg.runtime_isp_scale
@@ -360,6 +370,9 @@
         thrust_vac: cfg.stage2_thrust_vac, isp_sl: ispSl,
         isp_vac: cfg.stage2_isp_vac, max_gimbal_deg: cfg.max_gimbal_angle_deg,
         throttle_min: cfg.min_engine_throttle_fraction, throttle_max: cfg.max_engine_throttle_fraction,
+        stage1_engines: cfg.stage1_engine_count ?? 9, boostback_engines: cfg.boostback_engine_count ?? 3,
+        entry_engines: cfg.entry_engine_count ?? 3, landing_engines: cfg.landing_engine_count ?? 1,
+        diameter_m: cfg.vehicle_diameter_m ?? 3.7,
       },
       mission: {
         target_alt_km: cfg.orbit_target_altitude_m / 1000.0,

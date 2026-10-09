@@ -22,6 +22,12 @@ class VehicleSetup(BaseModel):
     max_gimbal_deg: float = Field(ge=0, le=30)
     throttle_min: float = Field(gt=0, le=1)
     throttle_max: float = Field(gt=0, le=1)
+    # Vehicle builder: engine cluster and geometry (defaults = reference vehicle).
+    stage1_engines: int = Field(9, ge=1, le=50)
+    boostback_engines: int = Field(3, ge=1, le=50)
+    entry_engines: int = Field(3, ge=1, le=50)
+    landing_engines: int = Field(1, ge=1, le=50)
+    diameter_m: float = Field(3.7, gt=0, le=20)
 
 
 class MissionSetup(BaseModel):

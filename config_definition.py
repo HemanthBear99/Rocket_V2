@@ -5,6 +5,7 @@ This module provides the core configuration dataclass for the RLV simulation,
 separating configuration definitions from factory logic.
 """
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -218,6 +219,14 @@ class SimulationConfig:
 
 
     stage2_thrust_vac: float = C.STAGE2_THRUST
+    # Vehicle definition (stage 1). Thrust levels for every burn and the
+    # aerodynamic reference area are derived from these.
+    stage1_engine_count: int = C.STAGE1_ENGINE_COUNT
+    stage1_engine_thrust_n: float = C.STAGE1_ENGINE_THRUST
+    boostback_engine_count: int = C.BOOSTBACK_ENGINE_COUNT
+    entry_engine_count: int = C.ENTRY_ENGINE_COUNT
+    landing_engine_count: int = C.LANDING_ENGINE_COUNT
+    vehicle_diameter_m: float = C.REFERENCE_DIAMETER
     stage2_isp_vac: float = C.STAGE2_ISP_VAC
     stage_sep_velocity: float = 2200.0
     target_inclination_deg: float = 28.5
@@ -422,6 +431,28 @@ class SimulationConfig:
         return {name: bool(getattr(self, name)) for name in EXPERIMENTAL_FEATURE_FLAGS}
 
     @property
+    def stage1_thrust_n(self) -> float:
+        """Liftoff thrust: every stage-1 engine at full throttle (sea level)."""
+        return float(self.stage1_engine_count) * float(self.stage1_engine_thrust_n)
+
+    @property
+    def boostback_thrust_n(self) -> float:
+        return float(self.boostback_engine_count) * float(self.stage1_engine_thrust_n)
+
+    @property
+    def entry_thrust_n(self) -> float:
+        return float(self.entry_engine_count) * float(self.stage1_engine_thrust_n)
+
+    @property
+    def landing_thrust_n(self) -> float:
+        return float(self.landing_engine_count) * float(self.stage1_engine_thrust_n)
+
+    @property
+    def reference_area_m2(self) -> float:
+        """Aerodynamic reference area from the vehicle diameter."""
+        return math.pi * float(self.vehicle_diameter_m) ** 2 / 4.0
+
+    @property
     def meco_mass_kg(self) -> float:
         """Stacked-vehicle mass at main-engine cutoff.
 
@@ -592,10 +623,23 @@ class SimulationConfig:
                 f"got {self.booster_landing_guidance!r}"
             )
         errors += _field_errors(self, (
+            ("stage1_engine_thrust_n", "positive"),
+            ("vehicle_diameter_m", "positive"),
             ("gfold_replan_period_s", "positive"),
             ("gfold_terminal_altitude_m", "nonneg"),
             ("orbit_coast_max_dt", "positive"),
         ))
+        for name in ("stage1_engine_count", "boostback_engine_count",
+                     "entry_engine_count", "landing_engine_count"):
+            value = getattr(self, name)
+            if not (float(value).is_integer() and 1 <= int(value) <= 50):
+                errors.append(f"{name} must be an integer in [1, 50], got {value}")
+        for name in ("boostback_engine_count", "entry_engine_count", "landing_engine_count"):
+            if float(getattr(self, name)) > float(self.stage1_engine_count):
+                errors.append(
+                    f"{name} ({getattr(self, name)}) cannot exceed stage1_engine_count "
+                    f"({self.stage1_engine_count})"
+                )
         if not (float(self.gfold_nodes).is_integer() and 5 <= int(self.gfold_nodes) <= 200):
             errors.append(f"gfold_nodes must be an integer in [5, 200], got {self.gfold_nodes}")
         if not (0.0 < self.gfold_glideslope_deg < 90.0):

@@ -164,6 +164,7 @@ class MissionManager:
         return compute_suicide_burn_altitude(
             state,
             self.config.booster_landing_ignition_safety_factor,
+            thrust_n=self.config.landing_thrust_n,
         )
 
     def _ignition_corridor_top(self, state: State) -> float:
@@ -177,7 +178,7 @@ class MissionManager:
             state.r,
             state.v,
             state.m,
-            C.LANDING_THRUST,
+            self.config.landing_thrust_n,
             safety_factor=self.config.booster_landing_ignition_safety_factor,
         )
         h_ignite = float(burn['burn_altitude'])
@@ -578,7 +579,7 @@ class MissionManager:
             state.r,
             state.v,
             state.m,
-            C.LANDING_THRUST,
+            self.config.landing_thrust_n,
             safety_factor=self.config.booster_landing_ignition_safety_factor,
         )
         h_ignite = float(burn['burn_altitude'])

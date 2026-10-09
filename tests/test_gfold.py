@@ -70,7 +70,7 @@ def test_landing_guidance_uses_gfold_when_enabled():
     cfg = create_default_config(booster_landing_guidance="gfold")
     site = target_landing_site_eci(0.0, cfg.booster_landing_target_downrange_km, config=cfg)
     up = site / np.linalg.norm(site)
-    r = up * (C.R_EARTH + 200.0)
+    r = up * (C.R_EARTH + 250.0)  # stoppable above the 15 m gate with one engine
     v = np.cross([0.0, 0.0, C.EARTH_ROTATION_RATE], r) - 80.0 * up
     gs = create_guidance_state()
     gs.booster_landing_burn_started = True

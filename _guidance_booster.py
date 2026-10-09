@@ -205,7 +205,7 @@ def score_recovery_candidates(
     current_throttle: float = 0.0,
 ) -> RecoveryPlanDiagnostics:
     phase_name = str(phase).upper()
-    thrust_n = C.BOOSTBACK_THRUST if phase_name == "BOOSTER_BOOSTBACK" else C.ENTRY_THRUST
+    thrust_n = config.boostback_thrust_n if phase_name == "BOOSTER_BOOSTBACK" else config.entry_thrust_n
     horizon = 180.0 if phase_name == "BOOSTER_BOOSTBACK" else 100.0
     step = 6.0 if phase_name == "BOOSTER_BOOSTBACK" else 4.0
     reserve = float(config.booster_landing_reserve_kg + config.booster_landing_propellant_margin_kg)
@@ -723,7 +723,7 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
                 max_capture_throttle = 0.65
             if capture_accel_cmd_mag is not None:
                 throttle_request = capture_accel_cmd_mag / max(
-                    C.ENTRY_THRUST / max(ctx.m, 1.0),
+                    ctx.cfg.entry_thrust_n / max(ctx.m, 1.0),
                     1e-9,
                 )
             else:
@@ -769,7 +769,7 @@ def _gfold_command(ctx: _BoosterContext, gs: GuidanceState, t_go: float,
     cfg = ctx.cfg
     if ctx.altitude <= float(cfg.gfold_terminal_altitude_m):
         return None  # below the terminal gate: vertical-descent law
-    thrust_max = float(C.LANDING_THRUST) * float(cfg.runtime_thrust_scale)
+    thrust_max = float(cfg.landing_thrust_n) * float(cfg.runtime_thrust_scale)
     plan = gs.gfold_plan
     remaining = (
         plan.t_start + plan.time_of_flight - ctx.t if plan is not None else None
@@ -877,7 +877,7 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
     v_horiz_mag = float(vec_norm(v_horiz_vec))
 
     g_loc = float(C.MU_EARTH / (float(vec_norm(ctx.r)) ** 2))
-    t_accel = float(C.LANDING_THRUST / max(ctx.m, 1.0))
+    t_accel = float(cfg.landing_thrust_n / max(ctx.m, 1.0))
     h = max(ctx.altitude, 0.5)
 
     target_descent_ceiling = 4.2 if near_pad_rtls else 3.0
@@ -901,7 +901,7 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
             ctx.r,
             ctx.v,
             ctx.m,
-            C.LANDING_THRUST,
+            cfg.landing_thrust_n,
             safety_factor=1.0,
         ),
         1.0,
@@ -969,7 +969,7 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         thrust_on=True,
         throttle=1.0,
         stage=1,
-        thrust_magnitude_override=C.LANDING_THRUST,
+        thrust_magnitude_override=cfg.landing_thrust_n,
         thrust_scale=cfg.runtime_thrust_scale,
         isp_scale=cfg.runtime_isp_scale,
         r=ctx.r,
@@ -1114,7 +1114,7 @@ def compute_booster_guidance(
     landing_margin = cfg.booster_landing_propellant_margin_kg
     target_downrange_km = cfg.booster_landing_target_downrange_km
     burn_prediction = estimate_suicide_burn(
-        r, v, m, C.LANDING_THRUST,
+        r, v, m, cfg.landing_thrust_n,
         safety_factor=cfg.booster_landing_ignition_safety_factor,
     )
     ctx = _BoosterContext(

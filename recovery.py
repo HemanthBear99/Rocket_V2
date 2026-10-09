@@ -332,8 +332,12 @@ def _predictor_params(config) -> np.ndarray:
         C.R_GAS,
         C.GAMMA,
         C.ATM_SPEED_OF_SOUND_FALLBACK,
-        C.REFERENCE_AREA,
+        _reference_area(config),
     ], dtype=float)
+
+
+def _reference_area(config) -> float:
+    return float(config.reference_area_m2) if config is not None else C.REFERENCE_AREA
 
 
 def _predictor_tables():
@@ -620,10 +624,10 @@ def compute_powered_descent_lead_time(
     entry_gate = ENTRY_BURN_EXIT_SPEED_MPS
     m_at_entry = max(
         float(m) * ENTRY_MASS_FRACTION,
-        C.STAGE1_DRY_MASS + float(config.booster_landing_reserve_kg),
+        float(config.stage1_dry_mass) + float(config.booster_landing_reserve_kg),
     )
     entry_net_decel = max(
-        C.ENTRY_THRUST * ENTRY_BURN_THROTTLE_FRACTION * ENTRY_RETROGRADE_EFFICIENCY
+        float(config.entry_thrust_n) * ENTRY_BURN_THROTTLE_FRACTION * ENTRY_RETROGRADE_EFFICIENCY
         / max(m_at_entry, 1.0) - g_local,
         1.0,
     )

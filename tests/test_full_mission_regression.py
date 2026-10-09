@@ -26,11 +26,11 @@ pytestmark = pytest.mark.slow
 
 REFERENCE = {
     "separation_time_s": 129.95,
-    "perigee_km": 326.99,
+    "perigee_km": 326.96,
     "apogee_km": 435.81,
     "eccentricity": 0.00806,
     "touchdown_speed_mps": 4.39,
-    "site_error_m": 0.27,
+    "site_error_m": 0.33,
 }
 
 

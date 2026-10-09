@@ -52,13 +52,14 @@ def compute_downrange_distance(state: State, launch_site: np.ndarray) -> float:
     return float(C.R_EARTH * np.arccos(cos_angle))
 
 
-def compute_suicide_burn_altitude(state: State, safety_factor: float) -> float:
+def compute_suicide_burn_altitude(state: State, safety_factor: float,
+                                  thrust_n: float = C.LANDING_THRUST) -> float:
     """Compute the shared recovery-based suicide burn ignition altitude."""
     burn = estimate_suicide_burn(
         state.r,
         state.v,
         state.m,
-        C.LANDING_THRUST,
+        thrust_n,
         safety_factor=safety_factor,
     )
     return float(burn["burn_altitude"])
