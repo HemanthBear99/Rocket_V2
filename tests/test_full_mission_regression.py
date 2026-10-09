@@ -11,7 +11,7 @@ test run. Run it with::
     pytest -m slow
 
 Reference values were recorded from the nominal mission on 2026-10-07
-(orbit_coast_max_dt = 0.5 s, max-q target 27 kPa, entry ZEV gain 0.5). When a
+(orbit_coast_max_dt = 0.5 s, q-hold throttle at 32 kPa, entry ZEV gain 0.5, vehicle-derived thrust). When a
 change *intentionally* alters the trajectory, re-run the mission, confirm the
 new outcome is correct, and update the references below.
 """
@@ -25,12 +25,12 @@ from rlv_sim.mission_summary import assess_full_mission
 pytestmark = pytest.mark.slow
 
 REFERENCE = {
-    "separation_time_s": 129.95,
-    "perigee_km": 326.96,
-    "apogee_km": 435.81,
-    "eccentricity": 0.00806,
-    "touchdown_speed_mps": 4.39,
-    "site_error_m": 0.33,
+    "separation_time_s": 129.55,
+    "perigee_km": 326.73,
+    "apogee_km": 435.01,
+    "eccentricity": 0.00802,
+    "touchdown_speed_mps": 4.41,
+    "site_error_m": 0.31,
 }
 
 

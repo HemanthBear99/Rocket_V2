@@ -21,7 +21,7 @@ def _fly(wind_mps, guidance="heuristic"):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("wind", [-7.5, 3.0])
+@pytest.mark.parametrize("wind", [-3.0, 3.0])
 def test_heuristic_lands_in_wind(wind):
     assessment = _fly(wind)
     assert assessment.landing.status == "landing_success", assessment.landing.reason

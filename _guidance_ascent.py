@@ -24,52 +24,59 @@ from ._guidance_common import (
 )
 from ._types import GuidanceOutput
 from .config_definition import SimulationConfig
-from .forces import compute_configured_atmosphere_properties
+from .forces import compute_configured_atmosphere_properties, compute_drag_force
 from .utils import compute_relative_velocity, vec_norm
 
+Q_HOLD_TIME_CONSTANT_S = 3.0
 
-def compute_max_q_throttle(
-    dynamic_pressure_pa: float,
-    dynamic_pressure_rate_pa_s: float,
-    config: SimulationConfig | None = None,
-) -> tuple[float, float]:
-    """Return predictive Max-Q throttle command and predicted pressure.
 
-    The pressure-rate look-ahead accounts for engine spool-down delay. A
-    pressure-ratio trim begins when predicted pressure crosses the target,
-    avoiding the deep throttle bucket caused by a hard limiter.
+def compute_q_hold_throttle(r, v, v_rel, m, q_dyn, q_rate, config):
+    """Throttle that keeps dynamic pressure at or below the max-q target.
+
+    Physics-based, from this vehicle's thrust, mass and drag:
+        dq/dt = rho*v*a_along - 0.5*rho*v^2*v_vert/H
+    (H = local density scale height). The acceleration along the flight path
+    that drives q toward the target with time constant tau is
+        a_req = (k*(q_target - q) + 0.5*rho*v^2*v_vert/H) / (rho*v),  k = 1/tau
+    and the throttle supplies a_req plus gravity and drag losses. Full
+    throttle whenever the vehicle cannot reach the target anyway. Replaces a
+    sqrt(target/q_predicted) trim that ignored why q was rising and
+    overshot by ~3 kPa (worse for higher-thrust vehicles).
     """
-    target = float(
-        config.ascent_max_q_target_pa
-        if config is not None
-        else 30000.0
-    )
-    horizon = float(
-        config.ascent_max_q_prediction_horizon_s
-        if config is not None
-        else 1.0
-    )
-    min_throttle = float(
-        config.min_engine_throttle_fraction
-        if config is not None
-        else SimulationConfig.min_engine_throttle_fraction
-    )
     max_throttle = float(
-        config.max_engine_throttle_fraction
-        if config is not None
+        config.max_engine_throttle_fraction if config is not None
         else SimulationConfig.max_engine_throttle_fraction
     )
-
-    q_now = max(float(dynamic_pressure_pa), 0.0)
-    q_rate_rising = max(float(dynamic_pressure_rate_pa_s), 0.0)
-    q_predicted = max(q_now, q_now + q_rate_rising * max(horizon, 0.0))
-    if q_predicted <= target:
-        throttle = max_throttle
-    else:
-        pressure_ratio_command = np.sqrt(
-            target / max(q_predicted, target)
-        )
-        throttle = max_throttle * pressure_ratio_command
+    min_throttle = float(
+        config.min_engine_throttle_fraction if config is not None
+        else SimulationConfig.min_engine_throttle_fraction
+    )
+    target = float(config.ascent_max_q_target_pa if config is not None else 30000.0)
+    q_predicted = max(q_dyn, q_dyn + max(q_rate, 0.0) * Q_HOLD_TIME_CONSTANT_S)
+    if config is None or q_predicted <= 0.6 * target:
+        return max_throttle, q_predicted
+    r_norm = float(vec_norm(r))
+    up = np.asarray(r, dtype=float) / r_norm
+    speed = float(vec_norm(v_rel))
+    if speed < 50.0:
+        return max_throttle, q_predicted
+    altitude = r_norm - C.R_EARTH
+    _, pressure, rho, _ = compute_configured_atmosphere_properties(altitude, config)
+    _, _, rho_up, _ = compute_configured_atmosphere_properties(altitude + 200.0, config)
+    if rho <= 0.0 or rho_up <= 0.0 or rho_up >= rho:
+        return max_throttle, q_predicted
+    scale_height = 200.0 / float(np.log(rho / rho_up))
+    v_vert = float(np.dot(v_rel, up))
+    k = 1.0 / Q_HOLD_TIME_CONSTANT_S
+    a_req = (k * (target - q_dyn) + 0.5 * rho * speed ** 2 * v_vert / scale_height) / (rho * speed)
+    g = C.MU_EARTH / r_norm ** 2
+    drag = float(vec_norm(compute_drag_force(r, v, wind_offset_mps=config.runtime_wind_offset_mps, config=config)))
+    a_cmd = a_req + g * v_vert / speed + drag / max(m, 1.0)
+    # Available thrust at this altitude (pressure-compensated stage 1).
+    thrust_sl = float(config.stage1_thrust_n) * float(config.runtime_thrust_scale)
+    thrust_vac = thrust_sl * C.ISP_VAC / C.ISP
+    thrust = thrust_sl + (thrust_vac - thrust_sl) * max(0.0, 1.0 - pressure / C.ATM_P0)
+    throttle = a_cmd * max(m, 1.0) / max(thrust, 1.0)
     return float(np.clip(throttle, min_throttle, max_throttle)), q_predicted
 
 
@@ -334,7 +341,7 @@ def compute_guidance_output(
         if gs.prev_dynamic_pressure_pa > 0.0
         else 0.0
     )
-    throttle, predicted_q = compute_max_q_throttle(q_dyn, q_rate, config)
+    throttle, predicted_q = compute_q_hold_throttle(r, v, v_rel, m, q_dyn, q_rate, config)
     gs.prev_dynamic_pressure_pa = q_dyn
 
     if v_rel_norm < C.ZERO_TOLERANCE:

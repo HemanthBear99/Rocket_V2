@@ -57,3 +57,31 @@ def test_ui_vehicle_fields_round_trip_to_config():
     assert cfg.stage1_engine_thrust_n == pytest.approx(1.0e6)
     assert cfg.stage1_thrust_n == pytest.approx(6.0e6)
     assert cfg.vehicle_diameter_m == pytest.approx(4.5)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("override", [
+    {"stage1_engine_thrust_n": C.STAGE1_ENGINE_THRUST * 1.10},
+    {"stage1_engine_thrust_n": C.STAGE1_ENGINE_THRUST * 0.95},
+    {"vehicle_diameter_m": 4.2},
+    {"payload_mass": 4000.0},
+])
+def test_vehicle_variants_fly_without_code_changes(override):
+    """Guidance derived from the vehicle (q-hold throttle, engine-derived burn
+    thrust) must fly these variants end to end without retuning."""
+    from rlv_sim._run_full_mission import run_full_mission
+    from rlv_sim.mission_summary import assess_full_mission
+
+    cfg = create_default_config(**override)
+    assessment = assess_full_mission(run_full_mission(config=cfg, verbose=False), cfg)
+    assert assessment.mission_success, assessment.failed_criteria
+
+
+@pytest.mark.slow
+def test_max_q_held_for_higher_thrust_vehicle():
+    from rlv_sim._run_full_mission import run_full_mission
+
+    cfg = create_default_config(stage1_engine_thrust_n=C.STAGE1_ENGINE_THRUST * 1.10, max_time=140.0)
+    result = run_full_mission(config=cfg, verbose=False)
+    peak_q = max(result.ascent_log.get_series("dynamic_pressure"))
+    assert peak_q <= cfg.ascent_max_q_target_pa * 1.01
