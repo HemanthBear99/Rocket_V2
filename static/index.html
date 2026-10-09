@@ -162,7 +162,8 @@
               <div><div class="k">Throttle</div><div class="n amber" id="vp-orb-thr">—</div><div class="u">%</div></div>
               <div><div class="k">Dyn. pressure</div><div class="n" id="vp-orb-q">—</div><div class="u">kPa</div></div>
             </div>
-            <div class="vp-foot"><span>Downrange <b id="vp-orb-dr">—</b> km</span><span>Mass <b id="vp-orb-mass">—</b> kg</span></div>
+            <div class="vp-fuel"><span id="vp-orb-fuel-lbl">S1 propellant</span><div class="fuel-bar"><div class="fill" id="vp-orb-fuel-fill"></div></div><b id="vp-orb-fuel">—</b></div>
+            <div class="vp-foot"><span>Downrange <b id="vp-orb-dr">—</b> km</span><span>Mass <b id="vp-orb-mass">—</b> kg</span><span>Propellant <b id="vp-orb-fuel-kg">—</b> kg</span></div>
           </div>
           <div class="vp" id="vp-booster">
             <div class="vp-head"><span class="vp-name">BOOSTER</span><span class="vp-phase" id="vp-bst-phase">Awaiting separation</span></div>
@@ -172,7 +173,8 @@
               <div><div class="k">Throttle</div><div class="n amber" id="vp-bst-thr">—</div><div class="u">%</div></div>
               <div><div class="k">Pad error</div><div class="n" id="vp-bst-err">—</div><div class="u">m</div></div>
             </div>
-            <div class="vp-fuel"><span>Landing fuel</span><div class="fuel-bar"><div class="fill" id="vp-bst-fuel-fill"></div></div><b id="vp-bst-fuel">—</b></div>
+            <div class="vp-fuel" title="Share of the propellant the booster keeps at separation for boostback, entry and landing burns"><span>Recovery fuel</span><div class="fuel-bar"><div class="fill" id="vp-bst-fuel-fill"></div></div><b id="vp-bst-fuel">—</b></div>
+            <div class="vp-foot"><span>Propellant <b id="vp-bst-fuel-kg">—</b> kg</span></div>
             <div class="hw-row" id="hw-row"></div>
           </div>
         </div>
@@ -360,6 +362,6 @@
 <script src="/static/js/vendor/three.min.js"></script>
 <script src="/static/js/charts.js?v=0.4.0"></script>
 <script src="/static/js/rocket_viz.js?v=0.3.2"></script>
-<script src="/static/js/app.js?v=0.4.2"></script>
+<script src="/static/js/app.js?v=0.4.3"></script>
 </body>
 </html>

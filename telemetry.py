@@ -66,6 +66,29 @@ def extract_telemetry_point(state: Any, guidance: dict, phase_name: str, config:
     }
 
 
+def _primary_fuel(progress: MissionProgress, config: SimulationConfig) -> dict:
+    """Propellant of the primary vehicle: the stacked first stage before
+    separation, the second stage (orbiter) after it."""
+    m = float(progress.primary_state.m)
+    if progress.vehicle == "dual":
+        label = "S2"
+        empty = float(config.stage2_dry_mass) + float(config.payload_mass)
+        capacity = float(config.stage2_prop_mass)
+    else:
+        label = "S1"
+        empty = (
+            float(config.stage1_dry_mass) + float(config.stage2_dry_mass)
+            + float(config.stage2_prop_mass) + float(config.payload_mass)
+        )
+        capacity = float(config.stage1_prop_mass)
+    kg = max(0.0, m - empty)
+    return {
+        "fuel_stage": label,
+        "fuel_remaining_kg": kg,
+        "fuel_remaining_pct": 100.0 * kg / capacity if capacity > 0 else 0.0,
+    }
+
+
 def extract_mission_progress(progress: MissionProgress, config: SimulationConfig) -> dict:
     """Convert a canonical runtime progress update into web telemetry."""
 
@@ -75,6 +98,7 @@ def extract_mission_progress(progress: MissionProgress, config: SimulationConfig
         progress.phase,
         config,
     )
+    payload.update(_primary_fuel(progress, config))
     if progress.vehicle != "dual" or progress.booster_state is None:
         return payload
 
@@ -107,6 +131,7 @@ def extract_mission_progress(progress: MissionProgress, config: SimulationConfig
         "booster_throttle": float(booster_guidance.get("throttle", 0.0)),
         "booster_pitch_angle": float(np.degrees(booster_guidance.get("pitch_angle", 0.0))),
         "booster_fuel_remaining": float((fuel_remaining / reserve) * 100.0 if reserve > 0 else 0.0),
+        "booster_fuel_remaining_kg": float(fuel_remaining),
         "booster_grid_fins": _grid_fin_status(booster_guidance),
         "booster_landing_legs": _landing_leg_status(booster_guidance),
         "booster_landing_error": landing_error_m,

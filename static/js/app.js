@@ -419,7 +419,7 @@
     $('#timeline-strip').innerHTML = '';
     $('#viz-orbiter-readout').innerHTML = '';
     $('#viz-booster-readout').innerHTML = '<span class="ph">Awaiting stage separation</span>';
-    ['#vp-bst-alt', '#vp-bst-vel', '#vp-bst-thr', '#vp-bst-err', '#vp-bst-fuel'].forEach((sel) => setText(sel, '—'));
+    ['#vp-bst-alt', '#vp-bst-vel', '#vp-bst-thr', '#vp-bst-err', '#vp-bst-fuel', '#vp-bst-fuel-kg'].forEach((sel) => setText(sel, '—'));
     setText('#vp-bst-phase', 'Awaiting separation');
     lastTimelinePhase = null;
   }
@@ -510,18 +510,28 @@
     setText('#vp-orb-q', fmt((p.dynamic_pressure || 0) / 1000, 1));
     setText('#vp-orb-dr', fmt((p.downrange || 0) / 1000, 1));
     setText('#vp-orb-mass', fmt(p.mass || 0, 0));
+    if (p.fuel_remaining_pct !== undefined) {
+      setText('#vp-orb-fuel-lbl', p.fuel_stage === 'S2' ? 'S2 propellant' : 'S1 propellant (stack)');
+      setFuelBar('#vp-orb-fuel', '#vp-orb-fuel-fill', p.fuel_remaining_pct);
+      setText('#vp-orb-fuel-kg', fmt(p.fuel_remaining_kg, 0));
+    }
     if (p.booster_altitude === undefined) return;
     setText('#vp-bst-phase', PHASE_LABELS[p.booster_phase] || p.booster_phase || '—');
     setText('#vp-bst-alt', fmt(p.booster_altitude / 1000, 2));
     setText('#vp-bst-vel', fmt(p.booster_velocity || 0, 0));
     setText('#vp-bst-thr', fmt((p.booster_throttle || 0) * 100, 0));
     setText('#vp-bst-err', p.booster_landing_error != null ? fmt(p.booster_landing_error, 0) : '—');
-    const fuel = Math.max(0, Math.min(100, p.booster_fuel_remaining ?? 0));
-    setText('#vp-bst-fuel', `${fmt(fuel, 0)}%`);
-    const fill = $('#vp-bst-fuel-fill');
+    setFuelBar('#vp-bst-fuel', '#vp-bst-fuel-fill', p.booster_fuel_remaining ?? 0);
+    if (p.booster_fuel_remaining_kg !== undefined) setText('#vp-bst-fuel-kg', fmt(p.booster_fuel_remaining_kg, 0));
+  }
+
+  function setFuelBar(textSel, fillSel, pct) {
+    const v = Math.max(0, Math.min(100, pct));
+    setText(textSel, `${fmt(v, v < 10 ? 1 : 0)}%`);
+    const fill = $(fillSel);
     if (fill) {
-      fill.style.width = `${fuel}%`;
-      fill.classList.toggle('low', fuel < 15);
+      fill.style.width = `${v}%`;
+      fill.classList.toggle('low', v < 15);
     }
   }
 
