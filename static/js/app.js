@@ -201,8 +201,10 @@
     const rC = $('#form-recovery'); rC.innerHTML = '';
     ['landing_lat', 'landing_lon'].forEach((k) => buildNumberField(rC, 'recovery', k, defaults.recovery[k]));
     ['grid_fins', 'landing_legs'].forEach((k) => buildToggleField(rC, 'recovery', k, defaults.recovery[k]));
+    const quick = $('#quick-gfold');
+    quick.innerHTML = '';
     if (defaults.recovery.gfold_available) {
-      buildToggleField(rC, 'recovery', 'gfold_guidance', !!defaults.recovery.gfold_guidance);
+      buildToggleField(quick, 'recovery', 'gfold_guidance', !!defaults.recovery.gfold_guidance);
     }
     state.formValues.recovery.mode = 'RTLS';
     state.formValues.recovery.landing_burn_alt = 'auto';
@@ -417,6 +419,8 @@
     $('#timeline-strip').innerHTML = '';
     $('#viz-orbiter-readout').innerHTML = '';
     $('#viz-booster-readout').innerHTML = '<span class="ph">Awaiting stage separation</span>';
+    ['#vp-bst-alt', '#vp-bst-vel', '#vp-bst-thr', '#vp-bst-err', '#vp-bst-fuel'].forEach((sel) => setText(sel, '—'));
+    setText('#vp-bst-phase', 'Awaiting separation');
     lastTimelinePhase = null;
   }
 
@@ -425,7 +429,7 @@
   function ensureCharts() {
     if (state.charts.altitude) return;
     rocketScene = new RocketScene($('#viz-orbiter'), $('#viz-booster'));
-    state.charts.altitude = new StripChart($('#chart-altitude'), { color: '#38e0ff' });
+    state.charts.altitude = new StripChart($('#chart-altitude'), { color: '#38e0ff', unit: 'km' });
     state.charts.velocity = new StripChart($('#chart-velocity'), { color: '#7c8bff' });
     state.charts.mass = new StripChart($('#chart-mass'), { color: '#3ddc84' });
     state.charts.q = new StripChart($('#chart-q'), { color: '#ff5470' });
@@ -448,20 +452,11 @@
     const throttle = payload[`${prefix}throttle`] ?? payload.throttle;
     const downrange = payload[`${prefix}downrange`] ?? payload.downrange;
 
-    $('#stat-altitude').innerHTML = `${fmt(alt / 1000, 2)}<span class="unit">km</span>`;
-    $('#stat-velocity').innerHTML = `${fmt(vel, 0)}<span class="unit">m/s</span>`;
-    $('#stat-downrange').innerHTML = `${fmt(downrange / 1000, 1)}<span class="unit">km</span>`;
-    $('#stat-mass').innerHTML = `${fmt(mass, 0)}<span class="unit">kg</span>`;
-    $('#stat-throttle').innerHTML = `${fmt(throttle * 100, 0)}<span class="unit">%</span>`;
-    // No booster_dynamic_pressure field exists in the telemetry payload (see
-    // telemetry.py) — dynamic_pressure only ever describes the orbiter, so
-    // showing it while the Booster tab is active would mislabel the value.
-    $('#stat-q').innerHTML = veh === 'booster'
-      ? '—<span class="unit">kPa</span>'
-      : `${fmt((payload.dynamic_pressure || 0) / 1000, 2)}<span class="unit">kPa</span>`;
+    updateVehiclePanels(payload);
 
-    $('#phase-chip').textContent = veh === 'booster' ? (payload.booster_phase || '—') : (payload.phase || '—');
-    renderTimeline(veh === 'booster' ? (payload.booster_phase || '—') : (payload.phase || '—'), payload.booster_altitude !== undefined);
+    const shownPhase = veh === 'booster' ? (payload.booster_phase || '—') : (payload.phase || '—');
+    $('#phase-chip').textContent = PHASE_LABELS[shownPhase] || shownPhase;
+    renderTimeline(shownPhase, veh === 'booster');
     updateVizReadout('#viz-orbiter-readout', payload.phase, payload.altitude, payload.velocity, payload.throttle);
     if (payload.booster_altitude !== undefined) {
       updateVizReadout('#viz-booster-readout', payload.booster_phase, payload.booster_altitude, payload.booster_velocity, payload.booster_throttle);
@@ -496,10 +491,37 @@
     hwRow.innerHTML = '';
     if (payload.booster_grid_fins) hwRow.appendChild(hwChip('Grid Fins', payload.booster_grid_fins === 'DEPLOYED'));
     if (payload.booster_landing_legs) hwRow.appendChild(hwChip('Landing Legs', payload.booster_landing_legs === 'DEPLOYED'));
-    if (payload.booster_fuel_remaining !== undefined) hwRow.appendChild(hwChip(`Booster Fuel Reserve: ${fmt(payload.booster_fuel_remaining, 0)}%`, payload.booster_fuel_remaining > 10));
 
     if (state.sim.startedAt) {
       $('#mission-clock').textContent = fmtClock(t);
+    }
+  }
+
+  function setText(sel, text) {
+    const el = $(sel);
+    if (el) el.textContent = text;
+  }
+
+  function updateVehiclePanels(p) {
+    setText('#vp-orb-phase', PHASE_LABELS[p.phase] || p.phase || '—');
+    setText('#vp-orb-alt', fmt((p.altitude || 0) / 1000, 1));
+    setText('#vp-orb-vel', fmt(p.velocity || 0, 0));
+    setText('#vp-orb-thr', fmt((p.throttle || 0) * 100, 0));
+    setText('#vp-orb-q', fmt((p.dynamic_pressure || 0) / 1000, 1));
+    setText('#vp-orb-dr', fmt((p.downrange || 0) / 1000, 1));
+    setText('#vp-orb-mass', fmt(p.mass || 0, 0));
+    if (p.booster_altitude === undefined) return;
+    setText('#vp-bst-phase', PHASE_LABELS[p.booster_phase] || p.booster_phase || '—');
+    setText('#vp-bst-alt', fmt(p.booster_altitude / 1000, 2));
+    setText('#vp-bst-vel', fmt(p.booster_velocity || 0, 0));
+    setText('#vp-bst-thr', fmt((p.booster_throttle || 0) * 100, 0));
+    setText('#vp-bst-err', p.booster_landing_error != null ? fmt(p.booster_landing_error, 0) : '—');
+    const fuel = Math.max(0, Math.min(100, p.booster_fuel_remaining ?? 0));
+    setText('#vp-bst-fuel', `${fmt(fuel, 0)}%`);
+    const fill = $('#vp-bst-fuel-fill');
+    if (fill) {
+      fill.style.width = `${fuel}%`;
+      fill.classList.toggle('low', fuel < 15);
     }
   }
 
@@ -516,15 +538,19 @@
     S2_COAST_TO_APOGEE: 'Coast', ORBIT_INSERTION: 'Insertion', ORBIT_ACHIEVED: 'Orbit',
     ORBIT_FAILED: 'Orbit Failed', APOGEE_REACHED: 'Apogee', S2_ORBIT_HOLD: 'Orbit Hold',
     S2_DEORBIT: 'Deorbit', S2_ENTRY: 'S2 Entry', S2_LANDING: 'S2 Landing',
-    BOOSTER_FLIP: 'Flip', BOOSTER_BOOSTBACK: 'Boostback', BOOSTER_ENTRY: 'Entry Burn',
+    BOOSTER_FLIP: 'Flip', BOOSTER_BOOSTBACK: 'Boostback', BOOSTER_COAST: 'Coast', BOOSTER_ENTRY: 'Entry Burn',
     BOOSTER_LANDING: 'Landing Burn',
   };
   let lastTimelinePhase = null;
 
-  function renderTimeline(phase, hasBooster) {
-    if (phase === lastTimelinePhase) return;
-    lastTimelinePhase = phase;
-    const steps = hasBooster ? [...ORBITER_PHASES.slice(0, 3), ...BOOSTER_PHASES, ...ORBITER_PHASES.slice(3)] : ORBITER_PHASES;
+  function renderTimeline(phase, boosterView) {
+    // One vehicle's path at a time: the orbiter's ascent-to-orbit sequence, or
+    // the booster's (shared ascent + recovery). Merging both made booster steps
+    // show as "done" whenever the orbiter was further along.
+    const key = `${boosterView ? 'B' : 'O'}:${phase}`;
+    if (key === lastTimelinePhase) return;
+    lastTimelinePhase = key;
+    const steps = boosterView ? [...ORBITER_PHASES.slice(0, 3), ...BOOSTER_PHASES] : ORBITER_PHASES;
     const idx = steps.indexOf(phase);
     const strip = $('#timeline-strip');
     strip.innerHTML = steps.map((p, i) => {
@@ -790,6 +816,7 @@
         workers: parseInt($('#camp-workers').value, 10),
         setup: currentSetup(),
       };
+      body.setup.recovery = { ...body.setup.recovery, gfold_guidance: $('#camp-guidance').value === 'gfold' };
       const result = await api('/api/campaigns/start', { method: 'POST', body: JSON.stringify(body) });
       state.campaign.id = result.campaign_id;
       $('#camp-idle').style.display = 'none';

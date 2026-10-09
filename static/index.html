@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Boostback</title>
-<link rel="stylesheet" href="/static/css/style.css?v=0.3.2" />
+<link rel="stylesheet" href="/static/css/style.css?v=0.4.1" />
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
@@ -66,38 +66,35 @@
 
     <!-- ---------------- CONFIG VIEW ---------------- -->
     <section class="view" id="view-config">
-      <div class="section-title">Configuration Source</div>
-      <div class="grid grid-2">
-        <div class="card">
-          <div class="card-head"><div class="card-title">Import Configuration File</div></div>
-          <div class="dropzone" id="dropzone">
+      <div class="setup-top">
+        <div class="card quick-card">
+          <div class="card-head"><div class="card-title">Quick Options</div></div>
+          <div class="quick-grid" id="quick-options">
+            <div class="toggle-row">
+              <div><div class="lbl">Real-time playback</div><div class="desc">Throttle to ~2x wall-clock for live viewing</div></div>
+              <label class="switch"><input type="checkbox" id="toggle-realtime" checked/><span class="track"><span class="thumb"></span></span></label>
+            </div>
+            <div class="toggle-row">
+              <div><div class="lbl">Demo mode</div><div class="desc">Coarse-step run for quick previews</div></div>
+              <label class="switch"><input type="checkbox" id="toggle-demo"/><span class="track"><span class="thumb"></span></span></label>
+            </div>
+            <div class="toggle-row" title="With the default propellant/thrust budget the second stage is propellant-starved for its landing burn; missions with this enabled frequently end in an S2 drone-ship crash or deorbit timeout. Booster recovery is unaffected.">
+              <div><div class="lbl">Stage-2 recovery <span class="badge bad" style="font-size:10px;vertical-align:middle;">EXPERIMENTAL</span></div><div class="desc">Usually fails: S2 is propellant-starved (hover for details)</div></div>
+              <label class="switch"><input type="checkbox" id="toggle-s2"/><span class="track"><span class="thumb"></span></span></label>
+            </div>
+            <div id="quick-gfold"></div>
+          </div>
+        </div>
+        <div class="card import-card">
+          <div class="card-head"><div class="card-title">Configuration</div></div>
+          <div class="dropzone compact" id="dropzone">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/></svg>
-            <div>Drop a mission config <b>.json</b> file here, or click to browse</div>
-            <div class="help-text">Validated against the full runtime schema before it's applied.</div>
+            <div>Drop a <b>.json</b> config or click to browse</div>
           </div>
           <input type="file" id="file-input" accept=".json" style="display:none" />
-        </div>
-        <div class="card">
-          <div class="card-head"><div class="card-title">Presets</div></div>
-          <div class="toggle-row">
-            <div><div class="lbl">Load validated defaults</div><div class="desc">Reset all fields to the reference vehicle baseline</div></div>
-            <button class="btn btn-sm" id="btn-load-defaults">Load</button>
-          </div>
-          <div class="toggle-row">
-            <div><div class="lbl">Demo mode</div><div class="desc">Fast coarse-step run for quick previews</div></div>
-            <label class="switch"><input type="checkbox" id="toggle-demo"/><span class="track"><span class="thumb"></span></span></label>
-          </div>
-          <div class="toggle-row">
-            <div><div class="lbl">Stage-2 recovery <span class="badge bad" style="font-size:10px;vertical-align:middle;">EXPERIMENTAL</span></div><div class="desc">Attempt second-stage deorbit &amp; recovery modeling. Known issue: with the default propellant/thrust budget, this vehicle is propellant-starved for the S2 landing burn and the deorbit phase can fail to converge -- missions with this enabled frequently end in "S2 DRONE-SHIP CRASH" or a deorbit timeout rather than a successful landing. Booster (Stage-1) recovery is unaffected.</div></div>
-            <label class="switch"><input type="checkbox" id="toggle-s2"/><span class="track"><span class="thumb"></span></span></label>
-          </div>
-          <div class="toggle-row">
-            <div><div class="lbl">Real-time playback</div><div class="desc">Throttle simulation to ~2x wall-clock for live viewing</div></div>
-            <label class="switch"><input type="checkbox" id="toggle-realtime" checked/><span class="track"><span class="thumb"></span></span></label>
-          </div>
-          <div class="toggle-row">
-            <div><div class="lbl">Export current configuration</div><div class="desc">Download the form contents as a reusable JSON profile</div></div>
-            <button class="btn btn-sm" id="btn-export-config">Export</button>
+          <div class="btn-row">
+            <button class="btn btn-sm" id="btn-load-defaults">Load defaults</button>
+            <button class="btn btn-sm" id="btn-export-config">Export JSON</button>
           </div>
         </div>
       </div>
@@ -123,7 +120,7 @@
         <div class="grid grid-4" id="form-physics"></div>
       </div>
 
-      <div style="display:flex;gap:12px;margin-top:22px;">
+      <div class="launch-bar">
         <button class="btn btn-primary" id="btn-launch" style="padding:12px 26px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
           Launch Simulation
@@ -156,29 +153,45 @@
 
         <div class="timeline-strip" id="timeline-strip"></div>
 
+        <div class="vehicle-panels">
+          <div class="vp" id="vp-orbiter">
+            <div class="vp-head"><span class="vp-name">ORBITER</span><span class="vp-phase" id="vp-orb-phase">—</span></div>
+            <div class="vp-nums">
+              <div><div class="k">Altitude</div><div class="n" id="vp-orb-alt">—</div><div class="u">km</div></div>
+              <div><div class="k">Velocity</div><div class="n" id="vp-orb-vel">—</div><div class="u">m/s</div></div>
+              <div><div class="k">Throttle</div><div class="n amber" id="vp-orb-thr">—</div><div class="u">%</div></div>
+              <div><div class="k">Dyn. pressure</div><div class="n" id="vp-orb-q">—</div><div class="u">kPa</div></div>
+            </div>
+            <div class="vp-foot"><span>Downrange <b id="vp-orb-dr">—</b> km</span><span>Mass <b id="vp-orb-mass">—</b> kg</span></div>
+          </div>
+          <div class="vp" id="vp-booster">
+            <div class="vp-head"><span class="vp-name">BOOSTER</span><span class="vp-phase" id="vp-bst-phase">Awaiting separation</span></div>
+            <div class="vp-nums">
+              <div><div class="k">Altitude</div><div class="n" id="vp-bst-alt">—</div><div class="u">km</div></div>
+              <div><div class="k">Velocity</div><div class="n" id="vp-bst-vel">—</div><div class="u">m/s</div></div>
+              <div><div class="k">Throttle</div><div class="n amber" id="vp-bst-thr">—</div><div class="u">%</div></div>
+              <div><div class="k">Pad error</div><div class="n" id="vp-bst-err">—</div><div class="u">m</div></div>
+            </div>
+            <div class="vp-fuel"><span>Landing fuel</span><div class="fuel-bar"><div class="fill" id="vp-bst-fuel-fill"></div></div><b id="vp-bst-fuel">—</b></div>
+            <div class="hw-row" id="hw-row"></div>
+          </div>
+        </div>
+
+
         <div class="card" style="padding:14px 16px 10px;margin-bottom:14px;">
           <div class="chart-head"><span class="name">FLIGHT VISUALIZATION</span><span class="now" id="viz-now" style="font-size:11px;color:var(--text-lo);">drag to rotate &middot; scroll to zoom &middot; double-click to reset</span></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="viz-pane">
               <div class="viz-caption">ORBITER / ASCENT STACK</div>
-              <canvas id="viz-orbiter" style="width:100%;height:520px;border-radius:10px;background:#05070b;display:block;"></canvas>
+              <canvas id="viz-orbiter" style="width:100%;height:300px;border-radius:10px;background:#05070b;display:block;"></canvas>
               <div class="viz-readout" id="viz-orbiter-readout"></div>
             </div>
             <div class="viz-pane">
               <div class="viz-caption">BOOSTER RECOVERY</div>
-              <canvas id="viz-booster" style="width:100%;height:520px;border-radius:10px;background:#05070b;display:block;"></canvas>
+              <canvas id="viz-booster" style="width:100%;height:300px;border-radius:10px;background:#05070b;display:block;"></canvas>
               <div class="viz-readout" id="viz-booster-readout"></div>
             </div>
           </div>
-        </div>
-
-        <div class="telemetry-grid">
-          <div class="stat-tile"><div class="k">Altitude</div><div class="v accent" id="stat-altitude">0<span class="unit">km</span></div></div>
-          <div class="stat-tile"><div class="k">Velocity</div><div class="v accent" id="stat-velocity">0<span class="unit">m/s</span></div></div>
-          <div class="stat-tile"><div class="k">Downrange</div><div class="v" id="stat-downrange">0<span class="unit">km</span></div></div>
-          <div class="stat-tile"><div class="k">Mass</div><div class="v" id="stat-mass">0<span class="unit">kg</span></div></div>
-          <div class="stat-tile"><div class="k">Throttle</div><div class="v amber" id="stat-throttle">0<span class="unit">%</span></div></div>
-          <div class="stat-tile"><div class="k">Dynamic Pressure</div><div class="v" id="stat-q">0<span class="unit">kPa</span></div></div>
         </div>
 
         <div class="grid grid-2">
@@ -202,10 +215,8 @@
 
         <div class="card chart-card" style="margin-top:14px;">
           <div class="chart-head"><span class="name">ALTITUDE vs DOWNRANGE — TRAJECTORY PROFILE</span></div>
-          <canvas id="chart-traj" height="220"></canvas>
+          <canvas id="chart-traj" height="200"></canvas>
         </div>
-
-        <div class="hw-row" id="hw-row"></div>
       </div>
     </section>
 
@@ -234,6 +245,13 @@
           <div class="field-row">
             <div class="field"><label>Runs <span class="unit">count</span></label><input type="number" id="camp-runs" value="100" min="1" max="2000"/></div>
             <div class="field"><label>Seed <span class="unit">int</span></label><input type="number" id="camp-seed" value="42" min="0"/></div>
+          </div>
+          <div class="field">
+            <label>Landing guidance</label>
+            <select id="camp-guidance">
+              <option value="heuristic">Heuristic suicide burn</option>
+              <option value="gfold">G-FOLD convex descent</option>
+            </select>
           </div>
           <div class="field">
             <label>Parallel workers <span class="unit">processes</span></label>
@@ -340,8 +358,8 @@
 </div>
 
 <script src="/static/js/vendor/three.min.js"></script>
-<script src="/static/js/charts.js?v=0.3.1"></script>
+<script src="/static/js/charts.js?v=0.4.0"></script>
 <script src="/static/js/rocket_viz.js?v=0.3.2"></script>
-<script src="/static/js/app.js?v=0.3.6"></script>
+<script src="/static/js/app.js?v=0.4.2"></script>
 </body>
 </html>

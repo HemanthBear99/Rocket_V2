@@ -43,7 +43,7 @@ class StripChart {
     const { ctx, w, h } = this;
     if (!w || !h) return;
     ctx.clearRect(0, 0, w, h);
-    const pad = { l: 6, r: 6, t: 8, b: 6 };
+    const pad = { l: 46, r: 8, t: 8, b: 18 };
     const plotW = w - pad.l - pad.r;
     const plotH = h - pad.t - pad.b;
 
@@ -72,6 +72,21 @@ class StripChart {
 
     const xToPx = (x) => pad.l + ((x - minX) / (maxX - minX)) * plotW;
     const yToPx = (y) => pad.t + plotH - ((y - minY) / (maxY - minY)) * plotH;
+
+    // axis labels: value at each grid line, time range along the bottom
+    ctx.fillStyle = 'rgba(200,214,230,0.55)';
+    ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 3; i++) {
+      const v = maxY - ((maxY - minY) / 3) * i;
+      ctx.fillText(StripChart.fmtTick(v), pad.l - 6, pad.t + (plotH / 3) * i);
+    }
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    ctx.fillText(`T+${minX.toFixed(0)}s`, pad.l, h - 4);
+    ctx.textAlign = 'right';
+    ctx.fillText(`T+${maxX.toFixed(0)}s`, w - pad.r, h - 4);
 
     // filled area
     if (this.fill) {
@@ -109,6 +124,14 @@ class StripChart {
     ctx.arc(lx, ly, 3, 0, Math.PI * 2);
     ctx.fillStyle = this.color;
     ctx.fill();
+  }
+
+  static fmtTick(v) {
+    const a = Math.abs(v);
+    if (a >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+    if (a >= 1e4) return (v / 1e3).toFixed(0) + 'k';
+    if (a >= 100) return v.toFixed(0);
+    return v.toFixed(1);
   }
 
   _alpha(hex, a) {
