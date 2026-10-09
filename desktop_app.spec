@@ -4,6 +4,17 @@
 import sys
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_data_files
+
+# cvxpy (optional G-FOLD guidance) inspects its own package directory at
+# import time, so its files must exist on disk inside the bundle, not only
+# in the compressed module archive.
+_optional_package_files = []
+try:
+    _optional_package_files += collect_data_files('cvxpy', include_py_files=True)
+except Exception:
+    pass
+
 block_cipher = None
 project_root = Path(SPECPATH)
 
@@ -14,7 +25,7 @@ a = Analysis(
     datas=[
         (str(project_root / 'static'), 'rlv_sim/static'),
         (str(project_root / 'aero_decks'), 'rlv_sim/aero_decks'),
-    ],
+    ] + _optional_package_files,
     hiddenimports=[
         'uvicorn.logging',
         'uvicorn.loops',
