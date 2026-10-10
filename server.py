@@ -651,6 +651,18 @@ async def run_simulation_task(sim_id: str, sim_meta: dict) -> None:
         await _publish(sim_meta, {"error": str(exc)})
 
 
+@app.post("/api/mission/plan", dependencies=[Depends(require_api_key)])
+async def plan_mission_endpoint(setup: SimulationSetup) -> dict[str, Any]:
+    """Rocket-equation feasibility check for a setup, without running it."""
+    from .mission_planner import plan_mission
+
+    try:
+        config = map_config(setup)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid configuration: {exc}") from exc
+    return plan_mission(config)
+
+
 @app.post("/api/simulations/start", dependencies=[Depends(require_api_key)])
 async def start_sim(setup: SimulationSetup):
     _prune_finished_simulations()

@@ -605,6 +605,27 @@
     });
   });
 
+  // Mission planner: rocket-equation feasibility, refreshed as the form changes.
+  let planTimer = null;
+  async function refreshPlan() {
+    const el = $('#plan-status');
+    if (!el) return;
+    try {
+      const plan = await api('/api/mission/plan', { method: 'POST', body: JSON.stringify(currentSetup()) });
+      const colors = { ok: 'var(--green)', warn: 'var(--amber, orange)', fail: 'var(--red)' };
+      el.innerHTML = plan.checks.map((c) =>
+        `<div style="color:${colors[c.status]}">${c.status === 'ok' ? '✓' : c.status === 'warn' ? '⚠' : '✗'} ${c.message}</div>`).join('');
+    } catch (err) {
+      el.textContent = '';
+    }
+  }
+  document.addEventListener('input', (e) => {
+    if (!e.target.closest || !e.target.closest('.grid')) return;
+    clearTimeout(planTimer);
+    planTimer = setTimeout(refreshPlan, 400);
+  });
+  setTimeout(refreshPlan, 1500);
+
   async function launchSimulation() {
     $('#launch-error').textContent = '';
     try {
