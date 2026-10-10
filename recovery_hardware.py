@@ -146,14 +146,12 @@ def command_grid_fins_to_target(
     v_ground_horiz = _horizontal_component(v_ground, vertical)
     v_vert = float(np.dot(v_ground, vertical))
 
-
     if time_to_go_s is not None and float(time_to_go_s) > 0.0:
         t_go = float(np.clip(time_to_go_s, 2.0, 180.0))
     else:
         descent_rate = max(-v_vert, 1.0)
         t_go = min(altitude / descent_rate, 60.0)
         t_go = max(t_go, 2.0)
-
 
     if zero_effort_miss is not None:
         zem = _horizontal_component(
@@ -163,7 +161,6 @@ def command_grid_fins_to_target(
     else:
         zem = site_vec - v_ground_horiz * t_go
 
-
     a_desired = (6.0 / (t_go ** 2)) * zem + (2.0 / t_go) * v_ground_horiz
     a_mag = float(vec_norm(a_desired))
 
@@ -172,14 +169,12 @@ def command_grid_fins_to_target(
 
     force_direction = np.asarray(a_desired, dtype=float) / a_mag
 
-
     v_rel = compute_relative_velocity(
         r, v,
         wind_offset_mps=config.runtime_wind_offset_mps if wind_offset_mps is None else wind_offset_mps,
     )
     speed = float(vec_norm(v_rel))
     _, _, rho, _ = compute_configured_atmosphere_properties(altitude, config)
-
 
     if rho < C.DENSITY_FLOOR or speed < C.SMALL_VELOCITY_TOL:
         deflection_fraction = 1.0
@@ -193,7 +188,6 @@ def command_grid_fins_to_target(
             deflection_fraction = 1.0
         else:
             deflection_fraction = min(a_mag / max_aero_accel, 1.0)
-
 
     max_deflection = float(config.grid_fin_max_deflection_deg)
     east_like = toward_site if site_dist > 100.0 else _unit_or_zero(v_ground_horiz)

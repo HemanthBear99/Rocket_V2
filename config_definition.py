@@ -16,64 +16,6 @@ AttitudeController = Literal["pd", "pid"]
 RecoveryAttitudeController = Literal["pd", "pid", "auto"]
 
 
-VALIDATED_RUNTIME_FIELDS = (
-    "dt", "max_time",
-    "kp_attitude", "kd_attitude", "ki_attitude",
-    "attitude_controller", "recovery_attitude_controller",
-    "attitude_integral_windup_fraction", "max_torque",
-    "max_gimbal_angle_deg", "min_engine_throttle_fraction",
-    "max_engine_throttle_fraction",
-    "gravity_turn_start_altitude", "gravity_turn_transition_range",
-    "min_velocity_for_turn", "pitchover_start_altitude",
-    "pitchover_end_altitude", "pitchover_angle",
-    "ascent_max_q_target_pa", "ascent_max_q_prediction_horizon_s",
-    "stage1_landing_fuel_reserve_kg", "launch_site_lat_deg",
-    "launch_site_lon_deg", "launch_site_altitude_m",
-    "booster_boostback_budget_kg", "booster_entry_budget_kg",
-    "booster_boostback_impact_corridor_m",
-    "booster_landing_reserve_kg", "booster_flip_min_time_s",
-    "booster_apogee_target_km", "booster_entry_interface_altitude_m",
-    "booster_entry_burn_min_altitude_m", "booster_entry_burn_min_speed_mps",
-    "booster_landing_ignition_safety_factor", "booster_landing_ignition_ceiling_m",
-    "booster_recovery_max_q_pa", "booster_recovery_max_q_alpha_pa_rad",
-    "booster_terminal_attitude_error_max_deg", "booster_landing_propellant_margin_kg",
-    "booster_landing_vertical_propellant_safety_factor",
-    "booster_terminal_capture_landing_reserve_fraction",
-    "booster_tail_first_cp_z_m",
-    "booster_landing_target_downrange_km", "booster_landing_site_lat_deg",
-    "booster_landing_site_lon_deg", "booster_landing_site_altitude_m",
-    "booster_pad_tolerance_m", "booster_enforce_pad_landing",
-    "enable_grid_fins", "enable_landing_legs", "grid_fin_deploy_altitude_m",
-    "grid_fin_max_deflection_deg", "grid_fin_area_m2", "grid_fin_cl_max",
-    "grid_fin_cd_increment", "landing_leg_deploy_altitude_m",
-    "landing_leg_deploy_time_s", "landing_leg_max_touchdown_speed_mps",
-    "landing_leg_max_tilt_deg", "landing_leg_footprint_radius_m",
-    "booster_powered_descent_lead_time_s",
-    "orbit_target_altitude_m", "orbit_altitude_tolerance_m",
-    "orbit_ecc_max", "orbit_insertion_start_altitude_m",
-    "orbit_insertion_timeout_s",
-    "enable_atmosphere", "enable_drag", "enable_lift",
-    "runtime_atmosphere_density_scale",
-    "quaternion_norm_tolerance", "zero_tolerance",
-    "enable_gps", "gps_position_sigma_m", "gps_velocity_sigma_mps",
-    "gps_update_period_s", "gps_seed", "wind_seed",
-    "enable_imu", "enable_landing_altimeter",
-    "landing_altimeter_max_altitude_m", "landing_altimeter_altitude_sigma_m",
-    "landing_altimeter_velocity_sigma_mps", "use_navigation_estimate_for_guidance",
-    "verbose",
-    "stage1_dry_mass", "stage1_prop_mass", "stage2_dry_mass", "stage2_prop_mass", "payload_mass",
-    "stage2_thrust_vac", "stage2_isp_vac", "stage_sep_velocity", "target_inclination_deg",
-)
-
-
-EXPERIMENTAL_FEATURE_FLAGS = (
-    "enable_j2", "enable_engine_transients", "abort_on_q_alpha_limit",
-    "enable_separation_dynamics",
-    "enable_upper_atmosphere", "enable_stochastic_wind",
-    "enable_rcs", "enable_abort_modes", "enable_s2_recovery",
-)
-
-
 def _validate_aero_deck_path(deck_path: str) -> str | None:
     """Return an error message if deck_path is not an allowed aero deck.
     Only .json files inside the package's own aero_decks directory are
@@ -133,10 +75,8 @@ class SimulationConfig:
     All validation is inlined in validate() — no sub-config classes.
     """
 
-
     dt: float = C.DT
     max_time: float = C.MAX_TIME
-
 
     enable_demo_mode: bool = False
     demo_coast_max_dt: float = 2.0
@@ -145,7 +85,6 @@ class SimulationConfig:
     # so a coarser RK4 step is accurate there. The step used is
     # max(dt, orbit_coast_max_dt); set it to dt or below to disable.
     orbit_coast_max_dt: float = 0.5
-
 
     kp_attitude: float = C.KP_ATTITUDE
     kd_attitude: float = C.KD_ATTITUDE
@@ -156,7 +95,6 @@ class SimulationConfig:
     max_torque: float = C.MAX_TORQUE
     max_gimbal_angle_deg: float = 15.0
 
-
     gravity_turn_start_altitude: float = C.GRAVITY_TURN_START_ALTITUDE
     gravity_turn_transition_range: float = C.GRAVITY_TURN_TRANSITION_RANGE
     min_velocity_for_turn: float = C.MIN_VELOCITY_FOR_TURN
@@ -166,7 +104,6 @@ class SimulationConfig:
     # Dynamic pressure held by the physics-based q-hold throttle law
     # (3 kPa margin below the 35 kPa structural limit).
     ascent_max_q_target_pa: float = 32000.0
-    ascent_max_q_prediction_horizon_s: float = 1.0  # unused since the q-hold law; kept for config compatibility
     stage1_landing_fuel_reserve_kg: float = C.STAGE1_LANDING_FUEL_RESERVE
     # Size the booster recovery reserve from the vehicle (rocket equation)
     # instead of using stage1_landing_fuel_reserve_kg as given.
@@ -176,7 +113,6 @@ class SimulationConfig:
     launch_site_altitude_m: float = 0.0
     orbit_target_altitude_m: float = C.TARGET_ORBIT_ALTITUDE
 
-
     orbit_altitude_tolerance_m: float = 75000.0
     orbit_ecc_max: float = 0.02
     orbit_insertion_start_altitude_m: float = 85000.0
@@ -184,7 +120,6 @@ class SimulationConfig:
     enable_s2_recovery: bool = False
     s2_orbit_hold_time_s: float = 600.0
     s2_entry_interface_altitude_m: float = 70000.0
-    s2_landing_start_altitude_m: float = 15000.0
     s2_deorbit_target_perigee_m: float = -80000.0
     s2_entry_drag_scale: float = 45.0
     s2_touchdown_speed_limit_mps: float = 5.0
@@ -215,13 +150,11 @@ class SimulationConfig:
     # have propellant headroom (e.g. a larger stage2_prop_mass) can opt in.
     s2_landing_propellant_reserve_kg: float = 0.0
 
-
     stage1_dry_mass: float = C.STAGE1_DRY_MASS
     stage1_prop_mass: float = C.STAGE1_PROPELLANT_MASS
     stage2_dry_mass: float = C.STAGE2_DRY_MASS
     stage2_prop_mass: float = C.STAGE2_PROPELLANT_MASS
     payload_mass: float = 8000.0
-
 
     stage2_thrust_vac: float = C.STAGE2_THRUST
     # Vehicle definition (stage 1). Thrust levels for every burn and the
@@ -235,7 +168,6 @@ class SimulationConfig:
     stage2_isp_vac: float = C.STAGE2_ISP_VAC
     stage_sep_velocity: float = 2200.0
     target_inclination_deg: float = 28.5
-
 
     booster_boostback_budget_kg: float = 43000.0
     booster_boostback_impact_corridor_m: float = 10000.0
@@ -302,7 +234,6 @@ class SimulationConfig:
     # Ground-relative cross-track offset applied to the target, signed along
     # the local east axis (positive = east). Used for drone-ship stations
     # displaced along the flight corridor.
-    landing_target_cross_track_offset_m: float = 0.0
     enable_grid_fins: bool = True
     enable_landing_legs: bool = True
     grid_fin_deploy_altitude_m: float = 70000.0
@@ -315,17 +246,10 @@ class SimulationConfig:
     landing_leg_deploy_time_s: float = 3.0
     landing_leg_max_touchdown_speed_mps: float = 6.0
     landing_leg_max_tilt_deg: float = 15.0
-    landing_leg_footprint_radius_m: float = 8.0
     booster_powered_descent_lead_time_s: float = 15.0
 
-
     booster_terminal_capture_floor_kg: float = 2500.0
-    booster_terminal_capture_floor_margin_kg: float = 0.0
-    booster_late_entry_east_bias_m: float = 3200.0
     booster_late_entry_bias_ref_altitude_m: float = 35000.0
-    booster_late_entry_bias_scale_m: float = 30000.0
-    booster_late_entry_bias_miss_ref_m: float = 1200.0
-    booster_late_entry_bias_miss_cutoff_m: float = 400.0
     booster_max_divert_accel_far_mps2: float = 40.0
     booster_max_divert_accel_near_mps2: float = 40.0
     booster_divert_accel_miss_threshold_m: float = 3000.0
@@ -339,16 +263,6 @@ class SimulationConfig:
     booster_fuel_critical_ratio: float = 0.35
     booster_terminal_hcapture_tstop_min_s: float = 1.5
     booster_terminal_hcapture_tstop_max_s: float = 3.0
-    booster_terminal_pad_capture_alt_m: float = 150.0
-    booster_terminal_offsite_chase_min_alt_m: float = 80.0
-    booster_terminal_offsite_chase_max_alt_m: float = 10000.0
-    booster_terminal_capture_geom_band_m: float = 1600.0
-    booster_terminal_capture_geom_altitude_m: float = 8500.0
-    booster_terminal_capture_geom_t_go_min_s: float = 12.0
-    booster_terminal_capture_geom_t_go_max_s: float = 24.0
-    booster_terminal_capture_geom_retrograde_blend: float = 0.74
-    booster_terminal_capture_geom_max_throttle: float = 0.10
-
 
     enable_atmosphere: bool = True
     enable_high_fidelity_gram: bool = False
@@ -379,8 +293,6 @@ class SimulationConfig:
 
     imu_accel_bias: float = 0.001
     imu_accel_noise: float = 0.01
-    imu_gyro_bias: float = 1e-5
-    imu_gyro_noise: float = 1e-4
     enable_gps: bool = False
     gps_position_sigma_m: float = 3.0
     gps_velocity_sigma_mps: float = 0.05
@@ -404,16 +316,11 @@ class SimulationConfig:
     abort_q_alpha_threshold: float = 60000.0
     abort_attitude_threshold: float = 30.0
 
-
     quaternion_norm_tolerance: float = C.QUATERNION_NORM_TOL
-    zero_tolerance: float = 1e-10
-
 
     enable_run_manifest: bool = True
-    energy_violation_terminates: bool = False
     min_engine_throttle_fraction: float = 0.35
     max_engine_throttle_fraction: float = 1.0
-
 
     runtime_thrust_scale: float = 1.0
     runtime_isp_scale: float = 1.0
@@ -421,19 +328,7 @@ class SimulationConfig:
     runtime_wind_offset_mps: float = 0.0
     aero_deck_path: str | None = None
 
-
     verbose: bool = True
-
-    @classmethod
-    def validated_runtime_fields(cls) -> tuple[str, ...]:
-        return VALIDATED_RUNTIME_FIELDS
-
-    @classmethod
-    def experimental_feature_flags(cls) -> tuple[str, ...]:
-        return EXPERIMENTAL_FEATURE_FLAGS
-
-    def experimental_flags_state(self) -> dict[str, bool]:
-        return {name: bool(getattr(self, name)) for name in EXPERIMENTAL_FEATURE_FLAGS}
 
     @property
     def stage1_thrust_n(self) -> float:
@@ -491,7 +386,6 @@ class SimulationConfig:
             if deck_error is not None:
                 errors.append(deck_error)
 
-
         errors += _field_errors(self, (
             ("kp_attitude", "nonneg"),
             ("kd_attitude", "nonneg"),
@@ -534,7 +428,6 @@ class SimulationConfig:
                 f"{self.min_engine_throttle_fraction} > {self.max_engine_throttle_fraction}"
             )
 
-
         if not (-90.0 <= self.launch_site_lat_deg <= 90.0):
             errors.append(f"launch_site_lat_deg must be in [-90, 90], got {self.launch_site_lat_deg}")
         if not (-180.0 <= self.launch_site_lon_deg <= 180.0):
@@ -551,7 +444,6 @@ class SimulationConfig:
             ("orbit_insertion_timeout_s", "positive"),
             ("s2_orbit_hold_time_s", "nonneg"),
             ("s2_entry_interface_altitude_m", "positive"),
-            ("s2_landing_start_altitude_m", "positive"),
             ("s2_entry_drag_scale", "at_least_1"),
         ))
         if self.s2_deorbit_target_perigee_m >= self.s2_entry_interface_altitude_m:
@@ -588,7 +480,6 @@ class SimulationConfig:
             ("landing_leg_deploy_time_s", "positive"),
             ("landing_leg_max_touchdown_speed_mps", "positive"),
             ("landing_leg_max_tilt_deg", "nonneg"),
-            ("landing_leg_footprint_radius_m", "positive"),
             ("booster_powered_descent_lead_time_s", "nonneg"),
         ))
         has_explicit_lat = self.booster_landing_site_lat_deg is not None
@@ -609,7 +500,6 @@ class SimulationConfig:
             errors.append(
                 "booster_landing_target_downrange_km must be 0 when explicit landing-site coordinates are provided"
             )
-
 
         if self.dt <= 0:
             errors.append(f"dt must be positive, got {self.dt}")
@@ -659,8 +549,6 @@ class SimulationConfig:
             ("gps_update_period_s", "positive"),
             ("imu_accel_bias", "nonneg"),
             ("imu_accel_noise", "nonneg"),
-            ("imu_gyro_bias", "nonneg"),
-            ("imu_gyro_noise", "nonneg"),
             ("landing_altimeter_max_altitude_m", "positive"),
             ("landing_altimeter_altitude_sigma_m", "nonneg"),
             ("landing_altimeter_velocity_sigma_mps", "nonneg"),
@@ -669,7 +557,6 @@ class SimulationConfig:
             ("runtime_thrust_scale", "positive"),
             ("runtime_isp_scale", "positive"),
         ))
-
 
         if C.INITIAL_MASS + self.runtime_initial_mass_offset_kg <= C.DRY_MASS + self.stage1_landing_fuel_reserve_kg:
             errors.append(
@@ -681,8 +568,6 @@ class SimulationConfig:
 
 
 __all__ = [
-    'EXPERIMENTAL_FEATURE_FLAGS',
-    'VALIDATED_RUNTIME_FIELDS',
     'AttitudeController',
     'RecoveryAttitudeController',
     'SimulationConfig',

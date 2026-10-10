@@ -27,7 +27,6 @@ class GuidanceState:
     gamma_int: float = 0.0
     prev_dynamic_pressure_pa: float = 0.0
 
-
     oi_start_time: float | None = None
     oi_start_direction: np.ndarray | None = None
     last_ascent_direction: np.ndarray | None = None
@@ -36,13 +35,11 @@ class GuidanceState:
     orbit_circularization_active: bool = False
     orbit_circularization_start_time: float | None = None
 
-
     apogee_raise_complete: bool = False
     booster_landing_burn_started: bool = False
     deorbit_start_mass: float | None = None
     landing_leg_state: object | None = None
     navigation_state: object | None = None
-
 
     rcs_state: object | None = None
     control_state: object | None = None
@@ -68,11 +65,6 @@ def _resolve_guidance_state(gs: GuidanceState | None) -> GuidanceState:
     if gs is None:
         return create_guidance_state()
     return gs
-
-
-def reset_guidance() -> GuidanceState:
-    """Return a fresh run-local guidance state for compatibility."""
-    return create_guidance_state()
 
 
 def _limit_aoa(thrust_dir: np.ndarray, velocity: np.ndarray,
@@ -104,7 +96,6 @@ def _limit_aoa(thrust_dir: np.ndarray, velocity: np.ndarray,
 
     if aoa <= max_aoa_rad:
         return thrust_dir
-
 
     axis = cross3(v_hat, thrust_dir)
     axis_norm = vec_norm(axis)
@@ -168,7 +159,6 @@ def gamma_profile_from_altitude(
     """
     gamma_start = 90.0
 
-
     gamma_final = 45.0
 
     turn_start_alt = (
@@ -181,7 +171,6 @@ def gamma_profile_from_altitude(
         if config is not None
         else C.GRAVITY_TURN_TRANSITION_RANGE
     )
-
 
     turn_scale = max(1.4 * transition_range, 1.0)
 

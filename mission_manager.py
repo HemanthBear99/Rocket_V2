@@ -22,11 +22,8 @@ import numpy as np
 from . import constants as C
 from ._mission_manager_helpers import (
     check_attitude_aligned,
-    compute_downrange_distance,
-    compute_horizontal_velocity,
     compute_orbit_metrics,
     compute_radial_velocity,
-    compute_suicide_burn_altitude,
 )
 from .config_definition import SimulationConfig
 from .config_factory import create_default_config
@@ -79,13 +76,11 @@ class MissionManager:
     Manages the current mission phase and transitions using physics-based criteria.
     """
 
-
     NEAR_PAD_HANDOFF_ALTITUDE_M = 7030.0
 
     # Extra lead time (s) added to the powered-descent lead when predicting the
     # boostback landing point; empirically tuned for the default vehicle.
     BOOSTBACK_TARGETING_LEAD_MARGIN_S = 22.4
-
 
     _RECOVERY_FINE_STEP_PHASES = frozenset({
         MissionPhase.BOOSTER_FLIP,
@@ -135,10 +130,6 @@ class MissionManager:
         """Compute radial velocity: r_dot = (r . v) / |r|."""
         return compute_radial_velocity(state)
 
-    def _compute_horizontal_velocity(self, state: State) -> float:
-        """Compute horizontal speed (perpendicular to radial direction)."""
-        return compute_horizontal_velocity(state)
-
     def _check_attitude_aligned(self, state: State, target_dir: np.ndarray,
                                  threshold_deg: float = 15.0) -> bool:
         """
@@ -148,24 +139,6 @@ class MissionManager:
         Body +Z in inertial frame = R @ [0,0,1] = 3rd column of R.
         """
         return check_attitude_aligned(state, target_dir, threshold_deg)
-
-    def _compute_downrange_distance(self, state: State) -> float:
-        """
-        Compute horizontal (great-circle) distance from launch site.
-
-        Uses the central angle: d = R_earth * arccos(r_hat . r0_hat)
-        """
-        return compute_downrange_distance(state, self._launch_site)
-
-    def _compute_suicide_burn_altitude(self, state: State, dry_mass: float) -> float:
-        """
-        Compute suicide-burn ignition altitude using shared recovery estimator.
-        """
-        return compute_suicide_burn_altitude(
-            state,
-            self.config.booster_landing_ignition_safety_factor,
-            thrust_n=self.config.landing_thrust_n,
-        )
 
     def _ignition_corridor_top(self, state: State) -> float:
         """Altitude ceiling (m AGL) below which the landing burn may ignite.
@@ -247,7 +220,6 @@ class MissionManager:
                 self.meco_time = state.t
                 self._phase_entry_time = state.t
 
-
         elif self.current_phase == MissionPhase.COAST:
             if self.meco_time is not None and (state.t - self.meco_time) > 3.0:
                 logger.info(f"Stage Separation at t={state.t:.2f}s, "
@@ -255,7 +227,6 @@ class MissionManager:
                 self.current_phase = MissionPhase.STAGE_SEPARATION
                 self.stage_separation_time = state.t
                 self._phase_entry_time = state.t
-
 
         elif self.current_phase == MissionPhase.STAGE_SEPARATION:
             time_since_sep = state.t - self._phase_entry_time
@@ -268,7 +239,6 @@ class MissionManager:
 
     def _update_coast_to_apogee(self, state: State, radial_velocity: float) -> bool:
         """Start orbit insertion; True when the transition happened this call."""
-
 
         above_atmosphere = (
             state.altitude > self.config.orbit_insertion_start_altitude_m
@@ -337,7 +307,6 @@ class MissionManager:
             self.current_phase = MissionPhase.ORBIT_FAILED
             self._phase_entry_time = state.t
 
-
         elif (
             state.altitude < 80000.0
             and radial_velocity < -50.0
@@ -358,7 +327,6 @@ class MissionManager:
         elif (
             state.t - self._phase_entry_time
         ) > float(self.config.orbit_insertion_timeout_s):
-
 
             self.orbit_failure_reason = (
                 f"guidance stall: coast timeout exceeded "
@@ -387,7 +355,6 @@ class MissionManager:
                 logger.info(f"S2 Deorbit Burn start at t={state.t:.2f}s")
         elif self.current_phase == MissionPhase.S2_DEORBIT:
 
-
             if (
                 state.altitude < self.config.s2_entry_interface_altitude_m
                 and radial_velocity < 0.0
@@ -402,7 +369,6 @@ class MissionManager:
                 )
         elif self.current_phase == MissionPhase.S2_ENTRY:
 
-
             if radial_velocity < 0.0 and state.altitude < 15000.0:
                 self.current_phase = MissionPhase.S2_LANDING
                 self._phase_entry_time = state.t
@@ -414,7 +380,6 @@ class MissionManager:
     def _update_booster(self, state: State, radial_velocity: float) -> None:
         """Booster recovery: flip -> boostback -> coast -> entry -> landing."""
 
-
         if self.current_phase == MissionPhase.BOOSTER_FLIP:
             v_norm = vec_norm(state.v)
             if v_norm > 1.0:
@@ -422,7 +387,6 @@ class MissionManager:
                 aligned = self._check_attitude_aligned(state, retrograde, 15.0)
             else:
                 aligned = True
-
 
             time_in_phase = state.t - self._phase_entry_time
             min_flip_time = max(float(self.config.booster_flip_min_time_s), 0.0)
@@ -432,10 +396,8 @@ class MissionManager:
                 self.current_phase = MissionPhase.BOOSTER_BOOSTBACK
                 self._phase_entry_time = state.t
 
-
         elif self.current_phase == MissionPhase.BOOSTER_BOOSTBACK:
             self._update_boostback(state, radial_velocity)
-
 
         elif self.current_phase == MissionPhase.BOOSTER_COAST:
 
@@ -447,7 +409,6 @@ class MissionManager:
                 self.current_phase = MissionPhase.BOOSTER_ENTRY
                 self._phase_entry_time = state.t
 
-
         elif self.current_phase == MissionPhase.BOOSTER_ENTRY:
             self._update_booster_entry(state, radial_velocity)
 
@@ -456,7 +417,6 @@ class MissionManager:
         r_hat = state.r / max(vec_norm(state.r), 1.0)
         v_horiz = state.v - np.dot(state.v, r_hat) * r_hat
         v_horiz_mag = float(vec_norm(v_horiz))
-
 
         target_downrange_km = self.config.booster_landing_target_downrange_km
         _lead_mm = compute_powered_descent_lead_time(
@@ -472,7 +432,6 @@ class MissionManager:
         )
         t_coast_est = targeting.coast_time_s
 
-
         site_dist = targeting.site_distance_m
         v_toward_site = targeting.v_toward_site_mps
         v_return_needed = targeting.v_return_needed_mps
@@ -486,7 +445,6 @@ class MissionManager:
             mass_kg=state.m,
             aero_mode=self.current_phase.name,
         )
-
 
         landing_site_now = target_landing_site_eci(
             state.t,
@@ -509,9 +467,7 @@ class MissionManager:
         t_return_ground = max(t_coast_est * 1.00, 60.0)
         v_pad_needed = float(np.clip(pad_dist_now / t_return_ground, 20.0, 250.0))
 
-
         near_pad_rtls = is_near_pad_target(self.config)
-
 
         impact_corridor_ready = (
             impact.miss_distance_m
@@ -543,10 +499,8 @@ class MissionManager:
                 and boostback_min_time_met
             )
 
-
         propellant_remaining = booster_propellant_remaining(state.m, self.config)
         min_after_boostback = booster_min_propellant_after_boostback(self.config)
-
 
         propellant_used = max(0.0, self._initial_propellant - propellant_remaining)
         budget_used = propellant_used >= self.config.booster_boostback_budget_kg
@@ -574,7 +528,6 @@ class MissionManager:
     def _update_booster_entry(self, state: State, radial_velocity: float) -> None:
         """Hand off to BOOSTER_LANDING at suicide-burn ignition or near-pad capture."""
 
-
         burn = estimate_suicide_burn(
             state.r,
             state.v,
@@ -583,7 +536,6 @@ class MissionManager:
             safety_factor=self.config.booster_landing_ignition_safety_factor,
         )
         h_ignite = float(burn['burn_altitude'])
-
 
         ignition_corridor_top = self._ignition_corridor_top(state)
         landing_trigger = (

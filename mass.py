@@ -64,7 +64,6 @@ def compute_mass_flow_rate(
     else:
         mdot = C.MASS_FLOW_RATE
 
-
     mdot *= float(thrust_scale) / max(float(isp_scale), 1e-9)
     return -mdot * float(np.clip(throttle, 0.0, 1.0))
 

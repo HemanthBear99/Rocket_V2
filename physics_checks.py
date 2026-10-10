@@ -132,7 +132,6 @@ def check_velocity_reasonable(v: np.ndarray) -> bool:
     """
     v_mag = vec_norm(v)
 
-
     max_reasonable_v = 15000.0
 
     if v_mag > max_reasonable_v:
@@ -154,7 +153,6 @@ def check_angular_velocity_reasonable(omega: np.ndarray) -> bool:
         True if valid, raises ValidationError otherwise
     """
     omega_mag = vec_norm(omega)
-
 
     max_reasonable_omega = 10.0
 

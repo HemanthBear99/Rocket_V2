@@ -117,6 +117,7 @@ async def lifespan(app: FastAPI):
     cleanup_task.cancel()
     await asyncio.gather(cleanup_task, return_exceptions=True)
 
+
 app = FastAPI(title="Boostback API", lifespan=lifespan)
 
 _api_key_header = APIKeyHeader(name="X-RLV-API-Key", auto_error=False)
@@ -266,7 +267,6 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
     """Map frontend configuration JSON structure to Python SimulationConfig."""
     overrides = {}
 
-
     m = setup.mission.model_dump()
     if "dt" in m:
         overrides["dt"] = float(m["dt"])
@@ -282,7 +282,6 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
         overrides["target_inclination_deg"] = float(m["target_inclination_deg"])
     if "stage_sep_velocity" in m:
         overrides["stage_sep_velocity"] = float(m["stage_sep_velocity"])
-
 
     r = setup.recovery.model_dump()
     if "landing_lat" in r:
@@ -310,7 +309,6 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
         },
     )
 
-
     p = setup.physics.model_dump()
     if "j2" in p:
         overrides["enable_j2"] = bool(p["j2"])
@@ -324,7 +322,6 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
         overrides["enable_imu"] = bool(p["sensor_noise"])
         overrides["enable_gps"] = bool(p["sensor_noise"])
         overrides["enable_landing_altimeter"] = bool(p["sensor_noise"])
-
 
     v = setup.vehicle.model_dump()
     default_isp    = C.ISP
@@ -669,7 +666,6 @@ async def plan_mission_endpoint(setup: SimulationSetup) -> dict[str, Any]:
 async def start_sim(setup: SimulationSetup):
     _prune_finished_simulations()
 
-
     active_runs = sum(
         1 for meta in active_simulations.values()
         if meta.get("status") in ("running", "paused")
@@ -703,7 +699,6 @@ async def start_sim(setup: SimulationSetup):
         "started_at": time.monotonic(),
     }
     active_simulations[sim_id] = sim_meta
-
 
     sim_meta["task"] = asyncio.create_task(run_simulation_task(sim_id, sim_meta))
 
@@ -867,12 +862,10 @@ async def websocket_telemetry(websocket: WebSocket, sim_id: str):
         await websocket.close(code=1013, reason="Telemetry client limit reached")
         return
 
-
     queue = asyncio.Queue(maxsize=100)
     sim_meta["queues"].add(queue)
     if "last_payload" in sim_meta:
         queue.put_nowait(sim_meta["last_payload"])
-
 
     client_id = id(websocket)
     sim_meta["clients"].add(client_id)
@@ -898,7 +891,6 @@ async def websocket_telemetry(websocket: WebSocket, sim_id: str):
 
         sim_meta["queues"].discard(queue)
         sim_meta["clients"].discard(client_id)
-
 
         # Keep a strong reference to the reaper task. asyncio's event loop only
         # holds a weak reference to a task, so an un-referenced create_task can

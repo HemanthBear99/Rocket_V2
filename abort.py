@@ -57,7 +57,6 @@ class AbortMonitor:
             'q_alpha' (float), 'omega_mag' (float)
         """
 
-
         if not (
             np.all(np.isfinite(r))
             and np.all(np.isfinite(v))
@@ -105,7 +104,6 @@ class AbortMonitor:
         _, _, rho, _ = compute_atmosphere_properties(altitude, enable_upper_atm=enable_upper_atmosphere)
         rho *= float(atmosphere_density_scale)
 
-
         from .frames import rotate_vector_by_quaternion
         body_z = rotate_vector_by_quaternion(C.BODY_Z_AXIS, q)
         if v_rel_mag > 10.0:
@@ -116,25 +114,21 @@ class AbortMonitor:
         q_dyn = 0.5 * rho * v_rel_mag ** 2
         q_alpha = q_dyn * aoa
 
-
         omega_mag = float(vec_norm(omega))
 
         abort = False
         reason = None
         mode = None
 
-
         if q_alpha > self.q_alpha_threshold and altitude < 80000.0:
             abort = True
             reason = f"Q-alpha exceedance: {q_alpha:.0f} > {self.q_alpha_threshold:.0f} Pa*rad"
             mode = self._determine_mode(altitude, v_rel_mag, t)
 
-
         elif attitude_error_rad > self.attitude_threshold:
             abort = True
             reason = f"Attitude error: {np.degrees(attitude_error_rad):.1f} > {np.degrees(self.attitude_threshold):.1f} deg"
             mode = self._determine_mode(altitude, v_rel_mag, t)
-
 
         elif omega_mag > self.max_tumble_rate:
             abort = True

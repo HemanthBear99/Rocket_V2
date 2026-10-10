@@ -34,24 +34,17 @@ class State:
         t: Simulation time (s)
     """
 
-
     r: np.ndarray = field(default_factory=lambda: np.zeros(3))
-
 
     v: np.ndarray = field(default_factory=lambda: np.zeros(3))
 
-
     q: np.ndarray = field(default_factory=lambda: np.array([1.0, 0.0, 0.0, 0.0]))
-
 
     omega: np.ndarray = field(default_factory=lambda: np.zeros(3))
 
-
     m: float = 0.0
 
-
     t: float = 0.0
-
 
     sim_config: Optional['SimulationConfig'] = field(default=None, repr=False)
     dry_mass_kg: float | None = field(default=None, repr=False)
@@ -60,7 +53,6 @@ class State:
         """Ensure arrays are numpy arrays with correct dtype and q is unit-length."""
         for attr in ['r', 'v', 'q', 'omega']:
             setattr(self, attr, np.asarray(getattr(self, attr), dtype=np.float64))
-
 
         q_norm = float(vec_norm(self.q))
         if np.isfinite(q_norm) and abs(q_norm - 1.0) > C.QUATERNION_NORM_TOL:

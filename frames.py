@@ -181,18 +181,15 @@ def direction_to_quaternion(direction: np.ndarray,
     if reference is None:
         reference = np.array([0.0, 0.0, 1.0])
 
-
     d_norm = vec_norm(direction)
     if d_norm < 1e-10:
         return np.array([1.0, 0.0, 0.0, 0.0])
-
 
     d = direction / d_norm
     r_norm = vec_norm(reference)
     if r_norm < C.ZERO_TOLERANCE:
         raise ValueError("reference direction must be non-zero")
     r = reference / r_norm
-
 
     dot = np.clip(np.dot(r, d), -1.0, 1.0)
 
@@ -203,7 +200,6 @@ def direction_to_quaternion(direction: np.ndarray,
         axis = axis / vec_norm(axis)
         return np.array([0.0, axis[0], axis[1], axis[2]])
 
-
     # Half-way quaternion: [1 + r.d, r x d] normalised is the shortest-arc
     # rotation and stays accurate for arbitrarily small angles (the old
     # explicit-angle form snapped anything within ~0.8 deg to identity).
@@ -211,33 +207,6 @@ def direction_to_quaternion(direction: np.ndarray,
     q[0] = 1.0 + dot
     q[1:] = cross3(r, d)
     return q / vec_norm(q)
-
-
-def quaternion_error(q_current: np.ndarray, q_desired: np.ndarray) -> np.ndarray:
-    """
-    Compute the body-frame quaternion error between current and desired
-    orientations.
-
-    q_error = q_current^(-1) * q_desired
-
-    This is the rotation, expressed in the body frame, needed to go from the
-    current orientation to the desired one.
-
-    Args:
-        q_current: Current quaternion [w, x, y, z]
-        q_desired: Desired quaternion [w, x, y, z]
-
-    Returns:
-        Error quaternion [w, x, y, z]
-    """
-    q_inv = quaternion_inverse(q_current)
-    q_err = quaternion_multiply(q_inv, q_desired)
-
-
-    if q_err[0] < 0:
-        q_err = -q_err
-
-    return q_err
 
 
 def quaternion_to_euler_zyx(q: np.ndarray, degrees: bool = False) -> np.ndarray:

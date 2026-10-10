@@ -483,7 +483,6 @@ def _extract_s2_recovery(
     if not log.get_series("time"):
         return None
 
-
     orbit_idx = _s2_initial_orbit_index(log)
     s2_dry_mass = float(config.stage2_dry_mass) + float(config.payload_mass)
     orbit = (
@@ -571,7 +570,6 @@ def assess_full_mission(
     terminal_attitude_error = _terminal_touchdown_tilt_deg(result)
     landing = _landing_with_contact_gates(landing, result, terminal_attitude_error)
 
-
     _bst_alt = float(result.booster_final_state.altitude)
     _bst_reason_u = (result.booster_reason or "").upper()
     if result.separation_time is None or _bst_alt > 100.0 or "Q-ALPHA" in _bst_reason_u or ("ABORT" in _bst_reason_u and "TOUCHDOWN" not in _bst_reason_u and "LANDING" not in _bst_reason_u):
@@ -601,10 +599,8 @@ def assess_full_mission(
     if not separation_occurred:
         failed.append("separation")
 
-
     s2_recovery = bool(getattr(config, "enable_s2_recovery", False))
     if s2_recovery:
-
 
         orbit = _assess_s2_initial_orbit(result, config)
         if not result.orbiter_success:

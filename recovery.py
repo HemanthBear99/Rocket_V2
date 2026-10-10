@@ -429,7 +429,6 @@ def _propagate_2body_to_surface(
 
         if r_new_norm <= R:
 
-
             f = (R - r_new_norm) / max(r_prev_norm - r_new_norm, 1e-12)
             f = float(np.clip(f, 0.0, 1.0))
             r_surface = r_new + f * (r_cur - r_new)
@@ -489,11 +488,9 @@ def _estimate_ballistic_impact_to_pad(
     altitude = max(r_norm - C.R_EARTH, 0.0)
     g_local = C.MU_EARTH / max(r_norm ** 2, 1.0)
 
-
     v_vert = float(np.dot(v_arr, vertical))
     discriminant = max(v_vert ** 2 + 2.0 * g_local * altitude, 0.0)
     time_to_impact_est = max((v_vert + float(np.sqrt(discriminant))) / max(g_local, 1e-9), 0.0)
-
 
     result = _propagate_2body_to_surface(
         r_arr,
@@ -554,7 +551,6 @@ def estimate_recovery_targeting(
     g_local = C.MU_EARTH / max(float(vec_norm(r)) ** 2, 1.0)
     h_apogee_pred = estimate_ballistic_apogee(altitude, radial_velocity, g_local)
     t_to_apogee = max(radial_velocity, 0.0) / max(g_local, 1e-6)
-
 
     h_entry_iface = float(config.booster_entry_interface_altitude_m)
     t_fall_height = max(h_apogee_pred - h_entry_iface, 0.0)
@@ -723,10 +719,8 @@ def estimate_suicide_burn(
             'a_brake': a_brake,
         }
 
-
     ve = isp * C.G0
     propellant = max(mass_kg - dry_mass, 0.0)
-
 
     mass_ratio_needed = np.exp(v_effective / ve)
     m_final_ideal = mass_kg / mass_ratio_needed
@@ -738,7 +732,6 @@ def estimate_suicide_burn(
     else:
         m_final_actual = m_final_ideal
 
-
     dm = mass_kg - m_final_actual
     if dm > 1.0 and m_final_actual > 0.0:
 
@@ -746,12 +739,9 @@ def estimate_suicide_burn(
     else:
         a_mean = a_brake
 
-
     a_mean = max(a_mean, g_local * 0.15)
 
-
     h_ignite = (v_effective ** 2) / (2.0 * a_mean)
-
 
     ignite = altitude <= h_ignite * safety_factor
 
@@ -814,7 +804,6 @@ def estimate_booster_touchdown_time(
     vertical = r / r_norm
     v_rel = compute_ground_relative_velocity(r, v)
 
-
     v_descent = max(-float(np.dot(v_rel, vertical)), 1.0)
     g_local = float(C.MU_EARTH / max(r_norm ** 2, 1.0))
 
@@ -826,7 +815,6 @@ def estimate_booster_touchdown_time(
         safety_factor=safety_factor,
     )
     ignition_altitude = max(float(burn['burn_altitude']) * safety_factor, 0.0)
-
 
     powered_scale = 1.2
 

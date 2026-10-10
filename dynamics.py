@@ -106,7 +106,6 @@ def compute_angular_acceleration(omega: np.ndarray, torque: np.ndarray,
         Angular acceleration in body frame (rad/s²)
     """
 
-
     I_omega = I_tensor @ omega
     gyroscopic = cross3(omega, I_omega)
 
@@ -198,7 +197,6 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
     if dry_mass is None:
         dry_mass = C.STAGE2_DRY_MASS if ctx.stage == 2 else C.DRY_MASS
 
-
     _cfg = ctx.config
     _stage1_reserve = _cfg.stage1_landing_fuel_reserve_kg if _cfg is not None else None
     I_tensor = compute_inertia_tensor(
@@ -207,14 +205,12 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         stage1_landing_reserve_kg=_stage1_reserve,
     )
 
-
     try:
         I_inv = np.linalg.inv(I_tensor)
     except np.linalg.LinAlgError:
 
         diag = np.diag(I_tensor)
         I_inv = np.diag(1.0 / np.where(diag != 0.0, diag, 1.0))
-
 
     cg_pos_z = compute_center_of_mass(
         m,
@@ -244,7 +240,6 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
             tau_aero = moment_scale * tau_aero
     else:
         tau_aero = np.zeros(3)
-
 
     m_dot = compute_mass_derivative(
         m,
@@ -306,12 +301,9 @@ def state_derivative_vector(state_vec: np.ndarray, t: float,
     omega = state_vec[10:13]
     m = state_vec[13]
 
-
     q = quaternion_normalize(q)
 
-
     derivs = compute_state_derivative(r, v, q, omega, m, torque, ctx)
-
 
     return np.concatenate([
         derivs.r_dot,

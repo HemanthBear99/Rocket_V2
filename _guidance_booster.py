@@ -390,7 +390,6 @@ def _compute_boostback_direction(
     v_horiz_vec = v - v_radial * vertical
     v_horiz_mag = float(vec_norm(v_horiz_vec))
 
-
     h_apogee_pred = estimate_ballistic_apogee(altitude, v_radial, g_local)
     _cfg = config or SimulationConfig()
     _lead = compute_powered_descent_lead_time(r, v, m, _cfg) + 22.4
@@ -405,7 +404,6 @@ def _compute_boostback_direction(
     site_dist = targeting.site_distance_m
     toward_site = targeting.toward_site
     v_return = targeting.v_return_needed_mps
-
 
     v_desired_h = v_return * toward_site
     if is_near_pad_target(_cfg):
@@ -439,7 +437,6 @@ def _compute_boostback_direction(
             thrust_dir = -v_guidance_h / max(v_horiz_mag, 1e-9)
     else:
         thrust_dir = -v / max(v_norm, 1.0)
-
 
     apogee_excess = max(0.0, h_apogee_pred - apogee_target_m)
     if v_radial > 0.0 and apogee_excess > 12000.0:

@@ -148,7 +148,6 @@ def _build_us76_tables():
     us76_tb = np.array(tb)
     us76_pb = np.array(pb)
 
-
     us76_tb.flags.writeable = False
     us76_pb.flags.writeable = False
     return us76_tb, us76_pb
@@ -189,7 +188,6 @@ def compute_atmosphere_properties(altitude: float, enable_upper_atm: bool = True
             T = T0
             P = P0 * np.exp(-C.G0 * dh / (C.R_GAS * T0))
     elif enable_upper_atm:
-
 
         h0 = _US76_H[-1]
         T0 = us76_tb[-1]
@@ -863,18 +861,15 @@ def compute_thrust_force(q: np.ndarray, r: np.ndarray, thrust_on: bool = True, t
     if not thrust_on:
         return np.zeros(3)
 
-
     throttle = float(np.clip(throttle, 0.0, 1.0))
     if throttle < 0.01:
         return np.zeros(3)
-
 
     altitude = vec_norm(r) - C.R_EARTH
     _, P_amb, _, _ = compute_configured_atmosphere_properties(altitude, config)
     P0 = C.ATM_P0
 
     if stage == 2:
-
 
         s2_thrust = (
             float(thrust_magnitude_override)
@@ -885,10 +880,8 @@ def compute_thrust_force(q: np.ndarray, r: np.ndarray, thrust_on: bool = True, t
 
         if P_amb > 100.0:
 
-
             thrust_magnitude *= max(0.0, 1.0 - 0.1 * P_amb / P0)
     else:
-
 
         thrust_sl = (
             float(thrust_magnitude_override)
@@ -899,16 +892,13 @@ def compute_thrust_force(q: np.ndarray, r: np.ndarray, thrust_on: bool = True, t
         pressure_thrust_scale = thrust_sl / max(C.THRUST_MAGNITUDE, 1e-9)
         thrust_vac = pressure_thrust_scale * C.MASS_FLOW_RATE * C.ISP_VAC * C.G0
 
-
         pressure_ratio = float(np.clip(P_amb / P0, 0.0, 1.2))
         thrust_magnitude = thrust_vac - (thrust_vac - thrust_sl) * pressure_ratio
-
 
     throttle_efficiency = 0.96 + 0.04 * throttle
     thrust_magnitude *= throttle * throttle_efficiency
 
     F_body = _gimbaled_thrust_body_vector(thrust_magnitude, control_torque_xy, lever_arm)
-
 
     R = quaternion_to_rotation_matrix(q)
     F_inertial = R @ F_body
@@ -1064,7 +1054,6 @@ def _booster_recovery_aero_scale(
 
     normalized = (mode or "").upper()
 
-
     if grid_fin_deployed <= 0.0:
         if normalized in ("BOOSTER_ENTRY", "BOOSTER_LANDING"):
             grid_fin_deployed = 1.0
@@ -1073,9 +1062,7 @@ def _booster_recovery_aero_scale(
     if landing_leg_deployed <= 0.0 and normalized == "BOOSTER_LANDING":
         landing_leg_deployed = 1.0
 
-
     base_area = reference_area
-
 
     if config is not None:
         grid_fin_total_area = float(
@@ -1086,10 +1073,8 @@ def _booster_recovery_aero_scale(
     grid_fin_area = grid_fin_total_area * grid_fin_deployed
     grid_fin_drag_area = grid_fin_area * C.GRID_FIN_CD
 
-
     leg_area = C.LANDING_LEG_COUNT * C.LANDING_LEG_AREA_M2 * landing_leg_deployed
     leg_drag_area = leg_area * C.LANDING_LEG_CD
-
 
     entry_plume_factor = 1.0
     if normalized == "BOOSTER_ENTRY":
@@ -1104,10 +1089,8 @@ def _booster_recovery_aero_scale(
     total_drag_area = (base_area + grid_fin_drag_area + leg_drag_area) * entry_plume_factor
     drag_scale = total_drag_area / max(base_area, 1e-9)
 
-
     moment_scale = 1.0
     if grid_fin_deployed > 0.0:
-
 
         moment_scale = 1.0 + 2.5 * grid_fin_deployed
     if normalized == "BOOSTER_ENTRY":
@@ -1200,7 +1183,6 @@ def _compute_force_breakdown(
             if lift_enabled else np.zeros(3)
         )
         if (vehicle_model or "").lower() == "booster":
-
 
             drag_scale, _ = _booster_recovery_aero_scale(booster_aero_mode, config=config)
             F_drag = drag_scale * F_drag

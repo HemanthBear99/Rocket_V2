@@ -50,7 +50,6 @@ def compute_commanded_quaternion(desired_direction: np.ndarray) -> np.ndarray:
         Commanded quaternion [w, x, y, z]
     """
 
-
     return direction_to_quaternion(desired_direction, C.BODY_Z_AXIS)
 
 
@@ -184,10 +183,8 @@ def _apply_integral_anti_windup(
     else:
         limit_roll = limit_transverse
 
-
     integral_error = integral_error.copy()
     tau_i = ki * integral_error
-
 
     tau_i_trans = tau_i[0:2]
     mag_trans = float(vec_norm(tau_i_trans))
@@ -195,7 +192,6 @@ def _apply_integral_anti_windup(
         integral_error[0:2] = integral_error[0:2] * (limit_transverse / mag_trans)
     elif limit_transverse <= 0.0:
         integral_error[0:2] = 0.0
-
 
     tau_i_roll = tau_i[2]
     mag_roll = abs(tau_i_roll)
@@ -268,7 +264,6 @@ def pd_control_law(q_error_vector: np.ndarray, error_angle: float,
 
     q_error_vector = np.asarray(q_error_vector, dtype=float)
 
-
     # RCS-only detection. The deadband exists to stop the RCS thrusters
     # chasing sub-deadband attitude errors it cannot null, wasting propellant.
     # It previously keyed on a hard-coded max_torque < 50000.0 literal, but
@@ -284,9 +279,7 @@ def pd_control_law(q_error_vector: np.ndarray, error_angle: float,
         if error_angle < deadband_rad:
             q_error_vector = np.zeros_like(q_error_vector)
 
-
     tau_p = kp * q_error_vector
-
 
     tau_d = -kd * omega
 
@@ -309,7 +302,6 @@ def pd_control_law(q_error_vector: np.ndarray, error_angle: float,
         tau_i = ki * control_state.integral_error
 
     torque = tau_p + tau_d + tau_i
-
 
     torque_magnitude = vec_norm(torque)
     if torque_magnitude > max_torque:

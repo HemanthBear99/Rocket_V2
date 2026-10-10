@@ -82,7 +82,6 @@ def _step_vehicle(state, actuator, mgr, gs, log, abort_monitor, config, max_time
     if step_dt <= 0.0:
         return state, actuator, gs, True, max_time_reason, None, None
 
-
     if vehicle_model == "booster":
         step_dt = min(step_dt, mgr.recovery_max_step_dt())
     mgr.update(state, step_dt)
@@ -235,7 +234,6 @@ def _run_ascent(rt: _MissionRuntime) -> _AscentOutcome:
     separation_time = None
     ascent_reason = "Stage separation"
 
-
     while True:
         if _wait_for_control() == "stop":
             ascent_reason = "User stopped"
@@ -252,10 +250,8 @@ def _run_ascent(rt: _MissionRuntime) -> _AscentOutcome:
             ascent_reason = f"Validation failure during ascent: {e}"
             break
 
-
         phase_before = mission_mgr.get_phase()
         step_dt = _remaining_step_dt(state, dt, max_time)
-
 
         step_dt = min(step_dt, C.STACKED_ASCENT_MAX_DT)
         if step_dt <= 0.0:
@@ -284,14 +280,12 @@ def _run_ascent(rt: _MissionRuntime) -> _AscentOutcome:
                 separation_time = _separation_time(mission_mgr, state)
             break
 
-
         if state.t >= max_time:
             ascent_reason = "Maximum simulation time reached (no separation)"
             break
         if state.altitude < C.CRASH_ALTITUDE_TOLERANCE:
             ascent_reason = "CRASH during ascent"
             break
-
 
         step_config = _apply_wind(config)
         state, guid_out, ctrl_out, actuator, gs_ascent = simulation_step(
@@ -372,7 +366,6 @@ def _run_dual_vehicles(rt: _MissionRuntime, ascent: _AscentOutcome):
         config=config,
     )
 
-
     orbiter_state = _inherit_separation_state(
         state,
         s2_wet_mass,
@@ -388,7 +381,6 @@ def _run_dual_vehicles(rt: _MissionRuntime, ascent: _AscentOutcome):
 
     orbiter_mgr.update(orbiter_state, min(dt, max(0.0, max_time - orbiter_state.t)))
 
-
     booster_state = _inherit_separation_state(
         state,
         booster_mass,
@@ -399,7 +391,6 @@ def _run_dual_vehicles(rt: _MissionRuntime, ascent: _AscentOutcome):
     gs_booster = create_guidance_state()
     booster_actuator = ActuatorState(thrust_dir=actuator.thrust_dir.copy())
     booster_mgr = MissionManager(vehicle_type="booster", initial_mass=booster_mass, config=config)
-
 
     booster_mgr.set_phase_entry_time(booster_state.t)
 
@@ -418,7 +409,6 @@ def _run_dual_vehicles(rt: _MissionRuntime, ascent: _AscentOutcome):
     bst_guid = {'thrust_on': False, 'phase': booster_mgr.get_phase().name}
     orbiter_energy_tracker = _EnergyValidationTracker()
     booster_energy_tracker = _EnergyValidationTracker()
-
 
     if verbose:
         print("--- PHASE B: Dual Vehicle Tracking (Orbiter + Booster) ---")
@@ -461,7 +451,6 @@ def _run_dual_vehicles(rt: _MissionRuntime, ascent: _AscentOutcome):
             if new_orb_guid is not None:
                 orb_guid = new_orb_guid
 
-
         if not booster_done:
             booster_state, booster_actuator, gs_booster, booster_done, booster_reason, _, new_bst_guid = _step_vehicle(
                 booster_state, booster_actuator, booster_mgr, gs_booster, booster_log,
@@ -472,7 +461,6 @@ def _run_dual_vehicles(rt: _MissionRuntime, ascent: _AscentOutcome):
             )
             if new_bst_guid is not None:
                 bst_guid = new_bst_guid
-
 
         _emit(MissionProgress(
             vehicle="dual",
@@ -504,7 +492,6 @@ def _run_dual_vehicles(rt: _MissionRuntime, ascent: _AscentOutcome):
             )
         else:
             booster_energy_tracker.reset()
-
 
         if verbose and dual_step % 2000 == 0:
             _print_dual_status(

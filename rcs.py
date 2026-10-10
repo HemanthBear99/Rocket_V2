@@ -26,14 +26,6 @@ class RCSState:
         if self.initial_propellant_kg is None:
             self.initial_propellant_kg = self.propellant_remaining_kg
 
-    @property
-    def propellant_fraction(self) -> float:
-        """Fraction of the initial RCS propellant remaining."""
-        if not self.initial_propellant_kg or self.initial_propellant_kg <= 0.0:
-            return 0.0
-        return max(0.0, self.propellant_remaining_kg / self.initial_propellant_kg)
-
-
 def compute_rcs_mass_flow_rate(
     rcs_torque_n_m: float,
     lever_arm_m: float = C.RCS_LEVER_ARM,
@@ -69,7 +61,6 @@ def compute_rcs_mass_flow_rate(
     if max_torque <= 0.0:
         return 0.0
 
-
     throttle = min(rcs_torque_n_m / max_torque, 1.0)
 
     # Normalize full-authority flow against the SAME thrust value used for
@@ -80,7 +71,6 @@ def compute_rcs_mass_flow_rate(
     # full 8-thruster flow for a 60 kN.m demand instead of 0.375 -- 2x
     # over-consumption), and demands above the hard-coded authority were
     # silently clamped and under-consumed.
-
 
     mdot_full = (
         float(thrust_per_thruster)

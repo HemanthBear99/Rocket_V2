@@ -99,7 +99,7 @@ rlv_sim/                    # repo root IS the package; parent dir (D:\) must be
 ├── __init__.py __main__.py main.py cli.py      # entry points / re-exports
 ├── server.py api_models.py desktop_app.py      # web + desktop
 ├── desktop_app.spec version_info.txt           # PyInstaller → dist/Boostback.exe
-├── campaign.py verify_wind.py probe_sign.py    # batch / probe scripts
+├── campaign.py mission_planner.py      # batch runs / feasibility check
 ├── config_definition.py config_factory.py config_io.py
 ├── _run_full_mission.py _run_simulation.py _simulation_step.py
 ├── mission_manager.py _mission_manager_helpers.py _mission_state.py
@@ -115,7 +115,6 @@ rlv_sim/                    # repo root IS the package; parent dir (D:\) must be
 ├── tests/                                      # pytest + 1 node test + 1 playwright e2e
 ├── docs/ (main.tex, MATHEMATICAL_REFERENCES.md, CODEBASE_MAP.md)
 ├── plots/                                      # default output dir
-└── ntrs.json test_aero.json                    # reference / sample data
 ```
 
 ## Module Guide

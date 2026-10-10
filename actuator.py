@@ -38,9 +38,7 @@ def _limit_rotation(current: np.ndarray, desired: np.ndarray, max_rate: float, d
     if axis_norm < 1e-9:
         if dot >= 0.0:
 
-
             return des_n
-
 
         perp = np.array([1.0, 0.0, 0.0])
         if abs(float(cur_n[0])) > 0.9:

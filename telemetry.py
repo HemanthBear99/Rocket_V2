@@ -117,7 +117,6 @@ def extract_mission_progress(progress: MissionProgress, config: SimulationConfig
     reserve = float(config.stage1_landing_fuel_reserve_kg)
     booster_phase = str(booster_guidance.get("phase", "UNKNOWN"))
 
-
     launch_site = rotating_launch_site_eci(booster_state.t, config=config)
     booster_downrange_m = float(great_circle_distance_m(booster_state.r, launch_site))
 

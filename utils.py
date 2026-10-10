@@ -44,7 +44,6 @@ def _wind_vector(r: np.ndarray, wind_offset_mps: float = 0.0) -> np.ndarray:
     if alt <= 0.0:
         return np.zeros(3)
 
-
     speed = C.WIND_REF_SPEED * (alt / C.WIND_REF_ALT) ** C.WIND_EXPONENT
     speed += float(wind_offset_mps)
     if alt < 5000.0:
