@@ -372,6 +372,8 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
         overrides["enable_demo_mode"] = True
         overrides["demo_coast_max_dt"] = demo.demo_coast_max_dt
 
+    if setup.auto_recovery_reserve:
+        overrides["auto_size_recovery_reserve"] = True
     if setup.enable_s2_recovery:
         overrides["enable_s2_recovery"] = True
         overrides["max_time"] = max(

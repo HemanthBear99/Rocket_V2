@@ -28,3 +28,13 @@ def test_plan_endpoint_round_trip():
     recovery = {k: v for k, v in d["recovery"].items() if k != "gfold_available"}
     setup = SimulationSetup(vehicle=d["vehicle"], mission=d["mission"], recovery=recovery, physics=d["physics"])
     assert asyncio.run(plan_mission_endpoint(setup))["verdict"] == "ok"
+
+
+def test_auto_sized_reserve_tracks_vehicle_dry_mass():
+    from rlv_sim.mission_planner import size_recovery_reserve
+
+    ref = create_default_config()
+    assert size_recovery_reserve(ref) == pytest.approx(ref.stage1_landing_fuel_reserve_kg, rel=0.03)
+    heavy = create_default_config(stage1_dry_mass=26000.0, auto_size_recovery_reserve=True)
+    assert heavy.stage1_landing_fuel_reserve_kg > ref.stage1_landing_fuel_reserve_kg
+    assert plan_mission(heavy)["checks"][2]["status"] == "ok"

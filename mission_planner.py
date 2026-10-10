@@ -2,7 +2,8 @@
 
 Cheap (no simulation) so the UI can run it on every edit. Loss and recovery
 thresholds are calibrated against full-mission runs of the reference vehicle:
-payloads up to 11 t reach orbit, 12 t does not.
+payloads up to 11 t reach orbit, 12 t does not, and the booster's RTLS uses
+~3600 m/s (67.5 t reserve, landing with ~5.4 t left).
 """
 
 from __future__ import annotations
@@ -16,8 +17,10 @@ from .config_definition import SimulationConfig
 G0 = 9.80665
 # Gravity + drag + steering losses implied by the simulated ascent (calibrated).
 ASCENT_LOSSES_MPS = 2600.0
-# Booster recovery delta-v (boostback + entry + landing) the reference RTLS uses.
-RECOVERY_DV_REQUIRED_MPS = 3000.0
+# Booster recovery delta-v (boostback + entry + landing) the reference RTLS uses,
+# measured down to booster_landing_reserve_kg.
+RECOVERY_DV_REQUIRED_MPS = 3600.0
+RECOVERY_DV_MARGIN_MPS = 50.0
 MIN_LIFTOFF_TWR = 1.15
 MARGIN_WARN_MPS = 300.0
 
@@ -30,6 +33,14 @@ class Check:
     unit: str
     status: str  # "ok" | "warn" | "fail"
     message: str
+
+
+def size_recovery_reserve(config: SimulationConfig) -> float:
+    """Stage-1 propellant to hold back at MECO for a full RTLS of this vehicle."""
+    isp = C.ISP_VAC * float(config.runtime_isp_scale) * G0
+    end = float(config.stage1_dry_mass) + float(config.booster_landing_reserve_kg)
+    dv = RECOVERY_DV_REQUIRED_MPS + RECOVERY_DV_MARGIN_MPS
+    return end * math.exp(dv / isp) - float(config.stage1_dry_mass)
 
 
 def _status(value: float, required: float, warn_band: float) -> str:
@@ -71,8 +82,10 @@ def plan_mission(config: SimulationConfig) -> dict:
               _status(twr, MIN_LIFTOFF_TWR, 0.1),
               f"Liftoff thrust-to-weight {twr:.2f} (min {MIN_LIFTOFF_TWR})"),
         Check("recovery_delta_v", dv_recovery, RECOVERY_DV_REQUIRED_MPS, "m/s",
-              _status(dv_recovery, RECOVERY_DV_REQUIRED_MPS, MARGIN_WARN_MPS),
-              f"Booster recovery delta-v {dv_recovery:.0f} m/s vs ~{RECOVERY_DV_REQUIRED_MPS:.0f} m/s for RTLS"),
+              _status(dv_recovery, RECOVERY_DV_REQUIRED_MPS, 0.0),
+              f"Booster recovery delta-v {dv_recovery:.0f} m/s vs ~{RECOVERY_DV_REQUIRED_MPS:.0f} m/s for RTLS "
+              f"(sized reserve {size_recovery_reserve(config) / 1000:.1f} t, "
+              f"set {config.stage1_landing_fuel_reserve_kg / 1000:.1f} t)"),
     ]
     statuses = {c.status for c in checks}
     verdict = "fail" if "fail" in statuses else "warn" if "warn" in statuses else "ok"
@@ -81,5 +94,6 @@ def plan_mission(config: SimulationConfig) -> dict:
         "stage1_delta_v_mps": dv_s1,
         "stage2_delta_v_mps": dv_s2,
         "liftoff_mass_kg": m0,
+        "sized_recovery_reserve_kg": size_recovery_reserve(config),
         "checks": [asdict(c) for c in checks],
     }

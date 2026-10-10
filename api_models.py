@@ -81,6 +81,7 @@ class SimulationSetup(BaseModel):
     realtime_mode: bool = False
     demo_mode: bool = False
     enable_s2_recovery: bool = False
+    auto_recovery_reserve: bool = False
     # Escape hatch for SimulationConfig fields the curated form doesn't
     # expose (e.g. s2_landing_propellant_reserve_kg, orbit_altitude_tolerance_m).
     # Populated when a client uploads a full config JSON containing fields

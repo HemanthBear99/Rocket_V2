@@ -168,6 +168,9 @@ class SimulationConfig:
     ascent_max_q_target_pa: float = 32000.0
     ascent_max_q_prediction_horizon_s: float = 1.0  # unused since the q-hold law; kept for config compatibility
     stage1_landing_fuel_reserve_kg: float = C.STAGE1_LANDING_FUEL_RESERVE
+    # Size the booster recovery reserve from the vehicle (rocket equation)
+    # instead of using stage1_landing_fuel_reserve_kg as given.
+    auto_size_recovery_reserve: bool = False
     launch_site_lat_deg: float = C.DEFAULT_LAUNCH_SITE_LAT_DEG
     launch_site_lon_deg: float = C.DEFAULT_LAUNCH_SITE_LON_DEG
     launch_site_altitude_m: float = 0.0

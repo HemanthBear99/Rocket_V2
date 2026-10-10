@@ -8,6 +8,11 @@ from .config_definition import SimulationConfig
 def _with_overrides(config: SimulationConfig, **overrides: Any) -> SimulationConfig:
     if overrides:
         config = SimulationConfig(**{**config.__dict__, **overrides})
+    if config.auto_size_recovery_reserve:
+        from .mission_planner import size_recovery_reserve
+
+        config = SimulationConfig(**{**config.__dict__,
+                                     "stage1_landing_fuel_reserve_kg": size_recovery_reserve(config)})
     config.validate()
     return config
 
