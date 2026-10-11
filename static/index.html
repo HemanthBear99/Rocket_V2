@@ -279,10 +279,16 @@
       </div>
 
       <div id="camp-results" style="display:none;">
-        <div class="section-title">Results Summary</div>
-        <div class="metric-grid" id="camp-summary-grid"></div>
-        <div class="section-title">Failure Criteria Breakdown</div>
-        <div class="card"><div class="metric-grid" id="camp-failure-grid"></div></div>
+        <div class="section-title" style="display:flex;align-items:center;">Results Summary
+          <button class="btn btn-sm btn-primary no-print" id="btn-export-campaign-pdf" style="margin-left:auto;">Export PDF</button></div>
+        <div class="grid grid-2">
+          <div class="card"><div id="camp-gauge" class="camp-gauge"></div><div class="metric-grid" id="camp-summary-grid"></div></div>
+          <div class="card"><div class="card-head"><div class="card-title">Failure Criteria</div></div><div id="camp-failure-grid"></div></div>
+        </div>
+        <div class="grid grid-2" style="margin-top:16px;">
+          <div class="card" id="camp-hist-touchdown"></div>
+          <div class="card" id="camp-hist-site"></div>
+        </div>
         <div class="section-title">Metric Distributions (median / p05 / p95)</div>
         <div class="card" style="max-height:280px;overflow:auto;">
           <table class="data-table" id="camp-metrics-table"><thead></thead><tbody></tbody></table>
@@ -367,6 +373,7 @@
 <script src="/static/js/vendor/three.min.js"></script>
 <script src="/static/js/charts.js?v=0.4.0"></script>
 <script src="/static/js/rocket_viz.js?v=0.3.2"></script>
-<script src="/static/js/app.js?v=0.6.1"></script>
+<script src="/static/js/report_charts.js?v=0.1.0"></script>
+<script src="/static/js/app.js?v=0.7.0"></script>
 </body>
 </html>

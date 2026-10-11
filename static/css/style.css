@@ -471,3 +471,43 @@ table.data-table tr:hover td{background:#0e1626;color:var(--text-hi);}
   .quick-grid{grid-template-columns:1fr;}
   .vp-nums .n{font-size:21px;}
 }
+
+/* ---- report / campaign charts (report_charts.js) ---- */
+.rc-svg{width:100%;height:auto;display:block;}
+.rc-plot{fill:none;stroke:var(--border-soft);}
+.rc-grid{stroke:var(--border-soft);stroke-dasharray:2 3;}
+.rc-tick{font:10px var(--mono);fill:var(--text-lo);}
+.rc-axis{font:11px var(--sans);fill:var(--text-mid);}
+.rc-title{font:600 12px var(--sans);fill:var(--text-hi);}
+.rc-bar-row{display:grid;grid-template-columns:170px 1fr 70px;gap:10px;align-items:center;margin:8px 0;font-size:12px;}
+.rc-bar-label{color:var(--text-mid);text-transform:capitalize;}
+.rc-bar-track{height:10px;background:var(--bg-2);border-radius:999px;overflow:hidden;border:1px solid var(--border-soft);}
+.rc-bar-fill{height:100%;background:var(--red);border-radius:999px;}
+.rc-bar-val{font-family:var(--mono);color:var(--text-hi);text-align:right;}
+.rc-bar-val span{color:var(--text-lo);}
+.camp-gauge{display:flex;justify-content:center;margin-bottom:8px;}
+.rc-gauge{width:220px;height:auto;}
+.rc-g-bg,.rc-g-ci,.rc-g-val{fill:none;stroke-linecap:round;}
+.rc-g-bg{stroke:var(--bg-2);stroke-width:14;}
+.rc-g-ci{stroke:var(--border);stroke-width:14;}
+.rc-g-val{stroke-width:8;}
+.rc-g-num{font:700 26px var(--sans);fill:var(--text-hi);}
+.tl-track{position:relative;height:18px;background:var(--bg-2);border-radius:999px;border:1px solid var(--border-soft);}
+.tl-tick{position:absolute;top:2px;width:3px;height:12px;border-radius:2px;transform:translateX(-1px);}
+.tl-tick.o{background:var(--accent);}
+.tl-tick.b{background:var(--amber);top:4px;height:8px;}
+.report-charts{margin-top:16px;}
+
+/* ---- PDF export (print one view on white) ---- */
+@media print{
+  :root{--text-hi:#111;--text-mid:#333;--text-lo:#666;--bg-2:#eef1f5;--border:#c9d1dc;--border-soft:#dde3ea;}
+  body{background:#fff !important;color:#111;}
+  .sidebar,.topbar,.no-print,.launch-bar,.toast-stack{display:none !important;}
+  .main{margin:0 !important;padding:0 !important;}
+  .view{display:none !important;animation:none !important;}
+  body[data-print="report"] #view-report,body[data-print="campaign"] #view-campaign{display:block !important;}
+  body[data-print="campaign"] #view-campaign > .grid:first-child{display:none !important;}
+  .card{background:#fff !important;box-shadow:none !important;border:1px solid #c9d1dc !important;break-inside:avoid;}
+  .data-table{font-size:10px;}
+  [style*="max-height"]{max-height:none !important;overflow:visible !important;}
+}

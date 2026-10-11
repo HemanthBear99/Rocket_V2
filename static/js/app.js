@@ -751,6 +751,53 @@
     return [cols.map(escapeCell).join(','), ...rows].join('\n');
   }
 
+  // PDF export: the browser's print-to-PDF with print styles for one view.
+  function printView(name) {
+    document.body.dataset.print = name;
+    window.print();
+    delete document.body.dataset.print;
+  }
+
+  function reportHeaderHtml() {
+    const v = state.formValues.vehicle || {}, m = state.formValues.mission || {}, r = state.formValues.recovery || {};
+    const engines = v.stage1_engines || 9;
+    const item = (k, val) => `<div class="metric-cell"><div class="k">${k}</div><div class="v">${escapeHtml(val)}</div></div>`;
+    return `<div class="card report-header">
+      <div class="card-head"><div class="card-title">Mission Summary</div>
+        <div class="help-text">${escapeHtml(new Date().toLocaleString())} · run ${escapeHtml(state.sim.id || '—')}</div></div>
+      <div class="metric-grid" style="grid-template-columns:repeat(3,1fr);">
+        ${item('Payload', `${fmt(v.payload_mass, 0)} kg`)}
+        ${item('Target orbit', `${fmt(m.target_alt_km, 0)} km`)}
+        ${item('Stage-1 engines', `${engines} × ${fmt((v.thrust_sl || 0) / engines / 1000, 0)} kN`)}
+        ${item('Liftoff thrust', `${fmt((v.thrust_sl || 0) / 1e6, 2)} MN`)}
+        ${item('Diameter', `${fmt(v.diameter_m, 1)} m`)}
+        ${item('Landing guidance', r.gfold_guidance ? 'G-FOLD' : 'Heuristic')}
+      </div></div>`;
+  }
+
+  function phaseTimelineHtml() {
+    const events = [];
+    let prev = null, prevB = null;
+    telemetryLog.forEach((p) => {
+      if (p.phase && p.phase !== prev) { events.push([p.time, 'Orbiter', p.phase]); prev = p.phase; }
+      if (p.booster_phase && p.booster_phase !== prevB && p.booster_phase !== 'UNKNOWN') {
+        events.push([p.time, 'Booster', p.booster_phase]); prevB = p.booster_phase;
+      }
+    });
+    if (!events.length) return '';
+    const tEnd = Math.max(...telemetryLog.map((p) => p.time), 1);
+    events.sort((a, b) => a[0] - b[0]);
+    const rows = events.map(([t, who, ph]) =>
+      `<tr><td class="mono">T+${fmt(t, 1)} s</td><td><span class="badge ${who === 'Booster' ? 'info' : 'ok'}">${who}</span></td><td>${escapeHtml(PHASE_LABELS[ph] || ph)}</td></tr>`).join('');
+    const ticks = events.map(([t, who, ph]) =>
+      `<div class="tl-tick ${who === 'Booster' ? 'b' : 'o'}" style="left:${(100 * t / tEnd).toFixed(2)}%" title="${escapeHtml(PHASE_LABELS[ph] || ph)}"></div>`).join('');
+    return `<div class="card" style="margin-top:16px;">
+      <div class="card-head"><div class="card-title">Phase Timeline</div><div class="help-text">${fmt(tEnd, 0)} s total</div></div>
+      <div class="tl-track">${ticks}</div>
+      <table class="data-table" style="margin-top:10px;"><thead><tr><th>Time</th><th>Vehicle</th><th>Phase</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+  }
+
   function buildReport(outcomes) {
     $('#report-empty').style.display = 'none';
     const content = $('#report-content');
@@ -788,7 +835,21 @@
           ${failedCriteriaHtml}
         </div>
       </div>
-      <div class="grid grid-2">
+      ${reportHeaderHtml()}
+      <div class="grid grid-2 report-charts">
+        <div class="card">${ReportCharts.lineChart([
+          { xs: telemetryLog.map((p) => p.time), ys: telemetryLog.map((p) => p.altitude / 1000), color: '#38e0ff', label: 'Orbiter / stack' },
+          { xs: telemetryLog.filter((p) => p.booster_altitude !== undefined).map((p) => p.time),
+            ys: telemetryLog.filter((p) => p.booster_altitude !== undefined).map((p) => p.booster_altitude / 1000), color: '#ffb454', label: 'Booster' },
+        ], { title: 'Altitude profile', xlabel: 'Mission time (s)', ylabel: 'Altitude (km)' })}</div>
+        <div class="card">${ReportCharts.lineChart([
+          { xs: telemetryLog.map((p) => p.time), ys: telemetryLog.map((p) => p.velocity), color: '#38e0ff', label: 'Orbiter / stack' },
+          { xs: telemetryLog.filter((p) => p.booster_velocity !== undefined).map((p) => p.time),
+            ys: telemetryLog.filter((p) => p.booster_velocity !== undefined).map((p) => p.booster_velocity), color: '#ffb454', label: 'Booster' },
+        ], { title: 'Speed profile', xlabel: 'Mission time (s)', ylabel: 'Speed (m/s)' })}</div>
+      </div>
+      ${phaseTimelineHtml()}
+      <div class="grid grid-2" style="margin-top:16px;">
         <div class="card">
           <div class="card-head"><div class="card-title">Orbiter</div><span class="badge ${outcomes.orbiter_success ? 'ok' : 'bad'}">${outcomes.orbiter_success ? 'SUCCESS' : 'FAIL'}</span></div>
           <div class="metric-grid" style="grid-template-columns:repeat(2,1fr);">
@@ -844,10 +905,12 @@
         </div>
         <p class="help-text">${s2.reason || ''}</p>
       </div>` : ''}
-      <div style="display:flex;gap:10px;margin-top:16px;">
+      <div class="no-print" style="display:flex;gap:10px;margin-top:16px;">
+        <button class="btn btn-sm btn-primary" id="btn-export-report-pdf">Export PDF</button>
         <button class="btn btn-sm" id="btn-export-telemetry-csv">Export Telemetry CSV</button>
         <button class="btn btn-sm" id="btn-export-report-json">Export Report JSON</button>
       </div>`;
+    $('#btn-export-report-pdf').addEventListener('click', () => printView('report'));
     $('#btn-export-telemetry-csv').addEventListener('click', () => {
       downloadBlob(`rlv_telemetry_${state.sim.id || 'run'}.csv`, telemetryToCsv(), 'text/csv');
     });
@@ -915,10 +978,18 @@
     }, 1500);
   }
 
+  $('#btn-export-campaign-pdf').addEventListener('click', () => printView('campaign'));
+
   function renderCampaignResults(summary, results) {
     $('#camp-results').style.display = 'block';
     const grid = $('#camp-summary-grid');
     const ci = summary.mission_success_rate_95pct_ci || [0, 0];
+    $('#camp-gauge').innerHTML = ReportCharts.gauge(summary.mission_success_rate || 0, ci);
+    const col = (k) => results.map((r) => Number(r[k]));
+    $('#camp-hist-touchdown').innerHTML = ReportCharts.histogram(col('touchdown_speed_mps'),
+      { title: 'Touchdown speed', xlabel: 'm/s', limit: 6 });
+    $('#camp-hist-site').innerHTML = ReportCharts.histogram(col('site_error_m').map((x) => Math.min(x, 200)),
+      { title: 'Landing site error (clipped at 200 m)', xlabel: 'm', limit: 50 });
     grid.innerHTML = `
       <div class="metric-cell"><div class="k">Runs</div><div class="v">${summary.runs}</div></div>
       <div class="metric-cell"><div class="k">Mission Success Rate</div><div class="v ${summary.mission_success_rate > 0.9 ? 'pass' : 'fail'}">${fmt(summary.mission_success_rate * 100, 1)}%</div></div>
@@ -928,9 +999,7 @@
     const failureGrid = $('#camp-failure-grid');
     const failureCounts = summary.failure_criteria_counts || {};
     const failureEntries = Object.entries(failureCounts);
-    failureGrid.innerHTML = failureEntries.length
-      ? failureEntries.map(([k, v]) => `<div class="metric-cell"><div class="k">${k}</div><div class="v fail">${v}</div></div>`).join('')
-      : '<div class="help-text">No failure criteria recorded — all cases passed.</div>';
+    failureGrid.innerHTML = ReportCharts.barList(failureEntries, summary.runs);
 
     const metricsTable = $('#camp-metrics-table');
     const metrics = summary.metrics || {};
