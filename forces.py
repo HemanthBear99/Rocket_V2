@@ -707,7 +707,9 @@ def compute_lift_force(
     q_dyn = 0.5 * rho * v_rel_norm**2
 
     aero_db = _get_aero_db(getattr(config, 'aero_deck_path', None) if config else None)
-    if aero_db and aero_db.is_loaded:
+    # A deck without CL/CM (e.g. drag-only tunnel data) falls back to the
+    # analytic model for that coefficient.
+    if aero_db and aero_db.is_loaded and "CL" in aero_db.data:
         cl = aero_db.interpolate_4d(mach, alpha_deg, beta_deg, fin_deg, "CL")
     else:
         cl_alpha = np.interp(mach, C.MACH_BREAKPOINTS, C.CL_ALPHA_VALUES)
@@ -961,7 +963,7 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
 
     aero_db = _get_aero_db(getattr(config, 'aero_deck_path', None) if config else None)
 
-    if aero_db and aero_db.is_loaded:
+    if aero_db and aero_db.is_loaded and "CM" in aero_db.data:
         cm = aero_db.interpolate_4d(mach, alpha_deg, beta_deg, fin_deg, "CM")
         # A pitching-moment coefficient acts about the axis normal to the
         # angle-of-attack plane (z_hat_body x u_trans), which is what the
@@ -1088,6 +1090,9 @@ def _booster_recovery_aero_scale(
     # approximation rather than substituting an unverified one.
     total_drag_area = (base_area + grid_fin_drag_area + leg_drag_area) * entry_plume_factor
     drag_scale = total_drag_area / max(base_area, 1e-9)
+    if config is not None and normalized in ("BOOSTER_ENTRY", "BOOSTER_LANDING"):
+        # Flight-data calibration (validation/drag_fit.py).
+        drag_scale *= float(getattr(config, "booster_descent_drag_scale", 1.0))
 
     moment_scale = 1.0
     if grid_fin_deployed > 0.0:

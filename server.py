@@ -456,6 +456,33 @@ async def aero_validation() -> dict[str, Any]:
     return run_aero_validation_checks(deck=_build_geometry_deck_database())
 
 
+MAX_AERO_UPLOAD_BYTES = 2_000_000
+
+
+@app.post("/api/aero/import", dependencies=[Depends(require_api_key)])
+async def aero_import(file: UploadFile = File(...), name: str | None = None) -> dict[str, Any]:  # noqa: B008 - FastAPI idiom
+    """Import wind-tunnel / CFD aero data (CSV or deck JSON) as an aero deck."""
+    from .aero_import import import_deck
+
+    filename = file.filename or "deck.csv"
+    if not filename.lower().endswith((".csv", ".json")):
+        raise HTTPException(status_code=422, detail="Aero data must be a .csv or .json file")
+    raw = await file.read(MAX_AERO_UPLOAD_BYTES + 1)
+    if len(raw) > MAX_AERO_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Aero data file is too large")
+    try:
+        return import_deck(raw, filename, name)
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid aero data: {exc}") from exc
+
+
+@app.get("/api/aero/decks", dependencies=[Depends(require_api_key)])
+async def aero_decks() -> list[dict[str, Any]]:
+    from .aero_import import list_decks
+
+    return list_decks()
+
+
 @app.get("/api/aero/validation/tier2", dependencies=[Depends(require_api_key)])
 async def aero_validation_tier2() -> dict[str, Any]:
     """Tier 2 aerodynamic validation report: comparison against published

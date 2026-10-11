@@ -28,3 +28,4 @@ scratch_full_run2.log
 
 # codegraph index
 .codegraph/
+aero_decks/user_*.json

@@ -1050,6 +1050,61 @@
     }
   }
 
+  // ---------------------------------------------------------- aero data import
+  function selectAeroDeck(path) {
+    const overrides = { ...(state.advancedOverrides || {}) };
+    if (path) overrides.aero_deck_path = path; else delete overrides.aero_deck_path;
+    state.advancedOverrides = Object.keys(overrides).length ? overrides : null;
+  }
+
+  async function refreshAeroDecks(selected) {
+    try {
+      const decks = await api('/api/aero/decks');
+      const sel = $('#aero-deck-select');
+      const current = selected ?? (state.advancedOverrides || {}).aero_deck_path ?? '';
+      sel.innerHTML = '<option value="">Built-in model</option>' + decks.map((d) =>
+        `<option value="${escapeHtml(d.aero_deck_path)}">${escapeHtml(d.name)}${d.user ? '' : ' (bundled)'}</option>`).join('');
+      sel.value = current;
+    } catch (e) { /* settings page still usable without the list */ }
+  }
+  $('#aero-deck-select').addEventListener('change', (e) => {
+    selectAeroDeck(e.target.value);
+    toast(e.target.value ? 'Simulations will use the selected aero deck' : 'Simulations will use the built-in aero model', 'info');
+  });
+
+  $('#btn-aero-import').addEventListener('click', async () => {
+    const file = $('#aero-import-file').files[0];
+    if (!file) { toast('Choose a .csv or .json aero data file first', 'error'); return; }
+    const fd = new FormData();
+    fd.append('file', file);
+    const name = $('#aero-import-name').value.trim();
+    try {
+      const r = await api('/api/aero/import' + (name ? `?name=${encodeURIComponent(name)}` : ''), { method: 'POST', body: fd });
+      $('#aero-import-results').style.display = 'block';
+      const failed = r.checks.filter((c) => !c.passed);
+      $('#aero-import-warnings').innerHTML =
+        `<div class="help-text">Imported <b>${escapeHtml(r.name)}</b>: ${r.grid.mach} Mach × ${r.grid.alpha} alpha points, `
+        + `${r.coefficients.join(', ')}. Interpolation checks: ${r.checks.length - failed.length}/${r.checks.length} passed.</div>`
+        + r.warnings.map((w) => `<div class="help-text" style="color:var(--amber)">⚠ ${escapeHtml(w)}</div>`).join('')
+        + failed.map((c) => `<div class="help-text" style="color:var(--red)">✗ ${escapeHtml(c.name)}: ${escapeHtml(c.detail || '')}</div>`).join('');
+      const rows = r.comparison;
+      $('#aero-import-chart').innerHTML = ReportCharts.lineChart([
+        { xs: rows.map((x) => x.mach), ys: rows.map((x) => x.cd_imported), color: '#38e0ff', label: 'Your data' },
+        { xs: rows.map((x) => x.mach), ys: rows.map((x) => x.cd_model), color: '#ffb454', label: 'Built-in model' },
+      ], { title: 'Drag coefficient at zero angle of attack', xlabel: 'Mach', ylabel: 'CD' });
+      const t = $('#aero-import-table');
+      t.querySelector('thead').innerHTML = '<tr><th>Mach</th><th>Your CD</th><th>Built-in CD</th><th>Ratio</th></tr>';
+      t.querySelector('tbody').innerHTML = rows.map((x) =>
+        `<tr><td>${fmt(x.mach, 2)}</td><td>${fmt(x.cd_imported, 3)}</td><td>${fmt(x.cd_model, 3)}</td><td>${fmt(x.ratio, 2)}</td></tr>`).join('');
+      await refreshAeroDecks(r.aero_deck_path);
+      selectAeroDeck(r.aero_deck_path);
+      toast(`Imported ${r.name}; simulations will use it`, 'success');
+    } catch (e) {
+      toast('Aero import failed: ' + e.message, 'error');
+    }
+  });
+  refreshAeroDecks();
+
   // ---------------------------------------------------------- aero validation
   $('#btn-run-aero-validation').addEventListener('click', async () => {
     const btn = $('#btn-run-aero-validation');

@@ -341,6 +341,9 @@ class SimulationConfig:
     runtime_initial_mass_offset_kg: float = 0.0
     runtime_wind_offset_mps: float = 0.0
     aero_deck_path: str | None = None
+    # Multiplier on booster descent drag (entry/landing), fitted to Falcon 9
+    # webcast telemetry by validation/drag_fit.py.
+    booster_descent_drag_scale: float = 1.0
 
     verbose: bool = True
 

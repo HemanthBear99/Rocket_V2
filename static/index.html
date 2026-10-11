@@ -353,6 +353,29 @@
           <table class="data-table" id="aero-tier2-table" style="margin-top:12px;"><thead></thead><tbody></tbody></table>
         </div>
       </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="card-head"><div class="card-title">Your Aero Data (Wind Tunnel / CFD)</div></div>
+        <p class="help-text">
+          Import measured aerodynamics to replace the built-in drag model. CSV with one row per grid point:
+          <code>mach,alpha_deg,CD</code> plus optional <code>CL</code>, <code>CM</code> columns, covering every
+          (Mach, alpha) pair; or a deck JSON exported from this tool.
+        </p>
+        <div class="field-row">
+          <div class="field"><label>Data file <span class="unit">.csv / .json</span></label><input type="file" id="aero-import-file" accept=".csv,.json"/></div>
+          <div class="field"><label>Name</label><input type="text" id="aero-import-name" placeholder="e.g. tunnel_run_3"/></div>
+        </div>
+        <button class="btn btn-sm btn-primary" id="btn-aero-import">Import &amp; Compare</button>
+        <div class="field" style="margin-top:12px;">
+          <label>Aerodynamics used for simulations</label>
+          <select id="aero-deck-select"><option value="">Built-in model</option></select>
+        </div>
+        <div id="aero-import-results" style="display:none;margin-top:12px;">
+          <div id="aero-import-warnings"></div>
+          <div id="aero-import-chart"></div>
+          <table class="data-table" id="aero-import-table" style="margin-top:10px;"><thead></thead><tbody></tbody></table>
+        </div>
+      </div>
     </section>
   </div>
 </div>
@@ -374,6 +397,6 @@
 <script src="/static/js/charts.js?v=0.4.0"></script>
 <script src="/static/js/rocket_viz.js?v=0.3.2"></script>
 <script src="/static/js/report_charts.js?v=0.1.0"></script>
-<script src="/static/js/app.js?v=0.7.0"></script>
+<script src="/static/js/app.js?v=0.8.0"></script>
 </body>
 </html>
