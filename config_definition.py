@@ -188,6 +188,9 @@ class SimulationConfig:
     # Subtract drag deceleration from the entry capture's vertical demand.
     booster_entry_drag_credit: bool = False
     # Max thrust tilt from vertical the entry capture may use to divert.
+    # Shortest time constant of the landing burn's horizontal velocity nulling
+    # (keeps the gain within the attitude loop's bandwidth). 0 = uncapped.
+    booster_terminal_divert_time_constant_s: float = 1.5  # MC 90% -> 94%
     booster_entry_divert_tilt_deg: float = 60.0  # 30 -> 60: MC 78% -> 90% (tailwind pad misses)
     booster_landing_ignition_safety_factor: float = 1.52
     booster_landing_ignition_ceiling_m: float = 20000.0

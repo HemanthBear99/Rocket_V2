@@ -83,3 +83,18 @@ def test_tailwind_dispersion_case_lands_on_pad():
     result = run_full_mission(config=cfg, verbose=False)
     assert result.booster_site_error_m < cfg.booster_pad_tolerance_m
     assert result.booster_touchdown_speed_mps < 6.0
+
+
+@pytest.mark.slow
+def test_tailwind_touchdown_has_no_lateral_limit_cycle():
+    """Monte Carlo case (seed 42) that touched down at 7.6 m/s: the final
+    velocity-nulling gain 2/t_go outran the attitude loop and limit-cycled."""
+    from rlv_sim._run_full_mission import run_full_mission
+    from rlv_sim.campaign import apply_case
+    from rlv_sim.config_factory import create_default_config
+
+    z = {"thrust": -0.294, "isp": -1.072, "mass": 0.714, "wind": 1.997, "atmosphere": -1.177, "pitchover": -0.837}
+    cfg = apply_case(create_default_config(), {"z_scores": z})
+    result = run_full_mission(config=cfg, verbose=False)
+    assert result.booster_touchdown_speed_mps < 5.5
+    assert result.booster_site_error_m < cfg.booster_pad_tolerance_m

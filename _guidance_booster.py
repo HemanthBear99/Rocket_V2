@@ -819,11 +819,11 @@ def _gfold_command(ctx: _BoosterContext, gs: GuidanceState, t_go: float,
 
 
 def _lateral_divert(v_horiz_site, t_stop, h, t_go, a_divert_zev, a_divert_zem_zev,
-                    a_horiz_budget, *, terminal_horizontal_capture,
+                    a_horiz_budget, *, tau_min, terminal_horizontal_capture,
                     terminal_inside_pad_capture, pad_reachable):
     """Horizontal divert acceleration for the landing burn, budget-limited."""
     if terminal_horizontal_capture:
-        a_divert = -v_horiz_site / max(t_stop, 1e-6)
+        a_divert = -v_horiz_site / max(t_stop, tau_min, 1e-6)
     elif terminal_inside_pad_capture:
         a_divert = a_divert_zev
     elif h < 150.0 or t_go < 5.0:
@@ -931,7 +931,11 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         and terminal_inside_pad_capture
         and v_horiz_site_mag > 3.0
     )
-    a_divert_zev = -(2.0 / t_go) * v_horiz_site
+    # Velocity-nulling gain is capped at 1/tau: the 2/t_go gain grows without
+    # bound near touchdown, and with ~1 s of attitude lag the horizontal
+    # velocity limit-cycles and grows (tailwind touchdowns at 6-7.6 m/s).
+    tau_min = float(cfg.booster_terminal_divert_time_constant_s)
+    a_divert_zev = -min(2.0 / t_go, 1.0 / max(tau_min, 1e-6)) * v_horiz_site
     a_divert_zem_zev = (6.0 / (t_go ** 2)) * zem + (2.0 / t_go) * v_horiz_site
     base_divert_fraction = divert_fraction_by_altitude(h, cfg)
 
@@ -1017,6 +1021,7 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
     ))
     a_divert = _lateral_divert(
         v_horiz_site, t_stop, h, t_go, a_divert_zev, a_divert_zem_zev, a_horiz_budget,
+        tau_min=tau_min,
         terminal_horizontal_capture=terminal_horizontal_capture,
         terminal_inside_pad_capture=terminal_inside_pad_capture,
         pad_reachable=pad_reachable,
