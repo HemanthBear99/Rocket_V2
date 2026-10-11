@@ -104,6 +104,11 @@ class SimulationConfig:
     # Dynamic pressure held by the physics-based q-hold throttle law
     # (3 kPa margin below the 35 kPa structural limit).
     ascent_max_q_target_pa: float = 32000.0
+    # Optional scheduled throttle-down through max-q (Falcon 9 style).
+    # Disabled while end <= start.
+    ascent_throttle_bucket_start_s: float = 0.0
+    ascent_throttle_bucket_end_s: float = 0.0
+    ascent_throttle_bucket_fraction: float = 0.7
     stage1_landing_fuel_reserve_kg: float = C.STAGE1_LANDING_FUEL_RESERVE
     # Size the booster recovery reserve from the vehicle (rocket equation)
     # instead of using stage1_landing_fuel_reserve_kg as given.

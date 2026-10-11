@@ -333,6 +333,9 @@ def compute_guidance_output(
         else 0.0
     )
     throttle, predicted_q = compute_q_hold_throttle(r, v, v_rel, m, q_dyn, q_rate, config)
+    if config is not None and config.ascent_throttle_bucket_start_s <= t < config.ascent_throttle_bucket_end_s:
+        throttle = min(throttle, max(float(config.ascent_throttle_bucket_fraction),
+                                     float(config.min_engine_throttle_fraction)))
     gs.prev_dynamic_pressure_pa = q_dyn
 
     if v_rel_norm < C.ZERO_TOLERANCE:

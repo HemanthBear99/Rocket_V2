@@ -38,8 +38,13 @@ def _first_time(times, phases, key):
     return None
 
 
-def simulate(payload_kg: float | None) -> dict:
-    cfg = create_default_config(verbose=False, **({"payload_mass": payload_kg} if payload_kg else {}))
+def simulate(payload_kg: float | None, throttle_bucket: tuple[float, float] | None = None) -> dict:
+    """Fly the default vehicle; optionally with the flight's max-q throttle-down window."""
+    overrides = {"payload_mass": payload_kg} if payload_kg else {}
+    if throttle_bucket:
+        overrides.update(ascent_throttle_bucket_start_s=throttle_bucket[0],
+                         ascent_throttle_bucket_end_s=throttle_bucket[1])
+    cfg = create_default_config(verbose=False, **overrides)
     res = run_full_mission(config=cfg, verbose=False)
     a, b = res.ascent_log, res.booster_log
     t = np.asarray(a.get_series("time"))
@@ -98,14 +103,20 @@ def main() -> None:
     sims: dict = {}
     for name, payload in FLIGHTS.items():
         real = load_flight(name)
-        key = payload or "default"
-        sim = sims.setdefault(key, simulate(payload))
+        ev0 = real["events"]
+        bucket = ((ev0["throttle_down_start"], ev0["throttle_down_end"])
+                  if ev0.get("throttle_down_start") else None)
+        key = (payload or 8000.0, bucket)
+        if key not in sims:
+            sims[key] = simulate(payload, bucket)
+        sim = sims[key]
         # Ascent-curve error up to the earlier MECO, on the flight's 1 Hz grid.
         t_end = min(real["meco"], sim["meco"])
         m = real["t"] <= t_end
         alt_rms = float(np.sqrt(np.mean((np.interp(real["t"][m], sim["t"], sim["alt"]) - real["alt"][m]) ** 2)))
         v_rms = float(np.sqrt(np.mean((np.interp(real["t"][m], sim["t"], sim["v"]) - real["v"][m]) ** 2)))
         curve_rows.append(f"| {name} | {_fmt(payload, '{:.0f}') if payload else '8000 (unpublished)'} "
+                          f"| {f'{bucket[0]}-{bucket[1]} s' if bucket else 'none (not in data)'} "
                           f"| {alt_rms:.2f} | {v_rms:.0f} |")
         ev = real["events"]
         rows += [
@@ -128,7 +139,7 @@ def main() -> None:
         ax_v.plot(real["t"][mr], real["v"][mr], lw=1, label=name)
     for key, sim in sims.items():
         ms = sim["t"] <= sim["meco"]
-        lbl = f"Sim ({key:.0f} kg)" if key != "default" else "Sim (8000 kg)"
+        lbl = f"Sim ({key[0]:.0f} kg" + (f", throttle-down {key[1][0]}-{key[1][1]} s)" if key[1] else ")")
         ax_alt.plot(sim["t"][ms], sim["alt"][ms], "k--", lw=1.6, label=lbl)
         ax_v.plot(sim["t"][ms], sim["v"][ms], "k--", lw=1.6)
     ax_alt.set(xlabel="Time (s)", ylabel="Altitude (km)", title="Stage-1 ascent: altitude")
@@ -154,8 +165,8 @@ def main() -> None:
         "",
         "## Ascent curve error (lift-off to MECO)",
         "",
-        "| Flight | Sim payload (kg) | Altitude RMS (km) | Speed RMS (m/s) |",
-        "|---|---|---|---|",
+        "| Flight | Sim payload (kg) | Throttle-down (flight's) | Altitude RMS (km) | Speed RMS (m/s) |",
+        "|---|---|---|---|---|",
         *curve_rows,
         "",
         "## Key events",
@@ -166,15 +177,19 @@ def main() -> None:
         "",
         "## Findings",
         "",
-        "- **MECO speed matches within ~2.5%** on every flight: the energy the stage delivers is right.",
-        ("- **The sim reaches MECO ~10-15 s early and ahead on the curve.** Stage-1 burns its ascent "
-        "propellant at full thrust (one throttle law, q-hold at 32 kPa), while Falcon 9 throttles "
-        "down through max-q (real peak q 23-29 kPa vs the sim's 32 kPa target) and burns longer at lower acceleration. The sim's trajectory is "
-        "therefore more aggressive in time, not in end state."),
+        "- **MECO speed matches within ~4%** on every flight: the energy the stage delivers is right.",
+        ("- **Max-q throttle-down.** Where the webcast data shows the throttle-down window "
+         "(CRS-11, Zuma) the sim flies it (`ascent_throttle_bucket_*`, 70% thrust). On CRS-11 this "
+         "halves the curve error (altitude RMS 9.2 -> 5.3 km, speed RMS 218 -> 111 m/s) and moves "
+         "MECO from 15.5 s to 9 s early. Flights without that data still use the q-hold law only."),
+        ("- **Remaining gap: MECO 6-10% early.** The sim holds back a 67.5 t recovery reserve and "
+         "its RTLS needs ~3600 m/s; Falcon 9 burns more of stage 1 on ascent, so its real RTLS "
+         "budget is smaller. Closing this needs a leaner boostback/entry profile, not ascent changes."),
+        ("- **Peak q still 9-29% high**: Falcon's throttle depth and timing are not published; "
+         "70% is an estimate."),
         ("- **Booster timelines start right (boostback within ~2%)**; later events differ by up to "
-        "~20% because the sim flies its own target orbit, inclination and pad, not each mission's."),
-        ("- Next model work: a Falcon-style throttle bucket around max-q and per-flight mission "
-        "settings (inclination, target orbit) would tighten the ascent-curve error."),
+         "~20% because the sim flies its own target orbit and pad. Target inclination was tried "
+         "per flight and does not change the stage-1 trajectory."),
         "",
     ]), encoding="utf-8")
     print((DOCS / "VALIDATION.md").read_text(encoding="utf-8"))
