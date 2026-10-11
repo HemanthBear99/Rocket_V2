@@ -187,6 +187,8 @@ class SimulationConfig:
     booster_entry_target_descent_rate_mps: float = 150.0
     # Subtract drag deceleration from the entry capture's vertical demand.
     booster_entry_drag_credit: bool = False
+    # Max thrust tilt from vertical the entry capture may use to divert.
+    booster_entry_divert_tilt_deg: float = 60.0  # 30 -> 60: MC 78% -> 90% (tailwind pad misses)
     booster_landing_ignition_safety_factor: float = 1.52
     booster_landing_ignition_ceiling_m: float = 20000.0
     booster_recovery_max_q_pa: float = 90000.0

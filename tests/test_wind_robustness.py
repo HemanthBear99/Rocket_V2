@@ -68,3 +68,18 @@ def test_impact_prediction_is_memoised_for_identical_inputs():
     other = recovery.estimate_ballistic_impact_to_pad(r, v * 1.01, 0.0, 0.0, cfg, mass_kg=30000.0)
     assert again is first
     assert other is not first
+
+
+@pytest.mark.slow
+def test_tailwind_dispersion_case_lands_on_pad():
+    """Monte Carlo case (seed 42) that missed the pad by 1.4 km with 11 t of
+    fuel left when the entry divert was capped at a 30 deg tilt."""
+    from rlv_sim._run_full_mission import run_full_mission
+    from rlv_sim.campaign import apply_case
+    from rlv_sim.config_factory import create_default_config
+
+    z = {"thrust": 0.9, "isp": 0.8, "mass": 0.6, "wind": 2.3, "atmosphere": -0.2, "pitchover": -2.0}
+    cfg = apply_case(create_default_config(), {"z_scores": z})
+    result = run_full_mission(config=cfg, verbose=False)
+    assert result.booster_site_error_m < cfg.booster_pad_tolerance_m
+    assert result.booster_touchdown_speed_mps < 6.0

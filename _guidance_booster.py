@@ -695,7 +695,7 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
                 )
                 max_divert_accel = min(
                     max_divert_accel,
-                    a_vertical_capture * np.tan(np.radians(30.0)),
+                    a_vertical_capture * np.tan(np.radians(float(cfg.booster_entry_divert_tilt_deg))),
                 )
                 if a_divert_mag > max_divert_accel:
                     a_divert *= max_divert_accel / a_divert_mag
