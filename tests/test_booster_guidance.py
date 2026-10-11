@@ -121,3 +121,19 @@ def test_guidance_without_config_uses_defaults(cfg):
     r, v = _booster_state(cfg, 70000.0, east_offset_m=60000.0, v_east=1500.0, v_up=500.0)
     out, _ = compute_booster_guidance(r, v, 0.0, _mass(cfg), "BOOSTER_FLIP")
     assert out["thrust_on"] is False
+
+
+@pytest.mark.slow
+def test_entry_drag_credit_saves_propellant_and_still_lands():
+    """Crediting drag in the entry capture cuts gravity losses (docs/VALIDATION.md)."""
+    from rlv_sim._run_full_mission import run_full_mission
+    from rlv_sim.config_factory import create_default_config
+
+    def leftover(**kw):
+        cfg = create_default_config(**kw)
+        res = run_full_mission(config=cfg, verbose=False)
+        assert res.booster_landing_success
+        return res.booster_final_state.m - cfg.stage1_dry_mass
+
+    lean = leftover(booster_entry_drag_credit=True, booster_entry_target_descent_rate_mps=300.0)
+    assert lean > leftover() + 2000.0

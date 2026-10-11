@@ -184,7 +184,11 @@ def main() -> None:
          "MECO from 15.5 s to 9 s early. Flights without that data still use the q-hold law only."),
         ("- **Remaining gap: MECO 6-10% early.** The sim holds back a 67.5 t recovery reserve and "
          "its RTLS needs ~3600 m/s; Falcon 9 burns more of stage 1 on ascent, so its real RTLS "
-         "budget is smaller. Closing this needs a leaner boostback/entry profile, not ascent changes."),
+         "budget is smaller. The entry burn is the outlier (~28 t over ~115 s, low throttle, mostly "
+         "lateral divert). Crediting drag and a 300 m/s target descent rate "
+         "(`booster_entry_drag_credit`, `booster_entry_target_descent_rate_mps`) saves ~2.6 t, but "
+         "that moves MECO only ~1 s and drops 100-run Monte Carlo success from 78% to 59%, so it is "
+         "off by default. Closing the gap needs a redesigned entry/landing targeting, not tuning."),
         ("- **Peak q still 9-29% high**: Falcon's throttle depth and timing are not published; "
          "70% is an estimate."),
         ("- **Booster timelines start right (boostback within ~2%)**; later events differ by up to "

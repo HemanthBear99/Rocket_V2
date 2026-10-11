@@ -520,7 +520,7 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
     predicted_landing_error = site_dist
     v_horiz_site = _horizontal_component(ctx.v_ground, site_vertical)
     v_horiz_site_mag = float(vec_norm(v_horiz_site))
-    target_entry_descent_rate = 150.0
+    target_entry_descent_rate = float(cfg.booster_entry_target_descent_rate_mps)
     # Time-to-go for the entry-descent lateral guidance must reflect the
     # vehicle's ACTUAL remaining flight time, not altitude/assumed-descent-rate.
     # The previous estimate (1.2*altitude/150 m/s, clipped to 180 s) gave
@@ -681,8 +681,16 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
                     max(-v_vert_rel, 0.0) ** 2
                     - target_entry_descent_rate ** 2
                 ) / (2.0 * max(altitude, 1.0))
+                # Credit the aerodynamic braking already acting on the
+                # booster: thrusting against gravity while drag could do the
+                # work wastes propellant (gravity loss).
+                a_drag_up = 0.0
+                if cfg.booster_entry_drag_credit:
+                    drag = compute_drag_force(ctx.r, ctx.v, wind_offset_mps=float(cfg.runtime_wind_offset_mps),
+                                              config=cfg)
+                    a_drag_up = max(float(np.dot(drag, vertical)) / max(ctx.m, 1.0), 0.0)
                 a_vertical_capture = max(
-                    g_local + net_vertical_braking,
+                    g_local + net_vertical_braking - a_drag_up,
                     0.0,
                 )
                 max_divert_accel = min(

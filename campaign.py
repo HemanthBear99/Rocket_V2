@@ -511,6 +511,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Comma-separated sensitivity parameters",
     )
     parser.add_argument(
+        "--set", action="append", default=[], metavar="FIELD=VALUE",
+        help="Override a config field for every case (repeatable), e.g. --set booster_entry_drag_credit=true",
+    )
+    parser.add_argument(
         "--landing-guidance",
         choices=("heuristic", "gfold"),
         default="heuristic",
@@ -524,12 +528,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _parse_overrides(items: list[str]) -> dict:
+    """FIELD=VALUE strings -> typed overrides (JSON literals, else string)."""
+    overrides = {}
+    for item in items:
+        key, sep, raw = item.partition("=")
+        if not sep:
+            raise SystemExit(f"--set expects FIELD=VALUE, got {item!r}")
+        try:
+            overrides[key.strip()] = json.loads(raw)
+        except json.JSONDecodeError:
+            overrides[key.strip()] = raw
+    return overrides
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     base = create_default_config(
         dt=args.dt if args.dt is not None else C.DT,
         max_time=args.max_time if args.max_time is not None else C.MAX_TIME,
         booster_landing_guidance=args.landing_guidance,
+        **_parse_overrides(args.set),
     )
     seed = args.seed if args.seed is not None else _DEFAULT_MC_SEED
     if args.mode == "sensitivity":

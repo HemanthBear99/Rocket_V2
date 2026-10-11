@@ -183,6 +183,10 @@ class SimulationConfig:
     booster_entry_interface_altitude_m: float = 70000.0
     booster_entry_burn_min_altitude_m: float = 20000.0
     booster_entry_burn_min_speed_mps: float = 250.0
+    # Descent rate the entry terminal-capture logic brakes towards (m/s).
+    booster_entry_target_descent_rate_mps: float = 150.0
+    # Subtract drag deceleration from the entry capture's vertical demand.
+    booster_entry_drag_credit: bool = False
     booster_landing_ignition_safety_factor: float = 1.52
     booster_landing_ignition_ceiling_m: float = 20000.0
     booster_recovery_max_q_pa: float = 90000.0
