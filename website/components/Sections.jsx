@@ -18,9 +18,9 @@ export function Nav() {
   return (
     <header ref={ref} className="nav">
       <nav className="wrap nav-inner">
-        <a href="#top" className="brand" aria-label="Boostback home">
-          <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 3c4 4 6 9 6 15l-3 4h-6l-3-4c0-6 2-11 6-15z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><path d="M13 22l-1 6M19 22l1 6M16 22v7" stroke="#FF7A3D" strokeWidth="1.8" strokeLinecap="round" /></svg>
-          <span>Boostback</span>
+        <a href="#top" className="brand" aria-label="Vyom home">
+          <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M5 27C5.5 10 24 4.5 25.5 22.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" /><path d="M21 28.2h9" stroke="#FF7A3D" strokeWidth="2.4" strokeLinecap="round" /><circle cx="25.5" cy="22.5" r="2.1" fill="#FF7A3D" /></svg>
+          <span>Vyom</span>
         </a>
         <div className="nav-links">
           <a href="#proof">Results</a><a href="#validation">Validation</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a>
@@ -135,7 +135,7 @@ export default function Sections() {
             </div>
           ))}
         </div>
-        <p className="fine">Prices per year, excluding taxes. Academic pricing needs an institutional email. Boostback is an engineering and teaching tool, not certified for flight-critical decisions.</p>
+        <p className="fine">Prices per year, excluding taxes. Academic pricing needs an institutional email. Vyom is an engineering and teaching tool, not certified for flight-critical decisions.</p>
       </section>
 
       <section id="download" className="download">
@@ -150,7 +150,7 @@ export default function Sections() {
             </div>
           </div>
           <dl className="specsheet" data-reveal>
-            <dt>FILE</dt><dd>BoostbackSetup-0.3.0.exe · 181 MB</dd>
+            <dt>FILE</dt><dd>VyomSetup-0.3.0.exe · 181 MB</dd>
             <dt>SYSTEM</dt><dd>Windows 10 or 11, 64-bit, 8 GB RAM</dd>
             <dt>INSTALL</dt><dd>No admin rights needed</dd>
             <dt>DATA</dt><dd>Stays on your PC, works offline</dd>
@@ -165,7 +165,7 @@ export default function Sections() {
 
       <footer className="footer">
         <div className="wrap footer-inner">
-          <span>© 2026 Boostback · Made in India</span>
+          <span>© 2026 Vyom · Made in India</span>
           <span className="mono">v0.3.0 · Flight data: shahar603/Telemetry-Data · Earth imagery: NASA</span>
         </div>
       </footer>

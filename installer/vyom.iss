@@ -1,15 +1,15 @@
-; Inno Setup script for the Boostback desktop app.
+; Inno Setup script for the Vyom desktop app.
 ; Build the exe first (PyInstaller, desktop_app.spec), then:
-;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\boostback.iss
-; Output: dist\BoostbackSetup-<version>.exe
+;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\vyom.iss
+; Output: dist\VyomSetup-<version>.exe
 ;
 ; User data (scenarios, run history, imported aero decks, license key) lives
-; in %APPDATA%\Boostback and is deliberately left in place on uninstall.
+; in %APPDATA%\Vyom and is deliberately left in place on uninstall.
 
-#define AppName "Boostback"
+#define AppName "Vyom"
 #define AppVersion "0.3.0"
-#define AppPublisher "Boostback"
-#define AppExe "Boostback.exe"
+#define AppPublisher "Vyom"
+#define AppExe "Vyom.exe"
 
 [Setup]
 AppId={{6E7B3C1A-4F2D-4B8E-9A61-B0057BACC0DE}
@@ -20,7 +20,7 @@ DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=BoostbackSetup-{#AppVersion}
+OutputBaseFilename=VyomSetup-{#AppVersion}
 SetupIconFile=..\static\app_icon.ico
 UninstallDisplayIcon={app}\{#AppExe}
 Compression=lzma2/max

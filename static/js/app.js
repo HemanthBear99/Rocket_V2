@@ -1,4 +1,4 @@
-/* Boostback — dashboard application logic. No external dependencies. */
+/* Vyom — dashboard application logic. No external dependencies. */
 (() => {
   'use strict';
 
@@ -1274,7 +1274,7 @@
       badge.className = `badge ${l.state === 'licensed' ? 'ok' : l.state === 'trial' ? 'info' : 'bad'}`;
       badge.textContent = l.state === 'licensed' ? 'LICENSED' : l.state === 'trial' ? `TRIAL · ${l.trial_days_left} days left` : 'EVALUATION ENDED';
       const cell = (k, v) => `<div class="metric-cell"><div class="k">${k}</div><div class="v" style="font-size:13px;word-break:break-all;">${escapeHtml(v)}</div></div>`;
-      $('#about-grid').innerHTML = cell('Version', `Boostback ${a.version}`)
+      $('#about-grid').innerHTML = cell('Version', `Vyom ${a.version}`)
         + cell('License', l.state === 'licensed' ? `${l.licensee} · ${l.plan} · until ${l.expires}` : (l.problem || (l.enforced ? 'Evaluation' : 'Developer build (not enforced)')))
         + cell('Data folder', a.data_dir);
     } catch (e) { /* older backend */ }

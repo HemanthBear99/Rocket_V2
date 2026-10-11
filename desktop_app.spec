@@ -1,4 +1,4 @@
-# PyInstaller build spec for the Boostback desktop app.
+# PyInstaller build spec for the Vyom desktop app.
 # Build with:  pyinstaller desktop_app.spec  (run from D:\rlv_sim)
 
 import sys
@@ -58,7 +58,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Boostback',
+    name='Vyom',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

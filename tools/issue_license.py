@@ -1,4 +1,4 @@
-"""Issue a Boostback license key.
+"""Issue a Vyom license key.
 
     python -m rlv_sim.tools.issue_license "Customer Name" --plan pro --days 365 \
         --key ~/.boostback_signing/license_private.pem

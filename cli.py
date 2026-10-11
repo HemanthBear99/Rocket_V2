@@ -247,7 +247,7 @@ def main():
     if args.quiet:
         logger.setLevel(logging.WARNING)
 
-    print(f"\n{'='*70}\nBOOSTBACK — FULL-MISSION SIMULATION RUN\n{'='*70}\n")
+    print(f"\n{'='*70}\nVYOM — FULL-MISSION SIMULATION RUN\n{'='*70}\n")
 
     exit_code = 0
     try:

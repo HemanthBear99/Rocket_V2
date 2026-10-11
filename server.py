@@ -118,7 +118,7 @@ async def lifespan(app: FastAPI):
     await asyncio.gather(cleanup_task, return_exceptions=True)
 
 
-app = FastAPI(title="Boostback API", lifespan=lifespan)
+app = FastAPI(title="Vyom API", lifespan=lifespan)
 
 _api_key_header = APIKeyHeader(name="X-RLV-API-Key", auto_error=False)
 _start_attempts: dict[str, deque[float]] = defaultdict(deque)

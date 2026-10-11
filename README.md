@@ -1,4 +1,4 @@
-# Boostback
+# Vyom
 
 A 6-DOF reusable launch vehicle mission simulator: stacked ascent, stage
 separation, orbit insertion, and RTLS booster recovery (boostback burn,

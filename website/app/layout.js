@@ -6,9 +6,9 @@ const sans = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], 
 const mono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-mono' });
 
 export const metadata = {
-  title: 'Boostback — launch and landing simulator',
+  title: 'Vyom — launch and landing simulator',
   description: 'Fly a reusable rocket to orbit and land its booster back on the pad. 6-DOF physics, G-FOLD landing guidance and Monte Carlo campaigns, checked against real Falcon 9 flights.',
-  openGraph: { title: 'Boostback', description: 'Launch it. Bring it back. A 6-DOF reusable rocket simulator.', type: 'website' },
+  openGraph: { title: 'Vyom', description: 'Launch it. Bring it back. A 6-DOF reusable rocket simulator.', type: 'website' },
 };
 
 export const viewport = { themeColor: '#04060D', width: 'device-width', initialScale: 1, viewportFit: 'cover' };

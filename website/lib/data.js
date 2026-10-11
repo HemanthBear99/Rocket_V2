@@ -1,4 +1,4 @@
-// Every number here comes from the Boostback simulator or from published
+// Every number here comes from the Vyom simulator or from published
 // Falcon 9 webcast telemetry (shahar603/Telemetry-Data, public domain).
 
 // Latest 100-run Monte Carlo campaign (seed 42): landing error (m, capped at
@@ -17,7 +17,7 @@ export const CURVES = {
   'NROL-76': [0.0,0.0,0.0,0.1,0.1,0.2,0.2,0.3,0.4,0.6,0.7,0.9,1.4,1.6,1.8,2.0,2.2,2.5,2.8,3.1,3.4,3.8,4.2,4.6,5.0,5.4,5.9,6.4,7.0,7.5,8.1,8.7,9.4,10.1,10.8,11.6,12.4,13.2,14.0,14.8,15.8,16.8,17.8,18.8,19.9,21.1,22.2,23.4,24.7,26.0,27.4,28.8,30.3,31.8,33.4,35.0,36.7,38.5,40.3,42.2,44.2,46.2,48.3,50.5,52.7,55.0,57.3,59.9,62.3,64.9,67.8],
   Zuma: [0.0,0.0,0.0,0.0,0.1,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.9,1.1,1.3,1.5,1.7,2.0,2.3,2.6,2.9,3.3,3.6,4.0,4.5,4.9,5.3,5.8,6.3,6.8,7.3,7.8,8.3,8.9,9.6,10.2,10.9,11.6,12.3,13.1,13.9,14.8,15.7,16.6,17.5,18.5,19.6,20.7,21.8,23.0,24.2,25.4,26.7,28.0,29.4,30.9,32.3,33.9,35.4,37.0,38.7,40.4,42.2,44.0,45.9,47.8,49.8,51.8,54.0,56.1,58.3,60.6],
   'Orbcomm OG2': [0.0,0.0,0.0,0.0,0.1,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.9,1.0,1.2,1.4,1.7,1.9,2.2,2.5,2.8,3.1,3.5,3.8,4.2,4.7,5.1,5.6,6.2,6.7,7.2,7.9,8.5,9.2,9.8,10.6,11.3,12.1,12.9,13.8,14.7,15.6,16.6,17.7,18.7,19.8,20.9,22.1,23.4,24.6,26.0,27.4,28.8,30.3,31.9,33.5,35.1,37.0,38.8,40.6,42.6,44.6,46.8,49.0,51.2,53.6,56.1,58.8,61.4,64.0,67.0,69.9,73.0],
-  Boostback: [0.0,0.0,0.0,0.0,0.1,0.2,0.2,0.4,0.5,0.6,0.8,1.0,1.2,1.4,1.7,2.0,2.3,2.6,3.0,3.4,3.8,4.2,4.7,5.2,5.8,6.4,7.0,7.6,8.2,8.9,9.5,10.2,10.9,11.6,12.4,13.1,13.9,14.6,15.4,16.3,17.2,18.1,19.1,20.2,21.3,22.4,23.7,24.9,26.3,27.6,29.1,30.6,32.2,33.8,35.5,37.3,39.1,41.0,43.0,45.1,47.2,49.4,51.8,54.1,56.6,59.2,61.9,64.6,67.1],
+  Vyom: [0.0,0.0,0.0,0.0,0.1,0.2,0.2,0.4,0.5,0.6,0.8,1.0,1.2,1.4,1.7,2.0,2.3,2.6,3.0,3.4,3.8,4.2,4.7,5.2,5.8,6.4,7.0,7.6,8.2,8.9,9.5,10.2,10.9,11.6,12.4,13.1,13.9,14.6,15.4,16.3,17.2,18.1,19.1,20.2,21.3,22.4,23.7,24.9,26.3,27.6,29.1,30.6,32.2,33.8,35.5,37.3,39.1,41.0,43.0,45.1,47.2,49.4,51.8,54.1,56.6,59.2,61.9,64.6,67.1],
 };
 
 export const FLIGHTS = [
@@ -44,7 +44,7 @@ export const SPECS = [
   { k: 'Landing guidance', title: 'G-FOLD on a switch', text: 'Flip between a classic suicide burn and lossless-convexification G-FOLD, the fuel-optimal method from the planetary-landing literature.' },
   { k: 'Monte Carlo', title: 'Hundreds of missions', text: 'Randomise thrust, Isp, mass, wind, density and pitch-over together. Get success rates with confidence intervals and a failure breakdown.' },
   { k: 'Physics', title: 'Six degrees of freedom', text: 'RK4 integration, EGM96 gravity, US-76 atmosphere, Mach-dependent aerodynamics, grid fins, landing legs, slosh and actuator limits.' },
-  { k: 'Your data', title: 'Bring tunnel or CFD results', text: 'Import drag, lift and moment tables as CSV. Boostback checks the grid, charts it against the built-in model and flies with it.' },
+  { k: 'Your data', title: 'Bring tunnel or CFD results', text: 'Import drag, lift and moment tables as CSV. Vyom checks the grid, charts it against the built-in model and flies with it.' },
   { k: 'Reports', title: 'Compare, then export', text: 'Every run is saved. Overlay two missions or two campaigns, see exactly which settings differ, and export the report as a PDF.' },
 ];
 
@@ -56,7 +56,7 @@ export const PLANS = [
 ];
 
 export const FAQS = [
-  { q: 'Can I use Boostback for flight-critical decisions?', a: 'No. It is an engineering and teaching tool for early design studies, guidance research and coursework. Its aerodynamics come from geometry and published literature, not from wind-tunnel tests of your vehicle. The validation section lists where it matches flight data and where it does not.' },
+  { q: 'Can I use Vyom for flight-critical decisions?', a: 'No. It is an engineering and teaching tool for early design studies, guidance research and coursework. Its aerodynamics come from geometry and published literature, not from wind-tunnel tests of your vehicle. The validation section lists where it matches flight data and where it does not.' },
   { q: 'Which vehicles can I model?', a: 'Two-stage vehicles with a reusable first stage returning to the launch site. You set engine count and thrust, masses, diameter and payload. Drone-ship landings, three-stage vehicles and solid motors are on the roadmap.' },
   { q: 'Does it need an internet connection?', a: 'No. Everything runs on your PC, and your scenarios and results stay in your own data folder. You only need the internet to download the installer.' },
   { q: 'How does the trial work?', a: 'Install it and you get 14 days with every feature. When you buy, you receive a licence key to paste into Settings. Your saved scenarios and runs carry over.' },

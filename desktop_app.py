@@ -61,7 +61,7 @@ def main() -> None:
     if not _wait_for_server(host, port):
         logger.error("Backend did not start in time on %s:%s", host, port)
         webview.create_window(
-            "Boostback - startup error",
+            "Vyom - startup error",
             html=(
                 "<body style='background:#05070b;color:#e6e6e6;font-family:sans-serif;padding:24px'>"
                 "<h2>The simulation backend failed to start.</h2>"
@@ -76,7 +76,7 @@ def main() -> None:
         return
 
     webview.create_window(
-        "Boostback",
+        "Vyom",
         url=f"http://{host}:{port}/",
         width=1440,
         height=900,
