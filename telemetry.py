@@ -67,20 +67,20 @@ def extract_telemetry_point(state: Any, guidance: dict, phase_name: str, config:
 
 
 def _primary_fuel(progress: MissionProgress, config: SimulationConfig) -> dict:
-    """Propellant of the primary vehicle: the stacked first stage before
-    separation, the second stage (orbiter) after it."""
+    """Usable propellant of the primary vehicle: the stacked first stage's
+    ascent propellant before separation, the second stage (orbiter) after it."""
     m = float(progress.primary_state.m)
     if progress.vehicle == "dual":
         label = "S2"
         empty = float(config.stage2_dry_mass) + float(config.payload_mass)
         capacity = float(config.stage2_prop_mass)
     else:
+        # Ascent propellant only: the recovery reserve is held back for the
+        # booster, so the meter reads 0% at MECO rather than ~16%.
         label = "S1"
-        empty = (
-            float(config.stage1_dry_mass) + float(config.stage2_dry_mass)
-            + float(config.stage2_prop_mass) + float(config.payload_mass)
-        )
-        capacity = float(config.stage1_prop_mass)
+        reserve = float(config.stage1_landing_fuel_reserve_kg)
+        empty = config.meco_mass_kg
+        capacity = float(config.stage1_prop_mass) - reserve
     kg = max(0.0, m - empty)
     return {
         "fuel_stage": label,

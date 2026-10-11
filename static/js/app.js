@@ -11,6 +11,7 @@
     advancedOverrides: null,
     demoMode: false,
     s2Recovery: false,
+    autoReserve: false,
     realtime: true,
     sim: { id: null, token: null, status: 'idle', startedAt: null, hasBooster: false },
     activeVehicleTab: 'primary',
@@ -220,6 +221,8 @@
 
     $('#toggle-demo').checked = false;
     $('#toggle-s2').checked = !!defaults.enable_s2_recovery;
+    state.autoReserve = !!defaults.auto_recovery_reserve;
+    $('#toggle-auto-reserve').checked = state.autoReserve;
   }
 
   async function loadDefaults() {
@@ -251,6 +254,7 @@
     }
   });
   $('#toggle-s2').addEventListener('change', (e) => { state.s2Recovery = e.target.checked; });
+  $('#toggle-auto-reserve').addEventListener('change', (e) => { state.autoReserve = e.target.checked; refreshPlan(); });
   $('#toggle-realtime').addEventListener('change', (e) => { state.realtime = e.target.checked; });
 
   function currentSetup() {
@@ -262,6 +266,7 @@
       realtime_mode: state.realtime,
       demo_mode: state.demoMode,
       enable_s2_recovery: state.s2Recovery,
+      auto_recovery_reserve: state.autoReserve,
       ...(state.advancedOverrides ? { advanced_overrides: state.advancedOverrides } : {}),
     };
   }
@@ -282,7 +287,7 @@
     'booster_landing_site_lat_deg', 'launch_site_lat_deg', 'booster_landing_site_lon_deg',
     'launch_site_lon_deg', 'enable_grid_fins', 'enable_landing_legs', 'enable_j2',
     'enable_atmosphere', 'enable_drag', 'enable_lift', 'enable_imu', 'enable_gps',
-    'enable_landing_altimeter', 'enable_s2_recovery', 'booster_landing_guidance',
+    'enable_landing_altimeter', 'enable_s2_recovery', 'booster_landing_guidance', 'auto_size_recovery_reserve',
     'stage1_engine_count', 'stage1_engine_thrust_n', 'boostback_engine_count',
     'entry_engine_count', 'landing_engine_count', 'vehicle_diameter_m',
   ]);
@@ -332,6 +337,7 @@
       recovery: setup.recovery,
       physics: setup.physics,
       enable_s2_recovery: setup.enable_s2_recovery,
+      auto_recovery_reserve: setup.auto_recovery_reserve,
     };
     state.advancedOverrides = setup.advanced_overrides || null;
     populateForms(merged);
@@ -391,6 +397,7 @@
         lift: cfg.enable_lift, sensor_noise: !!(cfg.enable_imu || cfg.enable_gps || cfg.enable_landing_altimeter),
       },
       enable_s2_recovery: !!cfg.enable_s2_recovery,
+      auto_recovery_reserve: !!cfg.auto_size_recovery_reserve,
     };
     const extra = {};
     for (const [key, value] of Object.entries(cfg)) {

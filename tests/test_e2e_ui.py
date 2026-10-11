@@ -14,6 +14,7 @@ browser binary is not available in the environment.
 """
 
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -117,21 +118,16 @@ def test_mission_launch_and_stop_via_ui(live_server):
 
             # --- At least one telemetry stat updates to a nonzero value -------
             def altitude_nonzero():
-                text = page.locator("#stat-altitude").inner_text()
-                digits = "".join(ch for ch in text if ch.isdigit() or ch == ".")
-                try:
-                    return float(digits) > 0
-                except ValueError:
-                    return False
+                text = page.locator("#viz-orbiter-readout").inner_text()
+                match = re.search(r"ALT\s+([0-9.]+)", text)
+                return bool(match) and float(match.group(1)) > 0
 
             page.wait_for_function(
-                """
+                r"""
                 () => {
-                    const el = document.querySelector('#stat-altitude');
-                    if (!el) return false;
-                    const digits = el.textContent.replace(/[^0-9.]/g, '');
-                    const v = parseFloat(digits);
-                    return !Number.isNaN(v) && v > 0;
+                    const el = document.querySelector('#viz-orbiter-readout');
+                    const m = el && el.textContent.match(/ALT\s+([0-9.]+)/);
+                    return !!m && parseFloat(m[1]) > 0;
                 }
                 """,
                 timeout=20000,

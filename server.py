@@ -522,6 +522,7 @@ async def frontend_config_defaults() -> dict[str, Any]:
         },
         "demo_mode": False,
         "enable_s2_recovery": bool(config.enable_s2_recovery),
+        "auto_recovery_reserve": bool(config.auto_size_recovery_reserve),
         "physics": {
             "j2": config.enable_j2,
             "atmosphere": config.enable_atmosphere,

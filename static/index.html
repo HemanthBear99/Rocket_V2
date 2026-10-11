@@ -82,6 +82,10 @@
               <div><div class="lbl">Stage-2 recovery <span class="badge bad" style="font-size:10px;vertical-align:middle;">EXPERIMENTAL</span></div><div class="desc">Usually fails: S2 is propellant-starved (hover for details)</div></div>
               <label class="switch"><input type="checkbox" id="toggle-s2"/><span class="track"><span class="thumb"></span></span></label>
             </div>
+            <div class="toggle-row" title="Hold back the stage-1 propellant the rocket equation says this booster needs for a return-to-launch-site landing, instead of the fixed reserve.">
+              <div><div class="lbl">Auto-size recovery fuel</div><div class="desc">Booster reserve sized from its dry mass</div></div>
+              <label class="switch"><input type="checkbox" id="toggle-auto-reserve"/><span class="track"><span class="thumb"></span></span></label>
+            </div>
             <div id="quick-gfold"></div>
           </div>
         </div>
@@ -363,6 +367,6 @@
 <script src="/static/js/vendor/three.min.js"></script>
 <script src="/static/js/charts.js?v=0.4.0"></script>
 <script src="/static/js/rocket_viz.js?v=0.3.2"></script>
-<script src="/static/js/app.js?v=0.6.0"></script>
+<script src="/static/js/app.js?v=0.6.1"></script>
 </body>
 </html>
