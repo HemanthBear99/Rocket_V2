@@ -147,7 +147,8 @@
       telemetry: ['Live Telemetry', 'Real-time vehicle state streamed from the running simulation.'],
       report: ['Mission Report', 'Final pass/fail assessment and key flight metrics.'],
       campaign: ['Monte Carlo Campaigns', 'Batch dispersion analysis across randomized flight parameters.'],
-      settings: ['Settings', 'Backend connection and application preferences.'],
+      compare: ['Compare Runs', 'Overlay two saved missions or Monte Carlo campaigns side by side.'],
+      settings: ['Settings', 'License, backend connection and aerodynamic data.'],
     };
     const [t, s] = titles[name];
     $('#topbar-title').textContent = t;
@@ -674,26 +675,42 @@
         return;
       }
       if (payload.event === 'completed' || payload.event === 'stopped') {
-        setStatus(payload.status === 'completed' ? 'completed' : 'idle', payload.status.toUpperCase());
-        // Previously the Pause/Resume/Stop control bar stayed visible and
-        // clickable after the mission actually ended (both on manual stop
-        // and natural completion) -- nothing here ever hid it. Clicking
-        // Pause/Stop again against a terminal-state simulation just got a
-        // 409 "not running" error, which looked indistinguishable from
-        // "Stop did nothing" since the buttons never changed.
-        disableSimControls();
-        if (payload.outcomes) {
-          buildReport(payload.outcomes);
-          if (rocketScene) rocketScene.onMissionComplete(payload.outcomes);
-          const oc = payload.outcomes;
-          $('#viz-orbiter-readout').insertAdjacentHTML('afterbegin', `<span class="banner ${oc.orbiter_success ? 'ok' : 'fail'}">${oc.orbiter_success ? 'ORBIT ACHIEVED' : 'ORBIT FAILED'}</span>`);
-          $('#viz-booster-readout').insertAdjacentHTML('afterbegin', `<span class="banner ${oc.booster_success ? 'ok' : 'fail'}">${oc.booster_success ? 'TOUCHDOWN CONFIRMED' : 'LANDING FAILED'}</span>`);
-        }
+        finishSimulation(payload.status, payload.outcomes);
         return;
       }
       updateTelemetryUi(payload);
     };
     ws.onerror = () => toast('Telemetry connection error', 'error');
+    // The stream can drop before the final message (network blip, throttled
+    // background window); recover the result from the status endpoint
+    // instead of showing RUNNING forever.
+    const thisWs = ws;
+    ws.onclose = () => { if (thisWs === ws && !state.sim.finished) pollSimulationResult(state.sim.id); };
+  }
+
+  async function pollSimulationResult(simId) {
+    for (let i = 0; i < 600 && state.sim.id === simId && !state.sim.finished; i += 1) {
+      try {
+        const r = await api(`/api/simulations/${simId}`, { headers: state.sim.token ? { 'X-Simulation-Token': state.sim.token } : {} });
+        if (r.status === 'error') { toast('Simulation error: ' + (r.error || 'unknown'), 'error'); setStatus('error', 'ERROR'); disableSimControls(); return; }
+        if (['completed', 'stopped', 'cancelled'].includes(r.status)) { finishSimulation(r.status, r.outcomes); return; }
+      } catch (e) { /* transient: retry */ }
+      await new Promise((res) => setTimeout(res, 2000));
+    }
+  }
+
+  function finishSimulation(status, outcomes) {
+    if (state.sim.finished) return;
+    state.sim.finished = true;
+    setStatus(status === 'completed' ? 'completed' : 'idle', String(status).toUpperCase());
+    // Hide Pause/Resume/Stop once the mission has ended: clicking them on a
+    // terminal-state simulation only produced a confusing 409.
+    disableSimControls();
+    if (!outcomes) return;
+    buildReport(outcomes);
+    if (rocketScene) rocketScene.onMissionComplete(outcomes);
+    $('#viz-orbiter-readout').insertAdjacentHTML('afterbegin', `<span class="banner ${outcomes.orbiter_success ? 'ok' : 'fail'}">${outcomes.orbiter_success ? 'ORBIT ACHIEVED' : 'ORBIT FAILED'}</span>`);
+    $('#viz-booster-readout').insertAdjacentHTML('afterbegin', `<span class="banner ${outcomes.booster_success ? 'ok' : 'fail'}">${outcomes.booster_success ? 'TOUCHDOWN CONFIRMED' : 'LANDING FAILED'}</span>`);
   }
 
   function disableSimControls() {
@@ -917,6 +934,7 @@
     $('#btn-export-report-json').addEventListener('click', () => {
       downloadBlob(`rlv_report_${state.sim.id || 'run'}.json`, JSON.stringify({ outcomes, final: last }, null, 2), 'application/json');
     });
+    saveRunRecord('mission', outcomes, last).catch(() => {});
     showView('report');
   }
 
@@ -969,7 +987,10 @@
           $('#camp-idle').style.display = 'block';
           $('#camp-idle').textContent = `Last campaign: ${r.status}`;
           if (r.error) toast('Campaign error: ' + r.error, 'error');
-          if (r.summary) renderCampaignResults(r.summary, r.results);
+          if (r.summary) {
+            renderCampaignResults(r.summary, r.results);
+            saveCampaignRecord(r.summary, r.results).catch(() => {});
+          }
         }
       } catch (e) {
         clearInterval(state.campaign.pollHandle);
@@ -1049,6 +1070,224 @@
       $('#backend-label').textContent = 'backend unreachable';
     }
   }
+
+  // ------------------------------------------------------------- scenarios
+  async function refreshScenarios(selectId) {
+    try {
+      const list = await api('/api/scenarios');
+      const sel = $('#scenario-select');
+      sel.innerHTML = list.length
+        ? list.map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('')
+        : '<option value="">— none saved —</option>';
+      if (selectId) sel.value = selectId;
+    } catch (e) { /* storage unavailable: keep the form usable */ }
+  }
+  $('#btn-scenario-save').addEventListener('click', async () => {
+    const name = $('#scenario-name').value.trim();
+    if (!name) { toast('Give the scenario a name first', 'error'); return; }
+    try {
+      const meta = await api('/api/scenarios', { method: 'POST', body: JSON.stringify({ name, setup: currentSetup() }) });
+      await refreshScenarios(meta.id);
+      toast(`Saved scenario "${meta.name}"`, 'success');
+    } catch (e) { toast('Save failed: ' + e.message, 'error'); }
+  });
+  $('#btn-scenario-load').addEventListener('click', async () => {
+    const id = $('#scenario-select').value;
+    if (!id) return;
+    try {
+      const rec = await api(`/api/scenarios/${encodeURIComponent(id)}`);
+      populateFromSetupShape(rec.setup);
+      $('#scenario-name').value = rec.name;
+      refreshPlan();
+      toast(`Loaded "${rec.name}"`, 'success');
+    } catch (e) { toast('Load failed: ' + e.message, 'error'); }
+  });
+  $('#btn-scenario-delete').addEventListener('click', async () => {
+    const sel = $('#scenario-select');
+    if (!sel.value) return;
+    const name = sel.selectedOptions[0].text;
+    if (!(await confirmModal('Delete scenario?', `"${name}" will be permanently removed.`))) return;
+    try {
+      await api(`/api/scenarios/${encodeURIComponent(sel.value)}`, { method: 'DELETE' });
+      await refreshScenarios();
+      toast(`Deleted "${name}"`, 'info');
+    } catch (e) { toast('Delete failed: ' + e.message, 'error'); }
+  });
+  refreshScenarios();
+
+  // ----------------------------------------------------------- run history
+  function downsample(arr, n = 600) {
+    const step = Math.max(1, Math.ceil(arr.length / n));
+    return arr.filter((_, i) => i % step === 0 || i === arr.length - 1);
+  }
+  function runLabel() {
+    const v = state.formValues.vehicle || {}, r = state.formValues.recovery || {};
+    const scen = $('#scenario-name').value.trim();
+    return `${scen ? scen + ' · ' : ''}${fmt((v.payload_mass || 0) / 1000, 1)} t · ${r.gfold_guidance ? 'G-FOLD' : 'heuristic'}`;
+  }
+  async function saveRunRecord(kind, outcomes, last) {
+    const pts = downsample(telemetryLog);
+    const col = (k) => pts.map((p) => (p[k] === undefined ? null : p[k]));
+    const a = outcomes.assessment || {};
+    const headline = {
+      success: !!(outcomes.orbiter_success && outcomes.booster_success),
+      orbit: !!outcomes.orbiter_success, landing: !!outcomes.booster_success,
+      apogee_km: a.orbit?.apogee_altitude_km, perigee_km: a.orbit?.perigee_altitude_km,
+      touchdown_mps: a.landing?.touchdown_speed_mps, site_error_m: a.landing?.site_error_m,
+      max_q_pa: a.max_ascent_q_pa, separation_s: a.separation_time_s, duration_s: a.mission_duration_s,
+      booster_fuel_pct: last.booster_fuel_remaining,
+    };
+    await api('/api/runs', { method: 'POST', body: JSON.stringify({
+      kind, name: runLabel(), headline,
+      payload: { setup: currentSetup(), outcomes,
+        series: { time: col('time'), altitude: col('altitude'), velocity: col('velocity'),
+          booster_altitude: col('booster_altitude'), booster_velocity: col('booster_velocity') } },
+    }) });
+  }
+  async function saveCampaignRecord(summary, results) {
+    const keep = ['mission_success', 'touchdown_speed_mps', 'site_error_m', 'failed_criteria'];
+    await api('/api/runs', { method: 'POST', body: JSON.stringify({
+      kind: 'campaign', name: `${runLabel()} · ${summary.runs} runs`,
+      headline: { runs: summary.runs, success_rate: summary.mission_success_rate,
+        ci: summary.mission_success_rate_95pct_ci, orbit_rate: summary.orbit_success_rate,
+        landing_rate: summary.landing_success_rate },
+      payload: { setup: currentSetup(), summary,
+        results: results.map((r) => Object.fromEntries(keep.map((k) => [k, r[k]]))) },
+    }) });
+  }
+
+  // ---------------------------------------------------------------- compare
+  async function refreshCompareLists() {
+    try {
+      const runs = await api(`/api/runs?kind=${$('#cmp-kind').value}`);
+      const opts = runs.length
+        ? runs.map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(new Date(r.saved_at).toLocaleString())} — ${escapeHtml(r.name)}</option>`).join('')
+        : '<option value="">— no saved runs yet —</option>';
+      $('#cmp-a').innerHTML = opts; $('#cmp-b').innerHTML = opts;
+      if (runs.length > 1) $('#cmp-b').selectedIndex = 1;
+    } catch (e) { toast('Could not load run history: ' + e.message, 'error'); }
+  }
+  $('#cmp-kind').addEventListener('change', refreshCompareLists);
+  $$('.nav-item[data-view=compare]').forEach((n) => n.addEventListener('click', refreshCompareLists));
+
+  function flatten(obj, prefix = '') {
+    return Object.entries(obj || {}).reduce((acc, [k, v]) => {
+      const key = prefix ? `${prefix}.${k}` : k;
+      if (v && typeof v === 'object' && !Array.isArray(v)) Object.assign(acc, flatten(v, key));
+      else acc[key] = v;
+      return acc;
+    }, {});
+  }
+  function setupDiffHtml(a, b) {
+    const fa = flatten(a), fb = flatten(b);
+    const keys = [...new Set([...Object.keys(fa), ...Object.keys(fb)])]
+      .filter((k) => JSON.stringify(fa[k]) !== JSON.stringify(fb[k])).sort();
+    const rows = keys.map((k) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(JSON.stringify(fa[k]) ?? '—')}</td><td>${escapeHtml(JSON.stringify(fb[k]) ?? '—')}</td></tr>`).join('');
+    return `<div class="card" style="margin-top:16px;"><div class="card-head"><div class="card-title">Setup Differences</div><div class="help-text">${keys.length} field(s) differ</div></div>
+      ${keys.length ? `<table class="data-table"><thead><tr><th>Field</th><th>A</th><th>B</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="help-text">Identical setups.</div>'}</div>`;
+  }
+  function metricTable(rows) {
+    return `<table class="data-table"><thead><tr><th>Metric</th><th><span class="cmp-dot a"></span>A</th><th><span class="cmp-dot b"></span>B</th><th>B − A</th></tr></thead><tbody>${
+      rows.map(([label, a, b, d = 1, unit = '']) => {
+        const num = typeof a === 'number' && typeof b === 'number';
+        const fa = typeof a === 'boolean' ? (a ? 'PASS' : 'FAIL') : fmt(a, d), fb = typeof b === 'boolean' ? (b ? 'PASS' : 'FAIL') : fmt(b, d);
+        return `<tr><td>${label}</td><td>${fa}${num ? unit : ''}</td><td>${fb}${num ? unit : ''}</td><td>${num ? (b - a >= 0 ? '+' : '') + fmt(b - a, d) + unit : ''}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  }
+  function seriesOf(rec, key, scale = 1) {
+    const s = rec.payload.series || {};
+    const xs = [], ys = [];
+    (s.time || []).forEach((t, i) => { const v = (s[key] || [])[i]; if (v !== null && v !== undefined) { xs.push(t); ys.push(v * scale); } });
+    return { xs, ys };
+  }
+
+  $('#btn-compare').addEventListener('click', async () => {
+    const ia = $('#cmp-a').value, ib = $('#cmp-b').value;
+    if (!ia || !ib) { toast('Save at least one run first', 'error'); return; }
+    try {
+      const [A, B] = await Promise.all([api(`/api/runs/${encodeURIComponent(ia)}`), api(`/api/runs/${encodeURIComponent(ib)}`)]);
+      const out = $('#cmp-results');
+      const ha = A.headline || {}, hb = B.headline || {};
+      if (A.kind === 'mission') {
+        const chart = (key, bkey, scale, title, ylabel) => ReportCharts.lineChart([
+          { ...seriesOf(A, key, scale), color: '#38e0ff', label: 'A stack/orbiter' },
+          { ...seriesOf(A, bkey, scale), color: '#7c8bff', label: 'A booster' },
+          { ...seriesOf(B, key, scale), color: '#ffb454', label: 'B stack/orbiter' },
+          { ...seriesOf(B, bkey, scale), color: '#ff5470', label: 'B booster' },
+        ], { title, xlabel: 'Mission time (s)', ylabel });
+        out.innerHTML = `
+          <div class="grid grid-2" style="margin-top:16px;">
+            <div class="card">${chart('altitude', 'booster_altitude', 1 / 1000, 'Altitude', 'km')}</div>
+            <div class="card">${chart('velocity', 'booster_velocity', 1, 'Speed', 'm/s')}</div>
+          </div>
+          <div class="card" style="margin-top:16px;"><div class="card-head"><div class="card-title">Key Metrics</div></div>${metricTable([
+            ['Mission', ha.success, hb.success], ['Orbit', ha.orbit, hb.orbit], ['Booster landing', ha.landing, hb.landing],
+            ['Apogee', ha.apogee_km, hb.apogee_km, 1, ' km'], ['Perigee', ha.perigee_km, hb.perigee_km, 1, ' km'],
+            ['Touchdown speed', ha.touchdown_mps, hb.touchdown_mps, 2, ' m/s'], ['Landing error', ha.site_error_m, hb.site_error_m, 1, ' m'],
+            ['Max ascent q', ha.max_q_pa, hb.max_q_pa, 0, ' Pa'], ['Stage separation', ha.separation_s, hb.separation_s, 1, ' s'],
+            ['Mission duration', ha.duration_s, hb.duration_s, 0, ' s'], ['Booster fuel left', ha.booster_fuel_pct, hb.booster_fuel_pct, 1, ' %'],
+          ])}</div>
+          ${setupDiffHtml(A.payload.setup, B.payload.setup)}`;
+      } else {
+        const col = (R, k) => (R.payload.results || []).map((r) => Number(r[k]));
+        const failures = (R) => R.payload.summary?.failure_criteria_counts || {};
+        const fk = [...new Set([...Object.keys(failures(A)), ...Object.keys(failures(B))])];
+        out.innerHTML = `
+          <div class="grid grid-2" style="margin-top:16px;">
+            <div class="card"><div class="card-title"><span class="cmp-dot a"></span>A</div><div class="camp-gauge">${ReportCharts.gauge(ha.success_rate || 0, ha.ci)}</div></div>
+            <div class="card"><div class="card-title"><span class="cmp-dot b"></span>B</div><div class="camp-gauge">${ReportCharts.gauge(hb.success_rate || 0, hb.ci)}</div></div>
+          </div>
+          <div class="card" style="margin-top:16px;"><div class="card-head"><div class="card-title">Key Metrics</div></div>${metricTable([
+            ['Runs', ha.runs, hb.runs, 0], ['Mission success', (ha.success_rate || 0) * 100, (hb.success_rate || 0) * 100, 1, ' %'],
+            ['Orbit success', (ha.orbit_rate || 0) * 100, (hb.orbit_rate || 0) * 100, 1, ' %'],
+            ['Landing success', (ha.landing_rate || 0) * 100, (hb.landing_rate || 0) * 100, 1, ' %'],
+            ...fk.map((k) => [`Failures: ${k.replace(/_/g, ' ')}`, failures(A)[k] || 0, failures(B)[k] || 0, 0]),
+          ])}</div>
+          <div class="grid grid-2" style="margin-top:16px;">
+            <div class="card">${ReportCharts.histogram(col(A, 'touchdown_speed_mps'), { title: 'A — touchdown speed', xlabel: 'm/s', limit: 6 })}</div>
+            <div class="card">${ReportCharts.histogram(col(B, 'touchdown_speed_mps'), { title: 'B — touchdown speed', xlabel: 'm/s', limit: 6 })}</div>
+          </div>
+          ${setupDiffHtml(A.payload.setup, B.payload.setup)}`;
+      }
+      $('#cmp-empty').style.display = 'none';
+      out.style.display = 'block';
+    } catch (e) { toast('Compare failed: ' + e.message, 'error'); }
+  });
+  $('#btn-run-delete').addEventListener('click', async () => {
+    const sel = $('#cmp-a');
+    if (!sel.value) return;
+    if (!(await confirmModal('Delete saved run?', `"${sel.selectedOptions[0].text}" will be permanently removed.`))) return;
+    try {
+      await api(`/api/runs/${encodeURIComponent(sel.value)}`, { method: 'DELETE' });
+      await refreshCompareLists();
+      toast('Run deleted', 'info');
+    } catch (e) { toast('Delete failed: ' + e.message, 'error'); }
+  });
+  $('#btn-compare-pdf').addEventListener('click', () => printView('compare'));
+
+  // ------------------------------------------------------- about & license
+  async function refreshAbout() {
+    try {
+      const a = await api('/api/about');
+      const l = a.license;
+      const badge = $('#lic-badge');
+      badge.className = `badge ${l.state === 'licensed' ? 'ok' : l.state === 'trial' ? 'info' : 'bad'}`;
+      badge.textContent = l.state === 'licensed' ? 'LICENSED' : l.state === 'trial' ? `TRIAL · ${l.trial_days_left} days left` : 'EVALUATION ENDED';
+      const cell = (k, v) => `<div class="metric-cell"><div class="k">${k}</div><div class="v" style="font-size:13px;word-break:break-all;">${escapeHtml(v)}</div></div>`;
+      $('#about-grid').innerHTML = cell('Version', `Boostback ${a.version}`)
+        + cell('License', l.state === 'licensed' ? `${l.licensee} · ${l.plan} · until ${l.expires}` : (l.problem || (l.enforced ? 'Evaluation' : 'Developer build (not enforced)')))
+        + cell('Data folder', a.data_dir);
+    } catch (e) { /* older backend */ }
+  }
+  $('#btn-lic-activate').addEventListener('click', async () => {
+    try {
+      await api('/api/license', { method: 'POST', body: JSON.stringify({ key: $('#lic-key').value }) });
+      $('#lic-key').value = '';
+      await refreshAbout();
+      toast('License activated', 'success');
+    } catch (e) { toast('Activation failed: ' + e.message, 'error'); }
+  });
+  refreshAbout();
 
   // ---------------------------------------------------------- aero data import
   function selectAeroDeck(path) {

@@ -41,6 +41,11 @@ def _free_port() -> int:
 def live_server():
     port = _free_port()
     base_url = f"http://127.0.0.1:{port}"
+    # Server output goes to a file: a PIPE nobody reads fills up and the
+    # server then blocks on its next log write, hanging the UI mid-test.
+    import tempfile
+
+    log = tempfile.TemporaryFile()  # noqa: SIM115 - closed in the fixture teardown
     proc = subprocess.Popen(
         [
             sys.executable,
@@ -53,7 +58,7 @@ def live_server():
             str(port),
         ],
         cwd=str(_REPO_ROOT),
-        stdout=subprocess.PIPE,
+        stdout=log,
         stderr=subprocess.STDOUT,
         env={
             **os.environ,
@@ -68,7 +73,8 @@ def live_server():
 
         while time.time() < deadline:
             if proc.poll() is not None:
-                out = proc.stdout.read().decode(errors="replace") if proc.stdout else ""
+                log.seek(0)
+                out = log.read().decode(errors="replace")
                 raise RuntimeError(f"server process exited early:\n{out}")
             try:
                 with urllib.request.urlopen(f"{base_url}/api/health", timeout=1) as resp:
@@ -88,6 +94,7 @@ def live_server():
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=10)
+        log.close()
 
 
 def test_mission_launch_and_stop_via_ui(live_server):

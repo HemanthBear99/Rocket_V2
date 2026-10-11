@@ -17,3 +17,10 @@ _REPO_PARENT = _REPO_ROOT.parent
 
 if str(_REPO_PARENT) not in sys.path:
     sys.path.insert(0, str(_REPO_PARENT))
+
+# Saved scenarios, run history, licenses and imported aero decks live in a
+# per-user data directory (app_paths); keep tests out of the real one.
+import os
+import tempfile
+
+os.environ.setdefault("RLV_DATA_DIR", tempfile.mkdtemp(prefix="rlv_test_data_"))

@@ -18,8 +18,8 @@ RecoveryAttitudeController = Literal["pd", "pid", "auto"]
 
 def _validate_aero_deck_path(deck_path: str) -> str | None:
     """Return an error message if deck_path is not an allowed aero deck.
-    Only .json files inside the package's own aero_decks directory are
-    accepted. The allowed root is resolved relative to this module so the
+    Only .json files inside the package's own aero_decks directory or the
+    user's imported-deck directory (app_paths.user_aero_dir) are accepted. The allowed root is resolved relative to this module so the
     check does not depend on the process working directory.
     """
     try:
@@ -30,16 +30,21 @@ def _validate_aero_deck_path(deck_path: str) -> str | None:
     if candidate.suffix.lower() != ".json":
         return f"aero_deck_path must point to a .json deck, got {deck_path!r}"
 
-    allowed_root = (Path(__file__).resolve().parent / "aero_decks").resolve()
+    from .app_paths import user_aero_dir
+
+    allowed_roots = (
+        (Path(__file__).resolve().parent / "aero_decks").resolve(),
+        user_aero_dir().resolve(),
+    )
     try:
         resolved = candidate.resolve()
     except OSError:
         return f"aero_deck_path could not be resolved: {deck_path!r}"
 
-    if resolved.parent != allowed_root:
+    if resolved.parent not in allowed_roots:
         return (
-            f"aero_deck_path must be a .json file directly inside {allowed_root}, "
-            f"got {deck_path!r}"
+            "aero_deck_path must be a .json file directly inside "
+            f"{' or '.join(str(r) for r in allowed_roots)}, got {deck_path!r}"
         )
     if not resolved.is_file():
         return f"aero_deck_path does not exist: {deck_path!r}"

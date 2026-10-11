@@ -459,6 +459,114 @@ async def aero_validation() -> dict[str, Any]:
 MAX_AERO_UPLOAD_BYTES = 2_000_000
 
 
+def _require_license() -> None:
+    from .licensing import require_license
+
+    try:
+        require_license()
+    except PermissionError as exc:
+        raise HTTPException(status_code=402, detail=str(exc)) from exc
+
+
+# ------------------------------------------------------------ about / license
+@app.get("/api/about", dependencies=[Depends(require_api_key)])
+async def about() -> dict[str, Any]:
+    from . import __version__
+    from .app_paths import data_dir
+    from .licensing import status
+
+    return {"version": __version__, "data_dir": str(data_dir()), "license": status()}
+
+
+@app.post("/api/license", dependencies=[Depends(require_api_key)])
+async def activate_license(body: dict[str, str]) -> dict[str, Any]:
+    from .licensing import activate
+
+    try:
+        return activate(str(body.get("key", "")))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+# ------------------------------------------------------- scenarios / run history
+def _storage_call(fn, *args):
+    try:
+        return fn(*args)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/scenarios", dependencies=[Depends(require_api_key)])
+async def scenarios_list() -> list[dict[str, Any]]:
+    from .storage import list_scenarios
+
+    return list_scenarios()
+
+
+@app.post("/api/scenarios", dependencies=[Depends(require_api_key)])
+async def scenarios_save(body: dict[str, Any]) -> dict[str, Any]:
+    from .storage import save_scenario
+
+    name, setup = str(body.get("name", "")).strip(), body.get("setup")
+    if not name or not isinstance(setup, dict):
+        raise HTTPException(status_code=422, detail="name and setup are required")
+    SimulationSetup.model_validate(setup)  # reject setups the launcher would refuse
+    return _storage_call(save_scenario, name, setup)
+
+
+@app.get("/api/scenarios/{item_id}", dependencies=[Depends(require_api_key)])
+async def scenarios_get(item_id: str) -> dict[str, Any]:
+    from .storage import get_scenario
+
+    return _storage_call(get_scenario, item_id)
+
+
+@app.delete("/api/scenarios/{item_id}", dependencies=[Depends(require_api_key)])
+async def scenarios_delete(item_id: str) -> dict[str, bool]:
+    from .storage import delete_scenario
+
+    _storage_call(delete_scenario, item_id)
+    return {"deleted": True}
+
+
+@app.get("/api/runs", dependencies=[Depends(require_api_key)])
+async def runs_list(kind: str | None = None) -> list[dict[str, Any]]:
+    from .storage import list_runs
+
+    return list_runs(kind)
+
+
+@app.post("/api/runs", dependencies=[Depends(require_api_key)])
+async def runs_save(body: dict[str, Any]) -> dict[str, Any]:
+    from .storage import save_run
+
+    raw = json.dumps(body)
+    if len(raw) > MAX_RUN_RECORD_BYTES:
+        raise HTTPException(status_code=413, detail="Run record is too large")
+    return _storage_call(save_run, str(body.get("kind", "")), str(body.get("name", "")),
+                         body.get("payload") or {}, body.get("headline") or {})
+
+
+@app.get("/api/runs/{item_id}", dependencies=[Depends(require_api_key)])
+async def runs_get(item_id: str) -> dict[str, Any]:
+    from .storage import get_run
+
+    return _storage_call(get_run, item_id)
+
+
+@app.delete("/api/runs/{item_id}", dependencies=[Depends(require_api_key)])
+async def runs_delete(item_id: str) -> dict[str, bool]:
+    from .storage import delete_run
+
+    _storage_call(delete_run, item_id)
+    return {"deleted": True}
+
+
+MAX_RUN_RECORD_BYTES = 5_000_000
+
+
 @app.post("/api/aero/import", dependencies=[Depends(require_api_key)])
 async def aero_import(file: UploadFile = File(...), name: str | None = None) -> dict[str, Any]:  # noqa: B008 - FastAPI idiom
     """Import wind-tunnel / CFD aero data (CSV or deck JSON) as an aero deck."""
@@ -692,6 +800,7 @@ async def plan_mission_endpoint(setup: SimulationSetup) -> dict[str, Any]:
 
 @app.post("/api/simulations/start", dependencies=[Depends(require_api_key)])
 async def start_sim(setup: SimulationSetup):
+    _require_license()
     _prune_finished_simulations()
 
     active_runs = sum(
@@ -1001,6 +1110,7 @@ def _run_campaign_task(campaign_id: str, meta: dict) -> None:
 
 @app.post("/api/campaigns/start", dependencies=[Depends(require_api_key)])
 async def start_campaign(request: CampaignRequest):
+    _require_license()
     active_runs = sum(
         1 for meta in active_campaigns.values() if meta.get("status") == "running"
     )

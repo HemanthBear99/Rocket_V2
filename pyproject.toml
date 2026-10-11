@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rlv_sim"
-version = "0.2.0"
+version = "0.3.0"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.21",
@@ -13,6 +13,7 @@ dependencies = [
     "uvicorn[standard]>=0.20",
     "pydantic>=2.0",
     "python-multipart>=0.0.9",
+    "cryptography>=42",
 ]
 
 [tool.setuptools.packages.find]

@@ -41,4 +41,4 @@ def test_imported_deck_is_saved_compared_and_flies(tmp_path, monkeypatch):
         result = run_full_mission(config=cfg, verbose=False)
         assert result.ascent_log.get_series("altitude")[-1] > 0.5
     finally:
-        aero_import.DECK_DIR.joinpath("user_pytest_deck.json").unlink(missing_ok=True)
+        aero_import.user_aero_dir().joinpath("user_pytest_deck.json").unlink(missing_ok=True)

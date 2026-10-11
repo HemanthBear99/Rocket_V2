@@ -505,9 +505,21 @@ table.data-table tr:hover td{background:#0e1626;color:var(--text-hi);}
   .sidebar,.topbar,.no-print,.launch-bar,.toast-stack{display:none !important;}
   .main{margin:0 !important;padding:0 !important;}
   .view{display:none !important;animation:none !important;}
-  body[data-print="report"] #view-report,body[data-print="campaign"] #view-campaign{display:block !important;}
+  body[data-print="report"] #view-report,body[data-print="campaign"] #view-campaign,body[data-print="compare"] #view-compare{display:block !important;}
+  body[data-print="compare"] #view-compare > .card:first-child{display:none !important;}
   body[data-print="campaign"] #view-campaign > .grid:first-child{display:none !important;}
   .card{background:#fff !important;box-shadow:none !important;border:1px solid #c9d1dc !important;break-inside:avoid;}
   .data-table{font-size:10px;}
   [style*="max-height"]{max-height:none !important;overflow:visible !important;}
 }
+
+/* ---- scenarios / compare ---- */
+.scenario-box{margin-top:14px;padding-top:12px;border-top:1px solid var(--border-soft);}
+.scenario-box .btn-row{display:flex;gap:8px;margin-top:8px;}
+.scenario-box input,.scenario-box select{flex:1;min-width:0;}
+.lbl-sm{font-size:11px;color:var(--text-lo);text-transform:uppercase;letter-spacing:.06em;}
+.cmp-pickers{display:grid;grid-template-columns:1fr 2fr 2fr;gap:12px;}
+.cmp-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+.cmp-dot.a{background:#38e0ff;}
+.cmp-dot.b{background:#ffb454;}
+@media (max-width:760px){.cmp-pickers{grid-template-columns:1fr;}}

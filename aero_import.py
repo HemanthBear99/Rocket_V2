@@ -6,8 +6,8 @@ CSV table with one row per grid point:
     mach,alpha_deg,CD[,CL][,CM]
 
 The rows must cover every (mach, alpha) combination. Beta and fin deflection
-are not varied (single 0 deg point). The deck is validated, saved inside the
-package's aero_decks/ directory (the only place aero_deck_path may point),
+are not varied (single 0 deg point). The deck is validated, saved in the user
+data directory's aero_decks/ (see app_paths),
 and compared against the built-in Cd(Mach) model.
 """
 
@@ -27,8 +27,9 @@ import numpy as np
 from . import constants as C
 from .aero_database import AeroDatabase
 from .aero_validation import run_deck_interpolation_checks
+from .app_paths import user_aero_dir
 
-DECK_DIR = Path(__file__).resolve().parent / "aero_decks"
+DECK_DIR = Path(__file__).resolve().parent / "aero_decks"  # bundled decks (read-only)
 USER_PREFIX = "user_"
 COEFFICIENTS = ("CD", "CL", "CM")
 MAX_GRID_POINTS = 20000
@@ -121,8 +122,7 @@ def import_deck(raw: bytes, filename: str, name: str | None = None) -> dict[str,
     errors = validate_deck(deck)
     if errors:
         raise ValueError("; ".join(errors))
-    DECK_DIR.mkdir(exist_ok=True)
-    path = DECK_DIR / f"{USER_PREFIX}{_slug(name or Path(filename).stem)}.json"
+    path = user_aero_dir() / f"{USER_PREFIX}{_slug(name or Path(filename).stem)}.json"
     path.write_text(json.dumps(deck), encoding="utf-8")
     db = AeroDatabase(str(path))
     checks = [c.__dict__ for c in run_deck_interpolation_checks(db)]
@@ -151,7 +151,6 @@ def compare_to_model(db: AeroDatabase, machs: list[float]) -> list[dict[str, flo
 
 
 def list_decks() -> list[dict[str, str]]:
-    if not DECK_DIR.exists():
-        return []
-    return [{"name": p.stem, "aero_deck_path": str(p), "user": p.stem.startswith(USER_PREFIX)}
-            for p in sorted(DECK_DIR.glob("*.json"))]
+    bundled = sorted(DECK_DIR.glob("*.json")) if DECK_DIR.exists() else []
+    user = sorted(user_aero_dir().glob("*.json"))
+    return [{"name": p.stem, "aero_deck_path": str(p), "user": p in user} for p in bundled + user]
