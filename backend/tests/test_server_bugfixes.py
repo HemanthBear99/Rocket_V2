@@ -148,3 +148,23 @@ class TestCampaignWorkersWired:
         assert len(meta["results"]) == meta["total"]
         result_ids = {row["case_id"] for row in meta["results"]}
         assert "baseline" in result_ids
+
+
+class TestConcurrentRunCap:
+    def test_stopping_runs_count_toward_cap(self, monkeypatch):
+        """A run that was asked to stop still holds its executor thread until
+        the physics loop exits, so it must still count toward the 5-run cap."""
+        import asyncio
+
+        from fastapi import HTTPException
+
+        from rlv_sim.server import app as server_app
+
+        fake = {f"sim_{i}": {"status": "stopping"} for i in range(5)}
+        monkeypatch.setattr(server_app, "active_simulations", fake)
+        monkeypatch.setattr(server_app, "_require_license", lambda: None)
+        monkeypatch.setattr(server_app, "_prune_finished_simulations", lambda *a, **k: None)
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(server_app.start_sim(None))
+        assert exc.value.status_code == 429

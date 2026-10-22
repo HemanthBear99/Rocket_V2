@@ -8,7 +8,6 @@ from rlv_sim.core import constants as C
 from rlv_sim.core.frames import quaternion_to_rotation_matrix
 from rlv_sim.core.state import State
 from rlv_sim.core.utils import cross3, vec_norm
-from rlv_sim.guidance.recovery import estimate_suicide_burn
 
 
 def compute_radial_velocity(state: State) -> float:
@@ -17,14 +16,6 @@ def compute_radial_velocity(state: State) -> float:
     if r_norm > 1.0:
         return float(np.dot(state.r, state.v) / r_norm)
     return 0.0
-
-
-def compute_horizontal_velocity(state: State) -> float:
-    """Compute horizontal speed perpendicular to the local radial direction."""
-    r_hat = state.r / max(vec_norm(state.r), 1.0)
-    v_radial = np.dot(state.v, r_hat) * r_hat
-    v_horiz = state.v - v_radial
-    return float(vec_norm(v_horiz))
 
 
 def check_attitude_aligned(
@@ -42,27 +33,6 @@ def check_attitude_aligned(
     cos_angle = np.clip(np.dot(body_z_inertial, target_hat), -1.0, 1.0)
     angle_deg = np.degrees(np.arccos(cos_angle))
     return angle_deg < threshold_deg
-
-
-def compute_downrange_distance(state: State, launch_site: np.ndarray) -> float:
-    """Compute great-circle distance from the launch site."""
-    r_hat = state.r / max(vec_norm(state.r), 1.0)
-    r0_hat = launch_site / max(vec_norm(launch_site), 1.0)
-    cos_angle = np.clip(np.dot(r_hat, r0_hat), -1.0, 1.0)
-    return float(C.R_EARTH * np.arccos(cos_angle))
-
-
-def compute_suicide_burn_altitude(state: State, safety_factor: float,
-                                  thrust_n: float = C.LANDING_THRUST) -> float:
-    """Compute the shared recovery-based suicide burn ignition altitude."""
-    burn = estimate_suicide_burn(
-        state.r,
-        state.v,
-        state.m,
-        thrust_n,
-        safety_factor=safety_factor,
-    )
-    return float(burn["burn_altitude"])
 
 
 def compute_orbit_metrics(state: State) -> dict:

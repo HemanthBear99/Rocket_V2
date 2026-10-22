@@ -30,59 +30,6 @@ def quaternion_normalize(q: np.ndarray) -> np.ndarray:
     return q / norm
 
 
-def quaternion_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
-    """
-    Multiply two quaternions: q1 * q2
-
-    Args:
-        q1: First quaternion [w, x, y, z]
-        q2: Second quaternion [w, x, y, z]
-
-    Returns:
-        Product quaternion [w, x, y, z]
-    """
-    w1, x1, y1, z1 = q1
-    w2, x2, y2, z2 = q2
-
-    return np.array([
-        w1*w2 - x1*x2 - y1*y2 - z1*z2,
-        w1*x2 + x1*w2 + y1*z2 - z1*y2,
-        w1*y2 - x1*z2 + y1*w2 + z1*x2,
-        w1*z2 + x1*y2 - y1*x2 + z1*w2
-    ])
-
-
-def quaternion_conjugate(q: np.ndarray) -> np.ndarray:
-    """
-    Compute the conjugate of a quaternion.
-
-    Args:
-        q: Quaternion [w, x, y, z]
-
-    Returns:
-        Conjugate quaternion [w, -x, -y, -z]
-    """
-    return np.array([q[0], -q[1], -q[2], -q[3]])
-
-
-def quaternion_inverse(q: np.ndarray) -> np.ndarray:
-    """
-    Compute the inverse of a quaternion.
-    For unit quaternions, inverse equals conjugate.
-
-    Args:
-        q: Quaternion [w, x, y, z]
-
-    Returns:
-        Inverse quaternion
-    """
-    conj = quaternion_conjugate(q)
-    norm_sq = np.dot(q, q)
-    if norm_sq < C.ZERO_TOLERANCE:
-        return np.array([1.0, 0.0, 0.0, 0.0])
-    return conj / norm_sq
-
-
 def quaternion_to_rotation_matrix(q: np.ndarray) -> np.ndarray:
     """
     Convert a quaternion to a rotation matrix R(q).

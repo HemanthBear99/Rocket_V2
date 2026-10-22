@@ -803,9 +803,11 @@ async def start_sim(setup: SimulationSetup):
     _require_license()
     _prune_finished_simulations()
 
+    # "stopping" runs still occupy an executor thread until the physics loop
+    # observes the stop signal, so they count toward the cap too.
     active_runs = sum(
         1 for meta in active_simulations.values()
-        if meta.get("status") in ("running", "paused")
+        if meta.get("status") in ("running", "paused", "stopping")
     )
     if active_runs >= 5:
         raise HTTPException(
