@@ -43,6 +43,12 @@ def size_recovery_reserve(config: SimulationConfig) -> float:
     return end * math.exp(dv / isp) - float(config.stage1_dry_mass)
 
 
+def wind_reserve_adjustment_kg(config: SimulationConfig, wind_offset_mps: float | None = None) -> float:
+    """Extra stage-1 reserve for a forecast headwind (negative wind offset)."""
+    wind = float(config.runtime_wind_offset_mps if wind_offset_mps is None else wind_offset_mps)
+    return float(config.recovery_reserve_wind_sensitivity_kg_per_mps) * max(-wind, 0.0)
+
+
 def _status(value: float, required: float, warn_band: float) -> str:
     if value < required:
         return "fail"

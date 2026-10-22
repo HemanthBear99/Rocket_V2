@@ -6,6 +6,8 @@ to eliminate code duplication (DRY principle).
 """
 
 import math
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 import numpy as np
 
@@ -37,6 +39,31 @@ _WIND_COS_AZ = np.cos(C.WIND_DIRECTION_AZIMUTH)
 _WIND_SIN_AZ = np.sin(C.WIND_DIRECTION_AZIMUTH)
 
 
+# Per-run altitude-correlated wind perturbation: a sum of sinusoidal modes
+# (amplitude m/s, wavelength m, phase rad) over altitude, added to the
+# power-law mean wind. Held in a ContextVar so concurrent server runs in
+# different threads each see their own profile.
+_WIND_PROFILE_MODES: ContextVar[tuple] = ContextVar("rlv_wind_profile_modes", default=())
+
+
+@contextmanager
+def wind_profile_context(modes):
+    """Activate a wind-profile perturbation for the duration of one run."""
+    token = _WIND_PROFILE_MODES.set(tuple(tuple(float(x) for x in mode) for mode in (modes or ())))
+    try:
+        yield
+    finally:
+        _WIND_PROFILE_MODES.reset(token)
+
+
+def wind_profile_perturbation(alt: float) -> float:
+    """Altitude-dependent wind-speed perturbation (m/s) for the active run."""
+    modes = _WIND_PROFILE_MODES.get()
+    if not modes:
+        return 0.0
+    return sum(a * math.sin(2.0 * math.pi * alt / lam + phi) for a, lam, phi in modes)
+
+
 def _wind_vector(r: np.ndarray, wind_offset_mps: float = 0.0) -> np.ndarray:
     """Simple altitude-dependent wind in inertial frame (East/West)."""
     r_norm = vec_norm(r)
@@ -46,6 +73,7 @@ def _wind_vector(r: np.ndarray, wind_offset_mps: float = 0.0) -> np.ndarray:
 
     speed = C.WIND_REF_SPEED * (alt / C.WIND_REF_ALT) ** C.WIND_EXPONENT
     speed += float(wind_offset_mps)
+    speed += wind_profile_perturbation(alt)
     if alt < 5000.0:
 
         x = alt / 5000.0

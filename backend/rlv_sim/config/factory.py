@@ -41,6 +41,15 @@ def _with_overrides(config: SimulationConfig, **overrides: Any) -> SimulationCon
 
         config = SimulationConfig(**{**config.__dict__,
                                      "stage1_landing_fuel_reserve_kg": size_recovery_reserve(config)})
+    if config.recovery_reserve_wind_sensitivity_kg_per_mps > 0.0:
+        from rlv_sim.mission.planner import wind_reserve_adjustment_kg
+
+        config = SimulationConfig(**{
+            **config.__dict__,
+            "stage1_landing_fuel_reserve_kg": (
+                config.stage1_landing_fuel_reserve_kg + wind_reserve_adjustment_kg(config)
+            ),
+        })
     config.validate()
     return config
 
@@ -49,6 +58,8 @@ def create_default_config(**overrides: Any) -> SimulationConfig:
     """Create a default research-profile configuration."""
     return _with_overrides(SimulationConfig(
         stage1_landing_fuel_reserve_kg=67500.0,
+        # Seed-42 MC (100 runs): 93% -> 95%, removing headwind fuel starvation.
+        recovery_reserve_wind_sensitivity_kg_per_mps=383.0,
         booster_entry_budget_kg=12500.0,
         booster_entry_burn_min_altitude_m=5000.0,
         booster_landing_reserve_kg=5000.0,

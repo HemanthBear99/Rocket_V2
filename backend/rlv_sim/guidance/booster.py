@@ -824,8 +824,16 @@ def _gfold_command(ctx: _BoosterContext, gs: GuidanceState, t_go: float,
 
 def _lateral_divert(v_horiz_site, t_stop, h, t_go, a_divert_zev, a_divert_zem_zev,
                     a_horiz_budget, *, tau_min, terminal_horizontal_capture,
-                    terminal_inside_pad_capture, pad_reachable):
-    """Horizontal divert acceleration for the landing burn, budget-limited."""
+                    terminal_inside_pad_capture, pad_reachable,
+                    r_err_horiz=None, position_hold_tau_min_s=0.0):
+    """Horizontal divert acceleration for the landing burn, budget-limited.
+
+    With ``position_hold_tau_min_s`` > 0 the final approach keeps correcting
+    position with a critically damped law a = r/tau^2 - 2v/tau, where tau never
+    drops below the floor. Velocity nulling alone (the default) freezes any
+    position error left at ~150 m, which caused 50-70 m pad misses with
+    propellant to spare; the floor avoids the 1/t_go^2 blow-up of ZEM/ZEV.
+    """
     if terminal_horizontal_capture:
         a_divert = -v_horiz_site / max(t_stop, tau_min, 1e-6)
     elif terminal_inside_pad_capture:
@@ -835,7 +843,11 @@ def _lateral_divert(v_horiz_site, t_stop, h, t_go, a_divert_zev, a_divert_zem_ze
         # term grows as 1/t_go^2 and, with the thrust pinned at the tilt
         # limit, kept accelerating toward an off-pad target instead of
         # braking (tailwind cases touched down at ~30 m/s sideways).
-        a_divert = a_divert_zev
+        if position_hold_tau_min_s > 0.0 and r_err_horiz is not None:
+            tau = max(0.5 * t_go, position_hold_tau_min_s)
+            a_divert = r_err_horiz / tau ** 2 - 2.0 * v_horiz_site / tau
+        else:
+            a_divert = a_divert_zev
     else:
         a_divert = a_divert_zem_zev if pad_reachable else a_divert_zev
 
@@ -1029,6 +1041,8 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         terminal_horizontal_capture=terminal_horizontal_capture,
         terminal_inside_pad_capture=terminal_inside_pad_capture,
         pad_reachable=pad_reachable,
+        r_err_horiz=r_err_horiz,
+        position_hold_tau_min_s=float(cfg.booster_terminal_position_hold_tau_s),
     )
 
     if v_descent < 1.0 and v_horiz_mag < 1.0:
@@ -1128,7 +1142,7 @@ def compute_booster_guidance(
     landing_margin = cfg.booster_landing_propellant_margin_kg
     target_downrange_km = cfg.booster_landing_target_downrange_km
     burn_prediction = estimate_suicide_burn(
-        r, v, m, cfg.landing_thrust_n,
+        r, v, m, cfg.landing_planning_thrust_n,
         safety_factor=cfg.booster_landing_ignition_safety_factor,
     )
     ctx = _BoosterContext(

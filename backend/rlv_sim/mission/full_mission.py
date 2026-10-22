@@ -15,7 +15,7 @@ from rlv_sim.config.definition import SimulationConfig
 from rlv_sim.config.factory import create_default_config
 from rlv_sim.core import constants as C
 from rlv_sim.core.state import State
-from rlv_sim.core.utils import surface_relative_speed
+from rlv_sim.core.utils import surface_relative_speed, wind_profile_context
 from rlv_sim.guidance import gfold as _gfold
 from rlv_sim.guidance.abort import AbortMonitor
 from rlv_sim.guidance.common import compute_local_vertical, create_guidance_state
@@ -510,6 +510,35 @@ def _run_dual_vehicles(rt: _MissionRuntime, ascent: _AscentOutcome):
 
 
 def run_full_mission(dt: float | None = None, max_time: float | None = None,
+                     verbose: bool = True,
+                     config: SimulationConfig = None,
+                     *,
+                     progress_callback: ProgressCallback | None = None,
+                     control_callback: ControlCallback | None = None,
+                     realtime_factor: float | None = None) -> FullMissionResult:
+    """
+    Run a full integrated mission: S1 ascent → separation → dual tracking.
+
+    After stage separation the simulation forks into two vehicles
+    (orbiter and booster) running in lockstep on the same clock.
+    Each vehicle has its own GuidanceState, MissionManager and telemetry log.
+    The config's wind-profile perturbation is active for the whole run.
+
+    Returns:
+        FullMissionResult with telemetry for ascent, orbiter and booster.
+    """
+    if config is None:
+        config = create_default_config()
+    with wind_profile_context(config.runtime_wind_profile_modes):
+        return _run_full_mission_body(
+            dt, max_time, verbose, config,
+            progress_callback=progress_callback,
+            control_callback=control_callback,
+            realtime_factor=realtime_factor,
+        )
+
+
+def _run_full_mission_body(dt: float | None = None, max_time: float | None = None,
                      verbose: bool = True,
                      config: SimulationConfig = None,
                      *,

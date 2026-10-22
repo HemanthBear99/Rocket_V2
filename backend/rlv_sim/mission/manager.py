@@ -151,7 +151,7 @@ class MissionManager:
             state.r,
             state.v,
             state.m,
-            self.config.landing_thrust_n,
+            self.config.landing_planning_thrust_n,
             safety_factor=self.config.booster_landing_ignition_safety_factor,
         )
         h_ignite = float(burn['burn_altitude'])
@@ -532,7 +532,7 @@ class MissionManager:
             state.r,
             state.v,
             state.m,
-            self.config.landing_thrust_n,
+            self.config.landing_planning_thrust_n,
             safety_factor=self.config.booster_landing_ignition_safety_factor,
         )
         h_ignite = float(burn['burn_altitude'])

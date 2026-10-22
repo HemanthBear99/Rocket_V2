@@ -120,6 +120,52 @@ def compute_angular_acceleration(omega: np.ndarray, torque: np.ndarray,
     return I_inv @ total_torque
 
 
+def _active_engine_count(ctx: DynamicsContext) -> int:
+    """Engines firing in the current burn (centre engine is always one of them)."""
+    cfg = ctx.config
+    if ctx.vehicle_model == "orbiter" or ctx.stage == 2:
+        return 1
+    if ctx.vehicle_model == "booster":
+        mode = (ctx.booster_aero_mode or "").upper()
+        if mode == "BOOSTBACK":
+            return int(cfg.boostback_engine_count if cfg is not None else C.BOOSTBACK_ENGINE_COUNT)
+        if mode == "ENTRY":
+            return int(cfg.entry_engine_count if cfg is not None else C.ENTRY_ENGINE_COUNT)
+        if mode == "LANDING":
+            return int(cfg.landing_engine_count if cfg is not None else C.LANDING_ENGINE_COUNT)
+    return int(cfg.stage1_engine_count if cfg is not None else C.STAGE1_ENGINE_COUNT)
+
+
+def compute_jet_damping_torque(m_dot: float, cg_pos_z: float, omega: np.ndarray,
+                               ctx: DynamicsContext) -> np.ndarray:
+    """Per-axis jet damping torque J*omega (subtracted in the Euler equation).
+
+    The exhaust leaving each nozzle exit p_i (about the CG) carries angular
+    momentum mdot_i [(p_i.p_i)E - p_i p_i^T] omega, plus the exit disk's own
+    spread. For a symmetric cluster the off-diagonal terms cancel, leaving
+      pitch/yaw: mdot (l^2 + f R^2/2 + r_e^2/4),   l = CG height above exit
+      roll:      mdot (f R^2 + r_e^2/2),
+    where f is the fraction of flow from ring engines at radius R. Roll
+    damping therefore depends on the engines' radial offsets, not on l; using
+    l^2 for roll overstated it ~100-750x (docs/reports, jet damping section).
+    Pairs with the explicit -Idot*omega term; do not also use mdot(l^2-k^2).
+    """
+    flow = -float(m_dot)
+    if flow <= 0.0:
+        return np.zeros(3)
+    if ctx.vehicle_model == "orbiter" or ctx.stage == 2:
+        ring_fraction, ring_radius, exit_radius = 0.0, 0.0, C.STAGE2_NOZZLE_EXIT_RADIUS_M
+    else:
+        n = max(_active_engine_count(ctx), 1)
+        ring_fraction = (n - 1) / n
+        ring_radius = C.STAGE1_ENGINE_RING_RADIUS_M
+        exit_radius = C.STAGE1_NOZZLE_EXIT_RADIUS_M
+    ring_sq = ring_fraction * ring_radius ** 2
+    c_transverse = flow * (cg_pos_z ** 2 + 0.5 * ring_sq + 0.25 * exit_radius ** 2)
+    c_roll = flow * (ring_sq + 0.5 * exit_radius ** 2)
+    return np.array([c_transverse * omega[0], c_transverse * omega[1], c_roll * omega[2]])
+
+
 def compute_linear_acceleration(r: np.ndarray, v: np.ndarray, q: np.ndarray,
                                 m: float,
                                 ctx: DynamicsContext,
@@ -262,17 +308,7 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         stage1_landing_reserve_kg=_stage1_reserve,
     )
 
-    # Jet damping Coriolis torque model: tau_damping = mdot * (r_exit^2) * omega
-    # Modeled dynamically. Since engine exhausts at base (z_exit = 0), the exit lever arm relative to the CG is cp_effective.
-    # We can approximate this as cp_effective^2 * mdot * omega.
-    # More generally, jet damping torque = m_dot * r_exit_CG^2 * omega, where exit_CG is CG position.
-    # Exit station is at 0 (base). CG position is cg_pos_z.
-    # Therefore, distance from CG to exit is cg_pos_z.
-    # Let's compute exit_dist = cg_pos_z.
-    # Jet damping Coriolis term (with mdot being negative) acts to damp rotational motion.
-    # tau_damping = -mdot * cg_pos_z^2 * omega. (Note: since mdot is negative, -mdot is positive, providing damping).
-    # Specifically: tau_damping = -m_dot * (cg_pos_z**2) * omega
-    jet_damping_torque = -m_dot * (cg_pos_z ** 2) * omega
+    jet_damping_torque = compute_jet_damping_torque(m_dot, cg_pos_z, omega, ctx)
 
     omega_dot = compute_angular_acceleration(omega, torque + tau_aero, I_tensor, I_inv, I_dot, jet_damping_torque)
     r_dot = v

@@ -60,6 +60,13 @@ BOOSTBACK_THRUST = BOOSTBACK_ENGINE_COUNT * STAGE1_ENGINE_THRUST
 ENTRY_THRUST = ENTRY_ENGINE_COUNT * STAGE1_ENGINE_THRUST
 LANDING_THRUST = LANDING_ENGINE_COUNT * STAGE1_ENGINE_THRUST
 
+# Nozzle-exit geometry for per-axis jet damping (physics.dynamics). Values are
+# engineering estimates for a 9-engine octaweb, not sourced flight data:
+# the centre engine sits on the axis, the other eight on a ring.
+STAGE1_ENGINE_RING_RADIUS_M = 1.5
+STAGE1_NOZZLE_EXIT_RADIUS_M = 0.46
+STAGE2_NOZZLE_EXIT_RADIUS_M = 1.65
+
 
 MASS_FLOW_RATE = THRUST_MAGNITUDE / (ISP * G0)
 

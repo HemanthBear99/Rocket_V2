@@ -65,8 +65,36 @@ def build_run_manifest(
             "assessment": assessment,
             "termination": termination,
         },
+        "credibility": _credibility_block(),
     }
     return manifest
+
+
+def _credibility_block() -> dict[str, Any]:
+    """NASA-STD-7009-style input pedigree (0 = none ... 4 = flight data).
+
+    Input pedigree is scored at the lowest-quality input, so the overall
+    score is the minimum over the listed inputs.
+    """
+    from rlv_sim.mission.campaign import DISPERSION_PEDIGREE
+
+    model_inputs = {
+        "aero_decks": {"pedigree": 1, "source": "geometry/literature estimates; no wind-tunnel or CFD data"},
+        "booster_descent_drag": {
+            "pedigree": 2,
+            "source": "fitted to Falcon 9 webcast telemetry (docs/VALIDATION_DRAG.md); not default",
+        },
+        "engine_geometry_for_jet_damping": {"pedigree": 1, "source": "engineering estimate"},
+        "landing_propellant_reserve": {"pedigree": 1, "source": "community estimate, low confidence"},
+    }
+    scores = [entry["pedigree"] for entry in model_inputs.values()]
+    scores += [entry["pedigree"] for entry in DISPERSION_PEDIGREE.values()]
+    return {
+        "standard": "NASA-STD-7009A style self-assessment",
+        "input_pedigree_score": min(scores),
+        "model_inputs": model_inputs,
+        "dispersions": DISPERSION_PEDIGREE,
+    }
 
 
 def _json_safe(value: Any) -> Any:

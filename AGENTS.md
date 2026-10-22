@@ -40,7 +40,7 @@ Config: `rlv_sim/config/definition.py` (frozen dataclass, validated) + `rlv_sim/
 - Hot paths: use `core.utils.cross3` / `core.utils.vec_norm`, not `np.cross` / `np.linalg.norm`.
 - Guidance/physics changes: run a Monte Carlo before changing defaults:
   `.venv/Scripts/python.exe -m rlv_sim.mission.campaign --mode monte-carlo --runs 100 --seed 42 --workers 6 [--set field=value]`
-  Current baseline (heuristic guidance, seed 42): **94% mission success** (CI 87.5–97.2%).
+  Current baseline (heuristic guidance, seed 42): **95% mission success** (90% lower bound 90.9%); see `docs/MONTE_CARLO_RESULTS.md`.
 - Full mission ≈ 35 s.
 
 ## Build & release

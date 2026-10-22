@@ -118,6 +118,10 @@ class SimulationConfig:
     # Size the booster recovery reserve from the vehicle (rocket equation)
     # instead of using stage1_landing_fuel_reserve_kg as given.
     auto_size_recovery_reserve: bool = False
+    # Wind-aware recovery reserve: extra stage-1 propellant held back per m/s
+    # of headwind (negative runtime_wind_offset_mps) from the day-of-launch
+    # forecast. 0 disables it. Monte Carlo slope (seed 42): ~383 kg per m/s.
+    recovery_reserve_wind_sensitivity_kg_per_mps: float = 0.0
     launch_site_lat_deg: float = C.DEFAULT_LAUNCH_SITE_LAT_DEG
     launch_site_lon_deg: float = C.DEFAULT_LAUNCH_SITE_LON_DEG
     launch_site_altitude_m: float = 0.0
@@ -196,8 +200,14 @@ class SimulationConfig:
     # Shortest time constant of the landing burn's horizontal velocity nulling
     # (keeps the gain within the attitude loop's bandwidth). 0 = uncapped.
     booster_terminal_divert_time_constant_s: float = 1.5  # MC 90% -> 94%
+    # Final-approach position hold time-constant floor (s); 0 = velocity
+    # nulling only below 150 m (see guidance.booster._lateral_divert).
+    booster_terminal_position_hold_tau_s: float = 0.0
     booster_entry_divert_tilt_deg: float = 60.0  # 30 -> 60: MC 78% -> 90% (tailwind pad misses)
     booster_landing_ignition_safety_factor: float = 1.52
+    # Fraction of landing thrust the ignition estimator plans on. Below 1.0 the
+    # burn starts earlier and keeps throttle in reserve for drag/wind shortfalls.
+    booster_landing_planning_throttle: float = 1.0
     booster_landing_ignition_ceiling_m: float = 20000.0
     booster_recovery_max_q_pa: float = 90000.0
     booster_recovery_max_q_alpha_pa_rad: float = 150000.0
@@ -345,6 +355,9 @@ class SimulationConfig:
     runtime_isp_scale: float = 1.0
     runtime_initial_mass_offset_kg: float = 0.0
     runtime_wind_offset_mps: float = 0.0
+    # Altitude-correlated wind perturbation modes (amplitude m/s, wavelength m,
+    # phase rad); see core.utils.wind_profile_context. Empty = mean profile only.
+    runtime_wind_profile_modes: tuple = ()
     aero_deck_path: str | None = None
     # Multiplier on booster descent drag (entry/landing), fitted to Falcon 9
     # webcast telemetry by validation/drag_fit.py.
@@ -368,6 +381,11 @@ class SimulationConfig:
     @property
     def landing_thrust_n(self) -> float:
         return float(self.landing_engine_count) * float(self.stage1_engine_thrust_n)
+
+    @property
+    def landing_planning_thrust_n(self) -> float:
+        """Landing thrust the ignition estimator plans on (reserve kept back)."""
+        return self.landing_thrust_n * float(self.booster_landing_planning_throttle)
 
     @property
     def reference_area_m2(self) -> float:
@@ -456,6 +474,8 @@ class SimulationConfig:
             errors.append(f"launch_site_lon_deg must be in [-180, 180], got {self.launch_site_lon_deg}")
         errors += _field_errors(self, (
             ("stage1_landing_fuel_reserve_kg", "nonneg"),
+            ("recovery_reserve_wind_sensitivity_kg_per_mps", "nonneg"),
+            ("booster_terminal_position_hold_tau_s", "nonneg"),
             ("orbit_target_altitude_m", "positive"),
             ("orbit_altitude_tolerance_m", "nonneg"),
         ))
@@ -468,6 +488,11 @@ class SimulationConfig:
             ("s2_entry_interface_altitude_m", "positive"),
             ("s2_entry_drag_scale", "at_least_1"),
         ))
+        if not 0.3 <= float(self.booster_landing_planning_throttle) <= 1.0:
+            errors.append(
+                "booster_landing_planning_throttle must be within [0.3, 1.0], "
+                f"got {self.booster_landing_planning_throttle}"
+            )
         if self.s2_deorbit_target_perigee_m >= self.s2_entry_interface_altitude_m:
             errors.append(
                 "s2_deorbit_target_perigee_m must be below s2_entry_interface_altitude_m, "
