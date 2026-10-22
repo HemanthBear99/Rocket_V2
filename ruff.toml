@@ -1,0 +1,8 @@
+# Shared lint settings for the whole repo. The rule set is ruff's defaults;
+# this file only pins the Python version and tells isort where the package lives
+# so `ruff check .` gives the same result from the repo root or from backend/.
+target-version = "py310"
+src = ["backend"]
+
+[lint.isort]
+known-first-party = ["rlv_sim", "tools"]

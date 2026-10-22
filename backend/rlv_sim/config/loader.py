@@ -1,0 +1,25 @@
+"""JSON import/export for reproducible mission configuration profiles."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from rlv_sim.config.definition import SimulationConfig
+from rlv_sim.config.factory import create_default_config
+
+
+def load_config_json(path: str | Path) -> SimulationConfig:
+    """Load validated configuration overrides from a JSON object."""
+    source = Path(path)
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        # ValueError (not TypeError) is this loader's documented error contract.
+        raise ValueError("Simulation configuration JSON must contain an object")  # noqa: TRY004
+    try:
+        return create_default_config(**payload)
+    except TypeError as exc:
+        raise ValueError(f"Invalid simulation configuration: {exc}") from exc
+
+
+__all__ = ["load_config_json"]

@@ -13,43 +13,43 @@ Repo: github.com/HemanthBear99/Rocket_V2, branch `main`. Owner works on Windows 
 6-DOF two-stage reusable launch vehicle simulator: stacked ascent → separation →
 stage-2 orbit insertion (optional S2 recovery) + stage-1 booster flip/boostback/
 coast/entry/landing (return to launch site, LZ-1).
-Front ends: CLI (`cli.py`), FastAPI + vanilla-JS web app (`server.py`, `static/`),
-pywebview desktop app (`desktop_app.py`, PyInstaller `desktop_app.spec`).
+Front ends: CLI (`rlv_sim/cli.py`), FastAPI + vanilla-JS web app (`rlv_sim/server/app.py`, `frontend/`),
+pywebview desktop app (`desktop/desktop_app.py`, PyInstaller `desktop/desktop_app.spec`).
+Layout: `backend/` (package `backend/rlv_sim/`, tests, pyproject), `frontend/`, `desktop/`, `website/`, `docs/`.
+Package paths below are relative to `backend/`.
 Marketing website: `website/` (Next.js 14 + React Three Fiber, separate app).
 
 Architecture details: `docs/CODEBASE_MAP.md`. Short summary: `CLAUDE.md`.
-Mission loop `_run_full_mission.py` → `_simulation_step.py` → guidance
-(`_guidance_ascent.py`, `_guidance_booster.py`, `_guidance_orbit.py`, `_gfold.py`) /
-`control.py` → RK4 `integrators.py` → `dynamics.py` / `forces.py`.
-Config: `config_definition.py` (frozen dataclass, validated) + `config_factory.py`
+Mission loop `rlv_sim/mission/full_mission.py` → `rlv_sim/mission/step.py` → guidance
+(`rlv_sim/guidance/ascent.py`, `rlv_sim/guidance/booster.py`, `rlv_sim/guidance/orbit.py`, `rlv_sim/guidance/gfold.py`) /
+`rlv_sim/vehicle/control.py` → RK4 `rlv_sim/physics/integrators.py` → `rlv_sim/physics/dynamics.py` / `rlv_sim/physics/forces.py`.
+Config: `rlv_sim/config/definition.py` (frozen dataclass, validated) + `rlv_sim/config/factory.py`
 (`create_default_config(**overrides)`; `RETIRED_FIELDS` keeps old saved configs loading).
 
 ## Environment (Windows quirks)
-- Python venv: `D:\rlv_sim\.venv`. `uv` only via `python -m uv` (not on PATH).
-- The repo root IS the package, so its parent must be on `sys.path`:
-  run from `D:\` with `PYTHONPATH=D:/`, e.g.
-  `cd /d && PYTHONPATH="D:/" rlv_sim/.venv/Scripts/python.exe -m pytest rlv_sim/tests -q`
+- Python venv: `D:\rlv_sim\backend\.venv` (package installed editable via `uv pip install -e ".[test]"`).
+  Run Python commands from `backend/`, e.g. `cd /d/rlv_sim/backend && .venv/Scripts/python.exe -m pytest -q`.
 - Git needs `git -c safe.directory=D:/rlv_sim ...` (dubious-ownership warning).
 - GitHub Actions CI exists but the account is billing-locked; runs don't start. Ignore.
-- Tests set `RLV_DATA_DIR` to a temp dir (tests/conftest.py); never write to the real `%APPDATA%\Vyom` in tests.
+- Tests set `RLV_DATA_DIR` to a temp dir (backend/tests/conftest.py); never write to the real `%APPDATA%\Vyom` in tests.
 
 ## Verify every change
-- Fast: `pytest rlv_sim/tests -q -p no:cacheprovider` (~255 tests, ~30 s, includes a Playwright UI test).
+- Fast (from `backend/`): `.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider` (~255 tests, ~30 s, includes a Playwright UI test).
 - Slow: add `-m "slow or not slow"` (full suite ~8 min). `-m slow -k regression` = full-mission reference values.
-- Lint: `python -m uv run --with ruff ruff check .` must be clean.
-- Hot paths: use `utils.cross3` / `utils.vec_norm`, not `np.cross` / `np.linalg.norm`.
+- Lint: `.venv/Scripts/ruff check .` must be clean (from `backend/` or repo root; config in root `ruff.toml`).
+- Hot paths: use `core.utils.cross3` / `core.utils.vec_norm`, not `np.cross` / `np.linalg.norm`.
 - Guidance/physics changes: run a Monte Carlo before changing defaults:
-  `PYTHONPATH="D:/" rlv_sim/.venv/Scripts/python.exe -m rlv_sim.campaign --mode monte-carlo --runs 100 --seed 42 --workers 6 [--set field=value]`
+  `.venv/Scripts/python.exe -m rlv_sim.mission.campaign --mode monte-carlo --runs 100 --seed 42 --workers 6 [--set field=value]`
   Current baseline (heuristic guidance, seed 42): **94% mission success** (CI 87.5–97.2%).
 - Full mission ≈ 35 s.
 
 ## Build & release
-- Desktop exe: `.venv/Scripts/python.exe -m PyInstaller desktop_app.spec --noconfirm -y` → `dist/Vyom.exe` (~180 MB).
-- Installer: `"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" installer\vyom.iss` → `dist/VyomSetup-0.3.0.exe`.
+- Desktop exe (from `desktop/`): `../backend/.venv/Scripts/python.exe -m PyInstaller desktop_app.spec --noconfirm -y` → `desktop/dist/Vyom.exe` (~180 MB).
+- Installer (from `desktop/`): `"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" installer\vyom.iss` → `desktop/dist/VyomSetup-0.3.0.exe`.
   Same AppId as the old Boostback installer, so it upgrades in place.
-- Version lives in `__init__.py`, `pyproject.toml`, `version_info.txt`, `installer/vyom.iss`, website copy.
-- Licensing (`licensing.py`): Ed25519-signed offline keys, 14-day trial, enforced only in the frozen exe
-  (or `RLV_ENFORCE_LICENSE=1`). Issue keys: `python -m rlv_sim.tools.issue_license "Name" --plan pro --days 365`.
+- Version lives in `backend/rlv_sim/__init__.py`, `backend/pyproject.toml`, `desktop/version_info.txt`, `desktop/installer/vyom.iss`, website copy.
+- Licensing (`rlv_sim/server/licensing.py`): Ed25519-signed offline keys, 14-day trial, enforced only in the frozen exe
+  (or `RLV_ENFORCE_LICENSE=1`). Issue keys (from `backend/`): `python -m tools.issue_license "Name" --plan pro --days 365`.
   **Private key is at `%USERPROFILE%\.boostback_signing\license_private.pem` — never commit or ship it.**
 - User data: `%APPDATA%\Vyom` (scenarios, run history, imported aero decks, license); auto-migrated from `%APPDATA%\Boostback`.
 
@@ -70,7 +70,7 @@ Config: `config_definition.py` (frozen dataclass, validated) + `config_factory.p
 - No wind-tunnel/CFD data; aero is geometry/literature based. Product is "not for flight-critical use".
 
 ## Open work (owner's backlog, highest value first)
-1. Rebuild `dist/Vyom.exe` and `VyomSetup-0.3.0.exe` after the Vyom rename (current dist files are old Boostback builds).
+1. Rebuild `desktop/dist/Vyom.exe` and `VyomSetup-0.3.0.exe` after the Vyom rename (old Boostback builds were deleted; no current build exists).
 2. Make landing guidance robust with realistic descent drag (scale 0.68) so it can become default (target ≥94% MC).
 3. Adaptive recovery reserve / leaner boostback: 3 remaining MC failures are headwind fuel starvation.
 4. Stage-2 sizing in the mission planner (12 t payload currently fails; planner should propose the fix).
@@ -81,6 +81,6 @@ Config: `config_definition.py` (frozen dataclass, validated) + `config_factory.p
 
 ## Conventions
 - Match surrounding style; comments explain *why*. Physics/guidance constants carry a note on how they were tuned.
-- New config fields: add to `config_definition.py` with a default that keeps current behaviour, validate them,
+- New config fields: add to `rlv_sim/config/definition.py` with a default that keeps current behaviour, validate them,
   and only change defaults after a Monte Carlo comparison.
 - Commit messages: imperative subject, body with what/why and measured results.
