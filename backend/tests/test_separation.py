@@ -22,7 +22,7 @@ def _split():
 
 
 def test_linear_and_angular_momentum_conserved():
-    cfg, state, m_o, m_b, (dv_o, dv_b, dw_o, dw_b) = _split()
+    cfg, _, m_o, m_b, (dv_o, dv_b, dw_o, dw_b) = _split()
     assert np.allclose(m_o * dv_o + m_b * dv_b, 0.0, atol=1e-9)
     i_o = compute_inertia_tensor(m_o, "orbiter", config=cfg)[0, 0]
     i_b = compute_inertia_tensor(m_b, "booster", cfg.stage1_landing_fuel_reserve_kg, config=cfg)[0, 0]
