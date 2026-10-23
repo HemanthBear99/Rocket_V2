@@ -136,14 +136,14 @@ class SimulationConfig:
     ascent_throttle_bucket_start_s: float = 0.0
     ascent_throttle_bucket_end_s: float = 0.0
     ascent_throttle_bucket_fraction: float = 0.7
-    stage1_landing_fuel_reserve_kg: float = C.STAGE1_LANDING_FUEL_RESERVE
+    stage1_landing_fuel_reserve_kg: float = 67500.0
     # Size the booster recovery reserve from the vehicle (rocket equation)
     # instead of using stage1_landing_fuel_reserve_kg as given.
     auto_size_recovery_reserve: bool = False
     # Wind-aware recovery reserve: extra stage-1 propellant held back per m/s
     # of headwind (negative runtime_wind_offset_mps) from the day-of-launch
     # forecast. 0 disables it. Monte Carlo slope (seed 42): ~383 kg per m/s.
-    recovery_reserve_wind_sensitivity_kg_per_mps: float = 0.0
+    recovery_reserve_wind_sensitivity_kg_per_mps: float = 383.0
     launch_site_lat_deg: float = C.DEFAULT_LAUNCH_SITE_LAT_DEG
     launch_site_lon_deg: float = C.DEFAULT_LAUNCH_SITE_LON_DEG
     launch_site_altitude_m: float = 0.0
@@ -207,12 +207,12 @@ class SimulationConfig:
 
     booster_boostback_budget_kg: float = 43000.0
     booster_boostback_impact_corridor_m: float = 10000.0
-    booster_entry_budget_kg: float = 5700.0
-    booster_landing_reserve_kg: float = 6000.0
+    booster_entry_budget_kg: float = 12500.0
+    booster_landing_reserve_kg: float = 5000.0
     booster_flip_min_time_s: float = 11.0
     booster_apogee_target_km: float = 85.0
     booster_entry_interface_altitude_m: float = 70000.0
-    booster_entry_burn_min_altitude_m: float = 20000.0
+    booster_entry_burn_min_altitude_m: float = 5000.0
     booster_entry_burn_min_speed_mps: float = 250.0
     # Descent rate the entry terminal-capture logic brakes towards (m/s).
     booster_entry_target_descent_rate_mps: float = 150.0
@@ -230,16 +230,16 @@ class SimulationConfig:
     # pure velocity nulling below it, so touchdown is never spent chasing position.
     booster_terminal_position_hold_floor_m: float = 30.0
     booster_entry_divert_tilt_deg: float = 60.0  # 30 -> 60: MC 78% -> 90% (tailwind pad misses)
-    booster_landing_ignition_safety_factor: float = 1.52
+    booster_landing_ignition_safety_factor: float = 1.8
     # Fraction of landing thrust the ignition estimator plans on. Below 1.0 the
     # burn starts earlier and keeps throttle in reserve for drag/wind shortfalls.
     booster_landing_planning_throttle: float = 1.0
-    booster_landing_ignition_ceiling_m: float = 20000.0
+    booster_landing_ignition_ceiling_m: float = 8000.0
     booster_recovery_max_q_pa: float = 90000.0
     booster_recovery_max_q_alpha_pa_rad: float = 150000.0
     booster_terminal_attitude_error_max_deg: float = 15.0
-    booster_landing_propellant_margin_kg: float = 350.0
-    booster_landing_vertical_propellant_safety_factor: float = 1.20
+    booster_landing_propellant_margin_kg: float = 750.0
+    booster_landing_vertical_propellant_safety_factor: float = 1.25
     booster_terminal_capture_landing_reserve_fraction: float = 1.0
     booster_tail_first_cp_z_m: float = C.STAGE1_RECOVERY_CP
     booster_landing_target_downrange_km: float = 0.0
@@ -305,17 +305,17 @@ class SimulationConfig:
     landing_leg_deploy_time_s: float = 3.0
     landing_leg_max_touchdown_speed_mps: float = 6.0
     landing_leg_max_tilt_deg: float = 15.0
-    booster_powered_descent_lead_time_s: float = 15.0
+    booster_powered_descent_lead_time_s: float = 28.0
 
     booster_terminal_capture_floor_kg: float = 2500.0
     booster_late_entry_bias_ref_altitude_m: float = 35000.0
     booster_max_divert_accel_far_mps2: float = 40.0
-    booster_max_divert_accel_near_mps2: float = 40.0
+    booster_max_divert_accel_near_mps2: float = 25.0
     booster_divert_accel_miss_threshold_m: float = 3000.0
-    booster_divert_fraction_high: float = 0.55
-    booster_divert_fraction_mid: float = 0.45
-    booster_divert_fraction_low: float = 0.28
-    booster_divert_band_high_alt_m: float = 500.0
+    booster_divert_fraction_high: float = 0.72
+    booster_divert_fraction_mid: float = 0.62
+    booster_divert_fraction_low: float = 0.40
+    booster_divert_band_high_alt_m: float = 1200.0
     booster_divert_band_low_alt_m: float = 150.0
     booster_vertical_load_risk_ratio: float = 0.72
     booster_terminal_descent_overspeed_factor: float = 4.0

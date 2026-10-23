@@ -27,24 +27,8 @@ PENDING_WIRING = {
     "atmosphere_model",
 }
 
-# Factory values that differ from the dataclass defaults (RC5 removes them).
-PROFILE_OVERRIDES = {
-    "stage1_landing_fuel_reserve_kg",
-    "recovery_reserve_wind_sensitivity_kg_per_mps",
-    "booster_entry_budget_kg",
-    "booster_landing_reserve_kg",
-    "booster_entry_burn_min_altitude_m",
-    "booster_landing_ignition_safety_factor",
-    "booster_landing_ignition_ceiling_m",
-    "booster_landing_propellant_margin_kg",
-    "booster_landing_vertical_propellant_safety_factor",
-    "booster_powered_descent_lead_time_s",
-    "booster_max_divert_accel_near_mps2",
-    "booster_divert_fraction_high",
-    "booster_divert_fraction_mid",
-    "booster_divert_fraction_low",
-    "booster_divert_band_high_alt_m",
-}
+# Factory values that may differ from the dataclass defaults (none: one source).
+PROFILE_OVERRIDES: set[str] = set()
 
 
 def _unread_fields() -> set[str]:

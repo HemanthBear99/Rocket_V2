@@ -65,22 +65,19 @@ class TestValidateRejectsBadConfig:
         assert "max_time must be positive" in message
 
 
-class TestCreateTestConfigDoesNotInheritResearchProfile:
-    """Confirmed divergence: create_test_config builds a bare SimulationConfig
-    rather than layering on create_default_config's research-profile
-    overrides. Anyone asserting research-profile values (e.g.
-    stage1_landing_fuel_reserve_kg=67500.0) against a create_test_config
-    instance will get the raw dataclass default instead.
-    """
+class TestOneDefaultSource:
+    """The research profile is the dataclass defaults, so a bare config, the
+    test config and the default config agree (they once diverged: the test
+    config silently used a 35 t reserve against the profile's 67.5 t)."""
 
-    def test_landing_fuel_reserve_differs_from_default_profile(self):
+    def test_test_config_inherits_research_profile(self):
         default_cfg = create_default_config()
         test_cfg = create_test_config()
         bare_cfg = SimulationConfig(dt=0.1, max_time=10.0, verbose=False)
 
         assert default_cfg.stage1_landing_fuel_reserve_kg == 67500.0
-        assert test_cfg.stage1_landing_fuel_reserve_kg == bare_cfg.stage1_landing_fuel_reserve_kg
-        assert test_cfg.stage1_landing_fuel_reserve_kg != default_cfg.stage1_landing_fuel_reserve_kg
+        assert test_cfg.stage1_landing_fuel_reserve_kg == default_cfg.stage1_landing_fuel_reserve_kg
+        assert bare_cfg.booster_landing_ignition_safety_factor == default_cfg.booster_landing_ignition_safety_factor
 
 
 class TestConfigRoundTripOverrides:

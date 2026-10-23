@@ -61,28 +61,12 @@ def _with_overrides(config: SimulationConfig, **overrides: Any) -> SimulationCon
 
 
 def create_default_config(**overrides: Any) -> SimulationConfig:
-    """Create a default research-profile configuration."""
-    return _with_overrides(SimulationConfig(
-        stage1_landing_fuel_reserve_kg=67500.0,
-        # Seed-42 MC (100 runs): 93% -> 95%, removing headwind fuel starvation.
-        recovery_reserve_wind_sensitivity_kg_per_mps=383.0,
-        booster_entry_budget_kg=12500.0,
-        booster_entry_burn_min_altitude_m=5000.0,
-        booster_landing_reserve_kg=5000.0,
-        booster_landing_propellant_margin_kg=750.0,
-        booster_landing_vertical_propellant_safety_factor=1.25,
-        booster_landing_ignition_safety_factor=1.8,
-        booster_landing_ignition_ceiling_m=8000.0,
-        booster_powered_descent_lead_time_s=28.0,
-        booster_divert_fraction_high=0.72,
-        booster_divert_fraction_mid=0.62,
-        booster_divert_fraction_low=0.40,
-        booster_max_divert_accel_far_mps2=40.0,
-        booster_max_divert_accel_near_mps2=25.0,
-        booster_fuel_critical_ratio=0.35,
-        booster_divert_band_high_alt_m=1200.0,
-        booster_terminal_capture_floor_kg=2500.0,
-    ), **overrides)
+    """Create a default research-profile configuration.
+
+    The research profile is the dataclass defaults; this only applies the
+    override hooks (auto-sized and wind-aware reserves) and validation.
+    """
+    return _with_overrides(SimulationConfig(), **overrides)
 
 
 def create_demo_config(**overrides: Any) -> SimulationConfig:
