@@ -53,8 +53,22 @@ def _compute_separation_adjustments(
 
     orbiter_dv = separation_axis * relative_delta_v * (booster_mass / total_mass)
     booster_dv = -separation_axis * relative_delta_v * (orbiter_mass / total_mass)
-    orbiter_domega = spin_axis * tumble_rate * (booster_mass / total_mass)
-    booster_domega = -spin_axis * tumble_rate * (orbiter_mass / total_mass)
+
+    # Residual tumble: a relative rate tumble_rate about spin_axis, split by
+    # transverse inertia so the two angular-momentum kicks cancel
+    # (I_o*dw_o + I_b*dw_b = 0). omega is a body-frame rate, so the inertial
+    # spin axis is expressed in body axes (it was added in ECI axes, and
+    # split by mass, which does not conserve angular momentum).
+    from rlv_sim.physics.mass import compute_inertia_tensor
+
+    i_orbiter = float(compute_inertia_tensor(orbiter_mass, "orbiter", config=config)[0, 0])
+    i_booster = float(compute_inertia_tensor(
+        booster_mass, "booster", config.stage1_landing_fuel_reserve_kg, config=config)[0, 0])
+    q_conj = np.array([state.q[0], -state.q[1], -state.q[2], -state.q[3]], dtype=float)
+    spin_axis_body = rotate_vector_by_quaternion(spin_axis, q_conj)
+    i_total = max(i_orbiter + i_booster, 1.0)
+    orbiter_domega = spin_axis_body * tumble_rate * (i_booster / i_total)
+    booster_domega = -spin_axis_body * tumble_rate * (i_orbiter / i_total)
     return orbiter_dv, booster_dv, orbiter_domega, booster_domega
 
 
