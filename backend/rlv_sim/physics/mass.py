@@ -24,17 +24,52 @@ S1_DRY_CG_Z = 24.0
 S1_PROP_CG_Z = 19.0
 S2_DRY_CG_Z = 59.0
 S2_PROP_CG_Z = 56.0
+# Payload sits above the stage-2 tank (project estimate, stack-base frame).
+PAYLOAD_CG_Z = 65.0
 
 
-def _stacked_component_masses(m: float) -> tuple[float, float, float, float]:
-    """Return S1 dry, S1 prop, S2 dry, S2 prop masses for the stacked vehicle."""
-    s1_prop = float(np.clip(m - C.DRY_MASS, 0.0, C.STAGE1_PROPELLANT_MASS))
-    return (
-        C.STAGE1_DRY_MASS,
-        s1_prop,
-        C.STAGE2_DRY_MASS,
-        C.STAGE2_PROPELLANT_MASS,
-    )
+def _vehicle_masses(config) -> tuple[float, float, float, float, float]:
+    """(S1 dry, S1 propellant, S2 dry, S2 propellant, payload) in kg.
+
+    From the configured vehicle when a config is given, else the reference
+    constants (which carry no payload).
+    """
+    if config is None:
+        return (C.STAGE1_DRY_MASS, C.STAGE1_PROPELLANT_MASS,
+                C.STAGE2_DRY_MASS, C.STAGE2_PROPELLANT_MASS, 0.0)
+    return (float(config.stage1_dry_mass), float(config.stage1_prop_mass),
+            float(config.stage2_dry_mass), float(config.stage2_prop_mass),
+            float(config.payload_mass))
+
+
+def _stacked_component_masses(m: float, config=None) -> tuple[float, float, float, float, float]:
+    """S1 dry, S1 prop, S2 dry, S2 prop, payload for the stacked vehicle.
+
+    Only stage-1 propellant burns on the stack; payload is its own component
+    (it was once counted as stage-1 propellant).
+    """
+    s1_dry, s1_prop_full, s2_dry, s2_prop, payload = _vehicle_masses(config)
+    fixed = s1_dry + s2_dry + s2_prop + payload
+    s1_prop = float(np.clip(m - fixed, 0.0, s1_prop_full))
+    return s1_dry, s1_prop, s2_dry, s2_prop, payload
+
+
+def _orbiter_propellant_fraction(m: float, config=None) -> float:
+    _, _, s2_dry, s2_prop, payload = _vehicle_masses(config)
+    return max(0.0, min(1.0, (m - s2_dry - payload) / max(s2_prop, 1.0)))
+
+
+def _booster_reserve_fraction(m: float, stage1_landing_reserve_kg, config=None) -> tuple[float, float]:
+    """(fraction of the recovery reserve left, reserve kg) for the booster."""
+    if stage1_landing_reserve_kg is not None:
+        reserve_source = stage1_landing_reserve_kg
+    elif config is not None:
+        reserve_source = config.stage1_landing_fuel_reserve_kg
+    else:
+        reserve_source = C.STAGE1_LANDING_FUEL_RESERVE
+    reserve = max(float(reserve_source), 1.0)
+    s1_dry = _vehicle_masses(config)[0]
+    return max(0.0, min(1.0, (m - s1_dry) / reserve)), reserve
 
 
 def compute_mass_flow_rate(
@@ -152,23 +187,15 @@ def compute_center_of_mass(
     model = (vehicle_model or "stacked").lower()
 
     if model == "orbiter":
-        s2_frac = max(0.0, min(1.0, (m - C.STAGE2_DRY_MASS) / C.STAGE2_PROPELLANT_MASS))
-        return 58.0 + s2_frac * 5.0
+        return 58.0 + _orbiter_propellant_fraction(m, config) * 5.0
 
     if model == "booster":
-        reserve_source = (
-            C.STAGE1_LANDING_FUEL_RESERVE
-            if stage1_landing_reserve_kg is None
-            else stage1_landing_reserve_kg
-        )
-        reserve = max(float(reserve_source), 1.0)
-        s1_frac = max(0.0, min(1.0, (m - C.STAGE1_DRY_MASS) / reserve))
+        s1_frac, _ = _booster_reserve_fraction(m, stage1_landing_reserve_kg, config)
         p = _mass_properties(config)
         return p.booster_cg_empty_m + s1_frac * (p.booster_cg_full_m - p.booster_cg_empty_m)
 
-    s1_dry, s1_prop, s2_dry, s2_prop = _stacked_component_masses(m)
-    masses = np.array([s1_dry, s1_prop, s2_dry, s2_prop], dtype=float)
-    stations = np.array([S1_DRY_CG_Z, S1_PROP_CG_Z, S2_DRY_CG_Z, S2_PROP_CG_Z], dtype=float)
+    masses = np.array(_stacked_component_masses(m, config), dtype=float)
+    stations = np.array([S1_DRY_CG_Z, S1_PROP_CG_Z, S2_DRY_CG_Z, S2_PROP_CG_Z, PAYLOAD_CG_Z], dtype=float)
     total = max(float(np.sum(masses)), 1.0)
     return float(np.dot(masses, stations) / total)
 
@@ -190,19 +217,13 @@ def compute_inertia_tensor(
     model = (vehicle_model or "stacked").lower()
 
     if model == "orbiter":
-        s2_frac = max(0.0, min(1.0, (m - C.STAGE2_DRY_MASS) / C.STAGE2_PROPELLANT_MASS))
+        s2_frac = _orbiter_propellant_fraction(m, config)
         ixx = 1.67e5 + s2_frac * (2.5e6 - 1.67e5)
         izz = 1.0e5 + s2_frac * (4.0e5 - 1.0e5)
         return np.diag([ixx, ixx, izz])
 
     if model == "booster":
-        reserve_source = (
-            C.STAGE1_LANDING_FUEL_RESERVE
-            if stage1_landing_reserve_kg is None
-            else stage1_landing_reserve_kg
-        )
-        reserve = max(float(reserve_source), 1.0)
-        s1_frac = max(0.0, min(1.0, (m - C.STAGE1_DRY_MASS) / reserve))
+        s1_frac, _ = _booster_reserve_fraction(m, stage1_landing_reserve_kg, config)
         p = _mass_properties(config)
         ixx = p.booster_ixx_empty_kgm2 + s1_frac * (p.booster_ixx_full_kgm2 - p.booster_ixx_empty_kgm2)
         izz = p.booster_izz_empty_kgm2 + s1_frac * (p.booster_izz_full_kgm2 - p.booster_izz_empty_kgm2)
@@ -216,8 +237,8 @@ def compute_inertia_tensor(
     # orphaned code, or to carelessly insert a new `if model == ...:`
     # branch above it that returns early and unintentionally shadows this
     # default case. Comment made explicit; behavior is unchanged.
-    s1_prop = float(np.clip(m - C.DRY_MASS, 0.0, C.STAGE1_PROPELLANT_MASS))
-    prop_frac = max(0.0, min(1.0, s1_prop / C.STAGE1_PROPELLANT_MASS))
+    s1_prop = _stacked_component_masses(m, config)[1]
+    prop_frac = max(0.0, min(1.0, s1_prop / max(_vehicle_masses(config)[1], 1.0)))
 
     p = _mass_properties(config)
     izz = p.stack_izz_empty_kgm2 + prop_frac * (p.stack_izz_full_kgm2 - p.stack_izz_empty_kgm2)
@@ -248,21 +269,17 @@ def compute_inertia_derivative(
 
     model = (vehicle_model or "stacked").lower()
 
+    s1_dry, s1_prop_full, s2_dry, s2_prop, payload = _vehicle_masses(config)
     if model == "orbiter":
-        if m <= C.STAGE2_DRY_MASS or m >= C.STAGE2_DRY_MASS + C.STAGE2_PROPELLANT_MASS:
+        if m <= s2_dry + payload or m >= s2_dry + payload + s2_prop:
             return np.zeros((3, 3))
-        d_ixx_dm = (2.5e6 - 1.67e5) / C.STAGE2_PROPELLANT_MASS
-        d_izz_dm = (4.0e5 - 1.0e5) / C.STAGE2_PROPELLANT_MASS
+        d_ixx_dm = (2.5e6 - 1.67e5) / s2_prop
+        d_izz_dm = (4.0e5 - 1.0e5) / s2_prop
         return np.diag([d_ixx_dm * mdot, d_ixx_dm * mdot, d_izz_dm * mdot])
 
     if model == "booster":
-        reserve_source = (
-            C.STAGE1_LANDING_FUEL_RESERVE
-            if stage1_landing_reserve_kg is None
-            else stage1_landing_reserve_kg
-        )
-        reserve = max(float(reserve_source), 1.0)
-        if m <= C.STAGE1_DRY_MASS or m >= C.STAGE1_DRY_MASS + reserve:
+        _, reserve = _booster_reserve_fraction(m, stage1_landing_reserve_kg, config)
+        if m <= s1_dry or m >= s1_dry + reserve:
             return np.zeros((3, 3))
         p = _mass_properties(config)
         d_ixx_dm = (p.booster_ixx_full_kgm2 - p.booster_ixx_empty_kgm2) / reserve
@@ -270,10 +287,11 @@ def compute_inertia_derivative(
         return np.diag([d_ixx_dm * mdot, d_ixx_dm * mdot, d_izz_dm * mdot])
 
     # Stacked ascent model
-    if m <= C.DRY_MASS or m >= C.DRY_MASS + C.STAGE1_PROPELLANT_MASS:
+    stack_floor = s1_dry + s2_dry + s2_prop + payload
+    if m <= stack_floor or m >= stack_floor + s1_prop_full:
         return np.zeros((3, 3))
 
     p = _mass_properties(config)
-    d_ixx_dm = (p.stack_ixx_full_kgm2 - p.stack_ixx_empty_kgm2) / C.STAGE1_PROPELLANT_MASS
-    d_izz_dm = (p.stack_izz_full_kgm2 - p.stack_izz_empty_kgm2) / C.STAGE1_PROPELLANT_MASS
+    d_ixx_dm = (p.stack_ixx_full_kgm2 - p.stack_ixx_empty_kgm2) / s1_prop_full
+    d_izz_dm = (p.stack_izz_full_kgm2 - p.stack_izz_empty_kgm2) / s1_prop_full
     return np.diag([d_ixx_dm * mdot, d_ixx_dm * mdot, d_izz_dm * mdot])

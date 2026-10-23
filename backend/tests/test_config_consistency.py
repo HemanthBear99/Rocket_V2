@@ -21,7 +21,6 @@ CONSUMED_IN_CONFIG = {
 # Remove an entry when its field is wired or retired; the test fails if a
 # listed field becomes read (stale list) or a new dead field appears.
 PENDING_WIRING = {
-    "max_gimbal_angle_deg",
     "stage_sep_velocity",
     "target_inclination_deg",
     "atmosphere_model",

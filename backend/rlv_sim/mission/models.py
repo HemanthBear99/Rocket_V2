@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 
 import numpy as np
@@ -15,6 +16,26 @@ from rlv_sim.core.state import State
 from rlv_sim.core.utils import axisymmetric_angle_of_attack, vec_norm
 from rlv_sim.guidance.common import compute_local_vertical
 from rlv_sim.physics.forces import compute_configured_atmosphere_properties
+
+
+@lru_cache(maxsize=8)
+def _launch_site_unit_at(lat_deg: float, lon_deg: float) -> np.ndarray:
+    from rlv_sim.core.state import _configured_launch_position
+
+    class _Site:
+        launch_site_lat_deg = lat_deg
+        launch_site_lon_deg = lon_deg
+        launch_site_altitude_m = 0.0
+
+    r0 = _configured_launch_position(_Site)
+    return r0 / vec_norm(r0)
+
+
+def _launch_site_unit(config) -> np.ndarray:
+    """Unit vector to the configured launch site at t=0 (downrange origin)."""
+    if config is None:
+        return C.INITIAL_POSITION / vec_norm(C.INITIAL_POSITION)
+    return _launch_site_unit_at(float(config.launch_site_lat_deg), float(config.launch_site_lon_deg))
 
 
 class SimulationLog:
@@ -54,7 +75,7 @@ class SimulationLog:
         cmd_thrust_dir = guidance.get('thrust_direction', np.array([0.0, 0.0, 1.0]))
         r_norm = float(vec_norm(state.r))
 
-        r0_hat = C.INITIAL_POSITION / vec_norm(C.INITIAL_POSITION)
+        r0_hat = _launch_site_unit(getattr(state, 'sim_config', None))
         r_hat = state.r / r_norm
         central_angle = float(np.arccos(np.clip(np.dot(r_hat, r0_hat), -1.0, 1.0)))
 
@@ -65,7 +86,7 @@ class SimulationLog:
         r_ecef = np.array([x_ecef, y_ecef, z_ecef])
         r_ecef_norm = vec_norm(r_ecef)
         if r_ecef_norm > C.ZERO_TOLERANCE:
-            r0_ecef_hat = C.INITIAL_POSITION / vec_norm(C.INITIAL_POSITION)
+            r0_ecef_hat = r0_hat  # ECI and ECEF coincide at t=0
             central_angle_ground = float(np.arccos(
                 np.clip(np.dot(r_ecef / r_ecef_norm, r0_ecef_hat), -1.0, 1.0)
             ))

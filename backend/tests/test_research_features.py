@@ -122,8 +122,10 @@ def test_scales_must_be_positive():
 
 
 # ------------------------------------------------------------------ mass properties
-def test_default_mass_properties_match_reference_constants():
-    cfg = create_default_config()
+def test_payload_free_reference_vehicle_matches_constants():
+    # Same stage masses as core.constants and no payload: config and
+    # constants paths must agree exactly.
+    cfg = create_default_config(payload_mass=0.0)
     for model in ("stacked", "booster"):
         for m in (400_000.0, 30_000.0):
             reserve = cfg.stage1_landing_fuel_reserve_kg
@@ -131,7 +133,28 @@ def test_default_mass_properties_match_reference_constants():
                 mass.compute_inertia_tensor(m, model, reserve, config=cfg),
                 mass.compute_inertia_tensor(m, model, reserve),
             )
-    assert mass.compute_center_of_mass(30_000.0, "booster", config=cfg) == mass.compute_center_of_mass(30_000.0, "booster")
+    reserve = cfg.stage1_landing_fuel_reserve_kg
+    assert mass.compute_center_of_mass(30_000.0, "booster", reserve, config=cfg) == mass.compute_center_of_mass(
+        30_000.0, "booster", reserve)
+
+
+def test_payload_is_not_counted_as_stage1_propellant():
+    cfg = create_default_config(payload_mass=8000.0)
+    liftoff = (cfg.stage1_dry_mass + cfg.stage1_prop_mass + cfg.stage2_dry_mass
+               + cfg.stage2_prop_mass + cfg.payload_mass)
+    _, s1_prop, _, _, payload = mass._stacked_component_masses(liftoff, cfg)
+    assert s1_prop == pytest.approx(cfg.stage1_prop_mass)
+    assert payload == 8000.0
+    # Payload raises the stack CG above the payload-free vehicle.
+    no_payload = create_default_config(payload_mass=0.0)
+    assert mass.compute_center_of_mass(liftoff, config=cfg) > mass.compute_center_of_mass(
+        liftoff - 8000.0, config=no_payload)
+
+
+def test_gimbal_limit_setting_sets_tvc_authority():
+    from rlv_sim.mission.step import _max_gimbal_rad
+
+    assert _max_gimbal_rad(create_test_config(max_gimbal_angle_deg=6.0)) == pytest.approx(np.radians(6.0))
 
 
 def test_mass_properties_follow_config():

@@ -235,7 +235,7 @@ def _available_attitude_torque_limit(
     """Bound commanded torque by actual TVC/RCS authority."""
     thrust_torque = 0.0
     if thrust_active and throttle > 0.0 and thrust_newton > 0.0:
-        lateral_force = thrust_newton * float(throttle) * np.sin(C.MAX_GIMBAL_ANGLE)
+        lateral_force = thrust_newton * float(throttle) * np.sin(_max_gimbal_rad(config))
         thrust_torque = lateral_force * _tvc_lever_arm(stage, vehicle_model, config=config)
 
     rcs_torque = 0.0
@@ -268,7 +268,7 @@ def _allocate_attitude_torque(
         tvc_limit = (
             thrust_newton
             * float(throttle)
-            * np.sin(C.MAX_GIMBAL_ANGLE)
+            * np.sin(_max_gimbal_rad(config))
             * _tvc_lever_arm(stage, vehicle_model, config=config)
         )
     tvc_limit = min(float(tvc_limit), float(structural_limit))
@@ -585,6 +585,13 @@ def _check_runtime_safety_limits(
     return None
 
 
+def _max_gimbal_rad(config: SimulationConfig | None) -> float:
+    """Configured TVC gimbal limit (max_gimbal_angle_deg), in radians."""
+    if config is None:
+        return float(C.MAX_GIMBAL_ANGLE)
+    return float(np.radians(config.max_gimbal_angle_deg))
+
+
 def _thrust_magnitude(mission_mgr, phase, stage: int, vehicle_model: str,
                       config: SimulationConfig) -> tuple[float | None, float]:
     """Return (booster thrust override or None, scaled thrust magnitude in N)."""
@@ -625,7 +632,7 @@ def _tvc_authority(thrust_active: bool, throttle: float, thrust_magnitude_n: flo
         return 0.0
     return (
         float(thrust_magnitude_n) * float(throttle)
-        * float(np.sin(C.MAX_GIMBAL_ANGLE))
+        * float(np.sin(_max_gimbal_rad(config)))
         * _tvc_lever_arm(stage, vehicle_model, config=config)
     )
 

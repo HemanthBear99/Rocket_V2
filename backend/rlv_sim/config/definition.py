@@ -678,7 +678,11 @@ class SimulationConfig:
             ("booster_descent_drag_scale", "positive"),
         ))
 
-        if C.INITIAL_MASS + self.runtime_initial_mass_offset_kg <= C.DRY_MASS + self.stage1_landing_fuel_reserve_kg:
+        liftoff_mass = (
+            float(self.stage1_dry_mass) + float(self.stage1_prop_mass) + float(self.stage2_dry_mass)
+            + float(self.stage2_prop_mass) + float(self.payload_mass)
+        )
+        if liftoff_mass + self.runtime_initial_mass_offset_kg < self.meco_mass_kg:
             errors.append(
                 "runtime_initial_mass_offset_kg leaves no ascent propellant above MECO mass"
             )

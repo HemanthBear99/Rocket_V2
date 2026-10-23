@@ -120,6 +120,12 @@ def compute_angular_acceleration(omega: np.ndarray, torque: np.ndarray,
     return I_inv @ total_torque
 
 
+# Orbiter (stage 2 alone) centre of pressure, stack-base frame: mid-length of
+# the stage-2 body (project estimate). The stack's C.H_CP made the orbiter's
+# CP sit ~25 m behind its CG.
+_ORBITER_CP_Z = C.H_STAGE1 + 0.5 * (C.H_STACK - C.H_STAGE1)
+
+
 def _active_engine_count(ctx: DynamicsContext) -> int:
     """Engines firing in the current burn (centre engine is always one of them)."""
     cfg = ctx.config
@@ -285,7 +291,7 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         tau_aero = compute_aerodynamic_moment(
             r, v, q,
             cg_pos_z,
-            cp_pos_z=C.H_CP,
+            cp_pos_z=_ORBITER_CP_Z if ctx.vehicle_model == "orbiter" else C.H_CP,
             wind_offset_mps=_cfg.runtime_wind_offset_mps if _cfg is not None else 0.0,
             omega=omega,
             config=ctx.config,
@@ -318,7 +324,9 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         config=_cfg,
     )
 
-    jet_damping_torque = compute_jet_damping_torque(m_dot, cg_pos_z, omega, ctx)
+    # Orbiter CG is in the stack-base frame; its nozzle exit is the S2 base.
+    nozzle_station = C.H_STAGE1 if ctx.vehicle_model == "orbiter" else 0.0
+    jet_damping_torque = compute_jet_damping_torque(m_dot, cg_pos_z - nozzle_station, omega, ctx)
 
     omega_dot = compute_angular_acceleration(omega, torque + tau_aero, I_tensor, I_inv, I_dot, jet_damping_torque)
     r_dot = v

@@ -135,7 +135,7 @@ class LandingAltimeter:
 
     def measure(self, state, config: SimulationConfig) -> AltimeterMeasurement:
         """Measure altitude above the local spherical surface and vertical speed."""
-        altitude = float(vec_norm(state.r) - C.R_EARTH)
+        altitude = float(state.altitude)  # same surface reference as the rest of the sim
         if (
             not bool(config.enable_landing_altimeter)
             or altitude > float(config.landing_altimeter_max_altitude_m)
@@ -230,7 +230,8 @@ def _apply_altimeter_correction(
     estimated_velocity = np.asarray(estimate.velocity_eci_mps, dtype=float)
 
     horizontal_position = estimated_position - float(np.dot(estimated_position, vertical)) * vertical
-    corrected_position = horizontal_position + (C.R_EARTH + measurement.altitude_m) * vertical
+    surface_radius = float(vec_norm(state.r)) - float(state.altitude)
+    corrected_position = horizontal_position + (surface_radius + measurement.altitude_m) * vertical
 
     horizontal_velocity = estimated_velocity - float(np.dot(estimated_velocity, vertical)) * vertical
     corrected_velocity = horizontal_velocity + measurement.vertical_velocity_mps * vertical
