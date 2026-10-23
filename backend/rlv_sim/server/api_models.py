@@ -42,7 +42,8 @@ class MissionSetup(BaseModel):
             "stage_sep_alt_km",
         ),
     )
-    stage_sep_velocity: float = Field(gt=0)
+    # Retired setting: still accepted so older saved setups load; ignored.
+    stage_sep_velocity: float | None = None
     dt: float = Field(gt=0, le=5)
     t_max: float = Field(gt=0, le=7200)
 

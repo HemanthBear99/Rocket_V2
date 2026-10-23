@@ -41,7 +41,6 @@ from rlv_sim.core.utils import (
 from rlv_sim.physics import numba_kernels as _numba_kernels
 from rlv_sim.physics.high_fidelity_atmosphere import (
     compute_gram_atmosphere,
-    eci_to_geodetic,
 )
 
 logger = logging.getLogger(__name__)
@@ -213,11 +212,11 @@ def compute_configured_atmosphere_properties(altitude: float, config=None, r: np
     density_modifier = 1.0
 
     if enable_high_fidelity and r is not None:
-        lat_deg, lon_deg, geodetic_alt = eci_to_geodetic(r, t)
-        altitude = geodetic_alt
-        density_modifier, _tropopause_base = compute_gram_atmosphere(lat_deg, lon_deg, geodetic_alt)
-        # Note: We could dynamically adjust US-76 model boundaries here, but keeping it simple:
-        # scale the computed density/pressure using the GRAM density modifier.
+        # The modifier depends on latitude only, which needs no Earth-rotation
+        # angle; the caller's altitude is kept so every model sees one surface.
+        r_norm = float(vec_norm(r))
+        lat_deg = float(np.degrees(np.arcsin(np.clip(float(r[2]) / max(r_norm, 1.0), -1.0, 1.0))))
+        density_modifier, _tropopause_base = compute_gram_atmosphere(lat_deg, 0.0, altitude)
 
     enable_upper = bool(getattr(config, "enable_upper_atmosphere", False))
     temperature, pressure, density, speed_of_sound = compute_atmosphere_properties(
@@ -637,7 +636,7 @@ def compute_drag_force(
     Uses Earth rotation for relative velocity (wind).
     """
     altitude = _altitude_from_r(r, config)
-    _, _, rho, speed_of_sound = compute_configured_atmosphere_properties(altitude, config)
+    _, _, rho, speed_of_sound = compute_configured_atmosphere_properties(altitude, config, r=r)
 
     if rho < C.DENSITY_FLOOR:
         return np.zeros(3)
@@ -679,7 +678,7 @@ def compute_lift_force(
     tabular Aero-Deck if available.
     """
     altitude = _altitude_from_r(r, config)
-    _, _, rho, speed_of_sound = compute_configured_atmosphere_properties(altitude, config)
+    _, _, rho, speed_of_sound = compute_configured_atmosphere_properties(altitude, config, r=r)
     if rho < C.DENSITY_FLOOR:
         return np.zeros(3)
 
@@ -867,8 +866,8 @@ def compute_thrust_force(q: np.ndarray, r: np.ndarray, thrust_on: bool = True, t
     if throttle < 0.01:
         return np.zeros(3)
 
-    altitude = vec_norm(r) - C.R_EARTH
-    _, P_amb, _, _ = compute_configured_atmosphere_properties(altitude, config)
+    altitude = _altitude_from_r(r, config)
+    _, P_amb, _, _ = compute_configured_atmosphere_properties(altitude, config, r=r)
     P0 = C.ATM_P0
 
     if stage == 2:
@@ -920,7 +919,7 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
     Models the aerodynamic instability (CP ahead of CG) or uses tabular Aero-Deck.
     """
     altitude = _altitude_from_r(r, config)
-    _, _, rho, speed_of_sound = compute_configured_atmosphere_properties(altitude, config)
+    _, _, rho, speed_of_sound = compute_configured_atmosphere_properties(altitude, config, r=r)
 
     if rho < C.DENSITY_FLOOR:
         return np.zeros(3)

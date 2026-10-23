@@ -188,9 +188,6 @@ FIELD_DOCS: dict[str, str] = {
         "Vacuum specific impulse of the upper stage engine, which sets how much velocity each unit of "
         "propellant gives."
     ),
-    "stage_sep_velocity": (
-        "Speed of the stack at the moment the booster and upper stage separate."
-    ),
     "target_inclination_deg": (
         "Inclination of the target orbit relative to the equator, which sets the orbital plane to "
         "reach."
@@ -489,9 +486,6 @@ FIELD_DOCS: dict[str, str] = {
     ),
     "separation_tumble_rate": (
         "Rotation rate the booster picks up at separation, causing it to tumble until controlled."
-    ),
-    "atmosphere_model": (
-        "Atmosphere model name; the default is a deterministic US Standard Atmosphere 1976 model."
     ),
     "enable_upper_atmosphere": (
         "Enables the upper-atmosphere density model used for high-altitude drag and abort checks."

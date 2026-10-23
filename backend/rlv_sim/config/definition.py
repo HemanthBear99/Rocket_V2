@@ -202,7 +202,6 @@ class SimulationConfig:
     landing_engine_count: int = C.LANDING_ENGINE_COUNT
     vehicle_diameter_m: float = C.REFERENCE_DIAMETER
     stage2_isp_vac: float = C.STAGE2_ISP_VAC
-    stage_sep_velocity: float = 2200.0
     target_inclination_deg: float = 28.5
 
     booster_boostback_budget_kg: float = 43000.0
@@ -339,7 +338,6 @@ class SimulationConfig:
     enable_separation_dynamics: bool = True
     separation_delta_v: float = 1.5
     separation_tumble_rate: float = 0.02
-    atmosphere_model: str = "us76_deterministic"
     enable_upper_atmosphere: bool = False
     enable_stochastic_wind: bool = False
     wind_turbulence_intensity: float = 2.0
@@ -719,7 +717,6 @@ class MissionProfile:
     orbit_target_altitude_m: float
     target_inclination_deg: float
     orbit_insertion_start_altitude_m: float
-    stage_sep_velocity: float
 
 
 @dataclass(frozen=True)
@@ -743,7 +740,6 @@ class PhysicsProfile:
     enable_lift: bool
     enable_j2: bool
     gravity_model: str
-    atmosphere_model: str
     enable_upper_atmosphere: bool
     enable_stochastic_wind: bool
 
@@ -785,7 +781,6 @@ def _mission_profile(config: SimulationConfig) -> MissionProfile:
         orbit_target_altitude_m=config.orbit_target_altitude_m,
         target_inclination_deg=config.target_inclination_deg,
         orbit_insertion_start_altitude_m=config.orbit_insertion_start_altitude_m,
-        stage_sep_velocity=config.stage_sep_velocity,
     )
 
 
@@ -811,7 +806,6 @@ def _physics_profile(config: SimulationConfig) -> PhysicsProfile:
         enable_lift=config.enable_lift,
         enable_j2=config.enable_j2,
         gravity_model=config.gravity_model,
-        atmosphere_model=config.atmosphere_model,
         enable_upper_atmosphere=config.enable_upper_atmosphere,
         enable_stochastic_wind=config.enable_stochastic_wind,
     )
@@ -876,7 +870,6 @@ def _from_profiles(
             "orbit_target_altitude_m": mission.orbit_target_altitude_m,
             "target_inclination_deg": mission.target_inclination_deg,
             "orbit_insertion_start_altitude_m": mission.orbit_insertion_start_altitude_m,
-            "stage_sep_velocity": mission.stage_sep_velocity,
         })
     if recovery is not None:
         values.update({
@@ -898,7 +891,6 @@ def _from_profiles(
             "enable_lift": physics.enable_lift,
             "enable_j2": physics.enable_j2,
             "gravity_model": physics.gravity_model,
-            "atmosphere_model": physics.atmosphere_model,
             "enable_upper_atmosphere": physics.enable_upper_atmosphere,
             "enable_stochastic_wind": physics.enable_stochastic_wind,
         })

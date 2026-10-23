@@ -7,6 +7,8 @@ from rlv_sim.config.definition import SimulationConfig
 # Fields removed because nothing read them; still accepted (and ignored) so
 # older saved configs keep loading.
 RETIRED_FIELDS = frozenset((
+    "stage_sep_velocity",   # never read; separation is set by MECO mass
+    "atmosphere_model",     # label only; the atmosphere is always US-76
     "ascent_max_q_prediction_horizon_s",
     "s2_landing_start_altitude_m",
     "landing_target_cross_track_offset_m",

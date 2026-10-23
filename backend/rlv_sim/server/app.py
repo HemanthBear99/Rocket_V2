@@ -283,8 +283,6 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
         )
     if "target_inclination_deg" in m:
         overrides["target_inclination_deg"] = float(m["target_inclination_deg"])
-    if "stage_sep_velocity" in m:
-        overrides["stage_sep_velocity"] = float(m["stage_sep_velocity"])
 
     r = setup.recovery.model_dump()
     if "landing_lat" in r:
@@ -644,7 +642,6 @@ async def frontend_config_defaults() -> dict[str, Any]:
             "orbit_insertion_start_alt_km": (
                 config.orbit_insertion_start_altitude_m / 1000.0
             ),
-            "stage_sep_velocity": config.stage_sep_velocity,
             "dt": config.dt,
             "t_max": config.max_time,
         },

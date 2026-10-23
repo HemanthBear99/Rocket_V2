@@ -20,11 +20,7 @@ CONSUMED_IN_CONFIG = {
 # Known dead settings still being wired or retired (root-cause plan, RC4).
 # Remove an entry when its field is wired or retired; the test fails if a
 # listed field becomes read (stale list) or a new dead field appears.
-PENDING_WIRING = {
-    "stage_sep_velocity",
-    "target_inclination_deg",
-    "atmosphere_model",
-}
+PENDING_WIRING: set[str] = set()
 
 # Factory values that may differ from the dataclass defaults (none: one source).
 PROFILE_OVERRIDES: set[str] = set()

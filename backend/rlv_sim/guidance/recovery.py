@@ -124,14 +124,21 @@ def target_landing_site_eci(
         config.booster_landing_site_lat_deg is not None and
         config.booster_landing_site_lon_deg is not None
     ):
-        return _fixed_surface_site_eci(
+        site = _fixed_surface_site_eci(
             t,
             config.booster_landing_site_lat_deg,
             config.booster_landing_site_lon_deg,
             altitude_m=config.booster_landing_site_altitude_m,
         )
+        if abs(float(downrange_km)) < 1e-12:
+            return site
+        # A movable target shifts an explicit site east by its offset too
+        # (validate() pins the base downrange to 0 for explicit sites).
+        base = site
+    else:
+        base = rotating_launch_site_eci(t, config=config)
 
-    launch = rotating_launch_site_eci(t, config=config)
+    launch = base
     launch_hat = launch / max(vec_norm(launch), 1e-9)
     k_axis = np.array([0.0, 0.0, 1.0], dtype=float)
     east = cross3(k_axis, launch_hat)

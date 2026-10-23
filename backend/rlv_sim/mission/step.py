@@ -721,7 +721,9 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
     requested_thrust_on = bool(guidance.get('thrust_on', False))
     throttle_cmd = float(guidance.get('throttle', 1.0))
     propellant_available = state.m > (dry_mass + 1e-6)
-    if not propellant_available:
+    if not propellant_available or not requested_thrust_on:
+        # An engine-off command spools the engine down, so a later ignition
+        # spools up again instead of restarting at the old throttle.
         throttle_cmd = 0.0
     actual_throttle = throttle_cmd
     if config.enable_engine_transients:

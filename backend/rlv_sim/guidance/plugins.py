@@ -14,8 +14,10 @@ Select it with ``booster_landing_guidance="plugin"`` and
 
 The command is converted to a thrust direction and a throttle
 (|a| / state.max_accel_mps2, clipped to [0, 1]). The sim still enforces the
-vehicle limits: the touchdown tilt cone, engine throttle range, attitude
-dynamics, and the engine cutoff below 10 m once the descent rate is safe.
+vehicle limits: the touchdown tilt cone, attitude dynamics, engine spool
+rate and the engine cutoff below 10 m once the descent rate is safe. The
+minimum throttle is NOT enforced on the booster path (known limit; the
+built-in booster guidance also commands deep throttle).
 It is called once per guidance step during the landing burn only; boostback
 and entry use the built-in guidance.
 

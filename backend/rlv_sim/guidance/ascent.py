@@ -33,6 +33,24 @@ from rlv_sim.physics.forces import (
 Q_HOLD_TIME_CONSTANT_S = 3.0
 
 
+
+def launch_azimuth_rad(config) -> float:
+    """Inertial launch azimuth (rad from north) for the target inclination.
+
+    Spherical trigonometry for a launch at geocentric latitude phi:
+    sin(Az) = cos(i) / cos(phi), ascending (north-east) branch. An inclination
+    below the launch latitude cannot be reached by a direct ascent; it is
+    clamped to due east, the minimum-inclination launch (what every launch
+    flew before this setting was wired). Earth-rotation azimuth correction is
+    not modelled.
+    """
+    if config is None:
+        return float(C.PITCHOVER_AZIMUTH)
+    inc = np.radians(float(config.target_inclination_deg))
+    lat = np.radians(float(config.launch_site_lat_deg))
+    ratio = float(np.clip(np.cos(inc) / max(np.cos(lat), 1e-9), -1.0, 1.0))
+    return float(np.arcsin(ratio))
+
 def compute_q_hold_throttle(r, v, v_rel, m, q_dyn, q_rate, config):
     """Throttle that keeps dynamic pressure at or below the max-q target.
 
@@ -188,10 +206,8 @@ def compute_desired_thrust_direction(
     guidance_dir /= vec_norm(guidance_dir)
 
     if pitchover_active:
-        pitchover_axis = (
-            np.cos(C.PITCHOVER_AZIMUTH) * north
-            + np.sin(C.PITCHOVER_AZIMUTH) * east
-        )
+        azimuth = launch_azimuth_rad(config)
+        pitchover_axis = np.cos(azimuth) * north + np.sin(azimuth) * east
         pitchover_axis /= vec_norm(pitchover_axis)
 
         kick_peak_alt = min(pitchover_start_alt + 500.0, pitchover_end_alt)

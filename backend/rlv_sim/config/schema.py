@@ -142,7 +142,6 @@ _GROUPS: tuple[tuple[str, str], ...] = (
     ("enable_atmosphere", "Environment"),
     ("enable_high_fidelity", "Environment"),
     ("enable_upper_atmosphere", "Environment"),
-    ("atmosphere_model", "Environment"),
     ("enable_drag", "Environment"),
     ("enable_lift", "Environment"),
     ("enable_j2", "Environment"),
@@ -157,7 +156,7 @@ _UNITS = (
 # Form fields the Mission Setup tabs already edit (server.app.map_config).
 FORM_FIELDS = frozenset({
     "dt", "max_time", "orbit_target_altitude_m", "orbit_insertion_start_altitude_m",
-    "target_inclination_deg", "stage_sep_velocity", "booster_landing_site_lat_deg",
+    "target_inclination_deg", "booster_landing_site_lat_deg",
     "booster_landing_site_lon_deg", "enable_grid_fins", "enable_landing_legs",
     "enable_j2", "enable_atmosphere", "enable_drag", "enable_lift", "enable_imu",
     "enable_gps", "enable_landing_altimeter", "stage1_engine_count",
