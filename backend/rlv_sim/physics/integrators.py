@@ -78,18 +78,25 @@ def rk4_step(state: State, torque: np.ndarray, dt: float,
         )
         if mdot_now < 0.0 and state.m + mdot_now * dt < dry_mass:
             t_to_dry = (state.m - dry_mass) / (-mdot_now)
+            # Both sub-steps use the plain RK4 core: re-entering rk4_step let
+            # rounding re-trigger this split with identical arguments until
+            # Python's recursion limit (seen at S2 m=6675.133319624401, dt=20).
+            coast_ctx = replace(ctx, thrust_on=False, throttle=0.0)
             if t_to_dry <= C.ZERO_TOLERANCE:
-                coast_ctx = replace(ctx, thrust_on=False, throttle=0.0)
-                return rk4_step(state, torque, dt, ctx=coast_ctx)
+                return _rk4_core(state, torque, dt, coast_ctx, dry_mass)
             powered_dt = min(float(t_to_dry), float(dt))
             coast_dt = float(dt) - powered_dt
-            powered_state = rk4_step(state, torque, powered_dt, ctx=ctx)
+            powered_state = _rk4_core(state, torque, powered_dt, ctx, dry_mass)
             powered_state.m = dry_mass
             if coast_dt <= C.ZERO_TOLERANCE:
                 return powered_state
-            coast_ctx = replace(ctx, thrust_on=False, throttle=0.0)
-            return rk4_step(powered_state, torque, coast_dt, ctx=coast_ctx)
+            return _rk4_core(powered_state, torque, coast_dt, coast_ctx, dry_mass)
 
+    return _rk4_core(state, torque, dt, ctx, dry_mass)
+
+
+def _rk4_core(state: State, torque: np.ndarray, dt: float, ctx, dry_mass: float) -> State:
+    """One classical RK4 step with quaternion renormalisation (no exhaustion split)."""
     t = state.t
     y = state.to_vector()
 
