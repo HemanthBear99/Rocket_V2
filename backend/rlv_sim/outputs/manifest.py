@@ -65,12 +65,12 @@ def build_run_manifest(
             "assessment": assessment,
             "termination": termination,
         },
-        "credibility": _credibility_block(),
+        "credibility": credibility_block(),
     }
     return manifest
 
 
-def _credibility_block() -> dict[str, Any]:
+def credibility_block() -> dict[str, Any]:
     """NASA-STD-7009-style input pedigree (0 = none ... 4 = flight data).
 
     Input pedigree is scored at the lowest-quality input, so the overall

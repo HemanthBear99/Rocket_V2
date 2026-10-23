@@ -69,6 +69,28 @@ def _field_errors(config, rules) -> list[str]:
             errors.append(f"{name} {phrase}, got {value}")
     return errors
 
+def _wind_mode_errors(modes) -> list[str]:
+    """Each wind mode is (amplitude m/s, wavelength m > 0, phase rad)."""
+    try:
+        items = list(modes)
+    except TypeError:
+        return [f"runtime_wind_profile_modes must be a list of modes, got {modes!r}"]
+    errors = []
+    for index, mode in enumerate(items):
+        try:
+            amplitude, wavelength, phase = (float(x) for x in mode)
+        except (TypeError, ValueError):
+            errors.append(
+                f"runtime_wind_profile_modes[{index}] must be [amplitude_mps, wavelength_m, phase_rad], got {mode!r}"
+            )
+            continue
+        if not all(math.isfinite(x) for x in (amplitude, wavelength, phase)) or wavelength <= 0.0:
+            errors.append(
+                f"runtime_wind_profile_modes[{index}] needs finite values and a positive wavelength, got {mode!r}"
+            )
+    return errors
+
+
 @dataclass(frozen=True)
 class SimulationConfig:
     """
@@ -229,7 +251,11 @@ class SimulationConfig:
     #   "heuristic" - latched suicide burn with ZEM/ZEV divert (default)
     #   "gfold"     - G-FOLD convex minimum-fuel powered descent, re-planned
     #                 every gfold_replan_period_s (needs the optional cvxpy)
+    #   "plugin"    - a user guidance plugin (booster_landing_plugin); see
+    #                 guidance.plugins
     booster_landing_guidance: str = "heuristic"
+    # Plugin name (file stem) in the user plugin folder or the bundled examples.
+    booster_landing_plugin: str = ""
     gfold_replan_period_s: float = 1.0
     gfold_nodes: int = 25
     gfold_glideslope_deg: float = 5.0
@@ -366,6 +392,24 @@ class SimulationConfig:
     # Multiplier on booster descent drag (entry/landing), fitted to Falcon 9
     # webcast telemetry by validation/drag_fit.py.
     booster_descent_drag_scale: float = 1.0
+
+    # Vehicle geometry and mass properties (defaults: the Falcon 9-like
+    # reference vehicle in core.constants). Nozzle geometry feeds per-axis
+    # jet damping; the inertias are linear in propellant between full/empty.
+    stage1_engine_ring_radius_m: float = C.STAGE1_ENGINE_RING_RADIUS_M
+    stage1_nozzle_exit_radius_m: float = C.STAGE1_NOZZLE_EXIT_RADIUS_M
+    stage2_nozzle_exit_radius_m: float = C.STAGE2_NOZZLE_EXIT_RADIUS_M
+    stack_ixx_full_kgm2: float = C.IXX_FULL
+    stack_ixx_empty_kgm2: float = C.IXX_EMPTY
+    stack_izz_full_kgm2: float = C.IZZ_FULL
+    stack_izz_empty_kgm2: float = C.IZZ_EMPTY
+    # Booster after separation: CG measured from the base.
+    booster_cg_full_m: float = C.STAGE1_RECOVERY_CG_FULL
+    booster_cg_empty_m: float = C.STAGE1_RECOVERY_CG_EMPTY
+    booster_ixx_full_kgm2: float = C.STAGE1_RECOVERY_IXX_FULL
+    booster_ixx_empty_kgm2: float = C.STAGE1_RECOVERY_IXX_EMPTY
+    booster_izz_full_kgm2: float = C.STAGE1_RECOVERY_IZZ_FULL
+    booster_izz_empty_kgm2: float = C.STAGE1_RECOVERY_IZZ_EMPTY
 
     verbose: bool = True
 
@@ -564,11 +608,33 @@ class SimulationConfig:
                 "demo_coast_max_dt must be >= dt "
                 f"({self.demo_coast_max_dt} < {self.dt})"
             )
-        if self.booster_landing_guidance not in ("heuristic", "gfold"):
+        if self.booster_landing_guidance not in ("heuristic", "gfold", "plugin"):
             errors.append(
-                "booster_landing_guidance must be 'heuristic' or 'gfold', "
+                "booster_landing_guidance must be 'heuristic', 'gfold' or 'plugin', "
                 f"got {self.booster_landing_guidance!r}"
             )
+        if self.booster_landing_guidance == "plugin":
+            from rlv_sim.guidance.plugins import plugin_error
+
+            message = plugin_error(self.booster_landing_plugin)
+            if message:
+                errors.append(message)
+        errors += _wind_mode_errors(self.runtime_wind_profile_modes)
+        errors += _field_errors(self, (
+            ("stage1_engine_ring_radius_m", "nonneg"),
+            ("stage1_nozzle_exit_radius_m", "positive"),
+            ("stage2_nozzle_exit_radius_m", "positive"),
+            ("stack_ixx_full_kgm2", "positive"),
+            ("stack_ixx_empty_kgm2", "positive"),
+            ("stack_izz_full_kgm2", "positive"),
+            ("stack_izz_empty_kgm2", "positive"),
+            ("booster_cg_full_m", "positive"),
+            ("booster_cg_empty_m", "positive"),
+            ("booster_ixx_full_kgm2", "positive"),
+            ("booster_ixx_empty_kgm2", "positive"),
+            ("booster_izz_full_kgm2", "positive"),
+            ("booster_izz_empty_kgm2", "positive"),
+        ))
         errors += _field_errors(self, (
             ("stage1_engine_thrust_n", "positive"),
             ("vehicle_diameter_m", "positive"),
@@ -608,6 +674,8 @@ class SimulationConfig:
             ("abort_attitude_threshold", "nonneg"),
             ("runtime_thrust_scale", "positive"),
             ("runtime_isp_scale", "positive"),
+            ("runtime_atmosphere_density_scale", "positive"),
+            ("booster_descent_drag_scale", "positive"),
         ))
 
         if C.INITIAL_MASS + self.runtime_initial_mass_offset_kg <= C.DRY_MASS + self.stage1_landing_fuel_reserve_kg:

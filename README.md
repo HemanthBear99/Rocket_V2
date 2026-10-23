@@ -74,6 +74,32 @@ pyinstaller desktop_app.spec --noconfirm        # -> desktop/dist/Vyom.exe
 ISCC installer\vyom.iss                         # -> desktop/dist/VyomSetup-<version>.exe
 ```
 
+## For researchers
+
+Everything below is available in the app (web UI and desktop exe) as well as the CLI.
+
+- **Every setting is editable.** Mission Setup → *All Settings* lists all ~190
+  configuration fields, grouped and searchable, with units, limits and help text
+  (served by `GET /api/config/schema`). *Wind & Dispersions* sets the mean wind,
+  descent-drag and density scales, turbulence, and altitude-varying wind modes.
+- **Your own landing guidance.** Drop a Python file with a
+  `landing_command(state)` function into the plugin folder (`%APPDATA%\Vyom\plugins`,
+  or `RLV_PLUGIN_DIR`) and pick it as the landing guidance, for a single run or a
+  whole Monte Carlo campaign. Start from
+  [example_zem_zev.py](backend/rlv_sim/guidance/plugin_examples/example_zem_zev.py);
+  the interface is documented in
+  [guidance/plugins.py](backend/rlv_sim/guidance/plugins.py).
+- **Campaign analysis.** Standard or extended dispersions, ±1σ sensitivity and ±3σ
+  driver sweeps, one-sided Clopper-Pearson lower bounds, 3σ tail percentiles, a
+  ranked table of what drives each outcome, live replay of any case, and re-running
+  only the failed cases.
+- **Flight validation.** Simulated ascent overlaid on four Falcon 9 flights
+  (webcast telemetry), with per-event differences.
+- **Model & limits.** Every physics and guidance model with its source, validity
+  limit and NASA-STD-7009-style input pedigree, plus the known limits of the results.
+- **Vehicle geometry is configurable**: nozzle and engine-ring radii, full/empty
+  inertias and booster CG are config fields, not constants.
+
 ## Status
 
 Research/educational tool, not flight-qualified software. Pass/fail

@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Vyom</title>
-<link rel="stylesheet" href="/static/css/style.css?v=0.4.1" />
+<link rel="stylesheet" href="/static/css/style.css?v=0.5.0" />
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
@@ -43,6 +43,14 @@
       <div class="nav-item" data-view="compare">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 4v16M16 4v16M4 8h8M12 16h8"/></svg>
         Compare Runs
+      </div>
+      <div class="nav-item" data-view="validation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-5 4 4 8-9"/><path d="M14 7h6v6"/></svg>
+        Flight Validation
+      </div>
+      <div class="nav-item" data-view="model">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
+        Model &amp; Limits
       </div>
       <div class="nav-item" data-view="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .35 1.9l.05.05a2 2 0 1 1-2.85 2.85l-.05-.05a1.7 1.7 0 0 0-1.9-.35 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.55 1.7 1.7 0 0 0-1.9.35l-.05.05a2 2 0 1 1-2.85-2.85l.05-.05a1.7 1.7 0 0 0 .35-1.9 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.65 9.4a1.7 1.7 0 0 0-.35-1.9l-.05-.05a2 2 0 1 1 2.85-2.85l.05.05a1.7 1.7 0 0 0 1.9.35H9.2A1.7 1.7 0 0 0 10.2 3.5V3a2 2 0 1 1 4 0v.1c0 .66.39 1.25 1 1.55.62.26 1.34.14 1.9-.35l.05-.05a2 2 0 1 1 2.85 2.85l-.05.05c-.49.56-.61 1.28-.35 1.9v.1c.3.61.89 1 1.55 1H21a2 2 0 1 1 0 4h-.1c-.66 0-1.25.39-1.5 1z"/></svg>
@@ -90,7 +98,6 @@
               <div><div class="lbl">Auto-size recovery fuel</div><div class="desc">Booster reserve sized from its dry mass</div></div>
               <label class="switch"><input type="checkbox" id="toggle-auto-reserve"/><span class="track"><span class="thumb"></span></span></label>
             </div>
-            <div id="quick-gfold"></div>
           </div>
         </div>
         <div class="card import-card">
@@ -125,6 +132,8 @@
         <div class="tab" data-tab="mission">Mission Profile</div>
         <div class="tab" data-tab="recovery">Booster Recovery</div>
         <div class="tab" data-tab="physics">Physics Model</div>
+        <div class="tab" data-tab="wind">Wind &amp; Dispersions</div>
+        <div class="tab" data-tab="advanced">All Settings <span class="tab-count" id="adv-count"></span></div>
       </div>
 
       <div class="tab-panel active" data-panel="vehicle">
@@ -138,6 +147,33 @@
       </div>
       <div class="tab-panel" data-panel="physics">
         <div class="grid grid-4" id="form-physics"></div>
+      </div>
+      <div class="tab-panel" data-panel="wind">
+        <p class="help-text panel-intro">Day-of-launch wind and model uncertainties for a single run. A negative wind offset is a
+          headwind on the booster's return. Monte Carlo campaigns disperse around the values set here.</p>
+        <div class="grid grid-4" id="form-wind"></div>
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head"><div class="card-title">Altitude-varying wind modes</div>
+            <div class="btn-row" style="margin:0;">
+              <button class="btn btn-sm" id="btn-wind-preset">Add 4 layered modes</button>
+              <button class="btn btn-sm" id="btn-wind-add">Add mode</button>
+              <button class="btn btn-sm btn-danger" id="btn-wind-clear">Clear</button>
+            </div></div>
+          <p class="help-text">Each mode adds a sinusoidal wind perturbation with altitude,
+            amplitude &middot; sin(2&pi; &middot; altitude / wavelength + phase), on top of the mean profile.</p>
+          <table class="data-table" id="wind-modes-table"><thead><tr><th>Amplitude (m/s)</th><th>Wavelength (m)</th><th>Phase (deg)</th><th></th></tr></thead><tbody></tbody></table>
+          <div class="help-text" id="wind-modes-empty">No modes: mean wind profile only.</div>
+        </div>
+      </div>
+      <div class="tab-panel" data-panel="advanced">
+        <div class="adv-toolbar">
+          <input type="search" id="adv-search" placeholder="Search settings by name or description&hellip;"/>
+          <label class="adv-check"><input type="checkbox" id="adv-changed-only"/> Changed only</label>
+          <button class="btn btn-sm btn-danger" id="btn-adv-reset">Reset all to defaults</button>
+        </div>
+        <p class="help-text panel-intro">Every simulator setting, grouped. Values that differ from the default are highlighted and
+          sent with the launch. Settings that have their own field on the other tabs are edited there.</p>
+        <div id="adv-groups"></div>
       </div>
 
       <div class="launch-bar">
@@ -263,6 +299,14 @@
             <select id="camp-mode">
               <option value="monte_carlo">Monte Carlo (randomized dispersions)</option>
               <option value="sensitivity">Sensitivity (±1σ per parameter)</option>
+              <option value="sweep_3sigma">Driver sweep (±3σ per parameter)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Dispersions</label>
+            <select id="camp-dispersions">
+              <option value="legacy">Standard: thrust, Isp, mass, wind, atmosphere, pitchover</option>
+              <option value="extended">Extended: + descent drag, separation &Delta;v, GPS noise, altitude-varying wind</option>
             </select>
           </div>
           <div class="field-row">
@@ -271,10 +315,7 @@
           </div>
           <div class="field">
             <label>Landing guidance</label>
-            <select id="camp-guidance">
-              <option value="heuristic">Heuristic suicide burn</option>
-              <option value="gfold">G-FOLD convex descent</option>
-            </select>
+            <select id="camp-guidance"></select>
           </div>
           <div class="field">
             <label>Parallel workers <span class="unit">processes</span></label>
@@ -296,7 +337,9 @@
 
       <div id="camp-results" style="display:none;">
         <div class="section-title" style="display:flex;align-items:center;">Results Summary
-          <button class="btn btn-sm btn-primary no-print" id="btn-export-campaign-pdf" style="margin-left:auto;">Export PDF</button></div>
+          <span style="margin-left:auto;display:flex;gap:8px;">
+            <button class="btn btn-sm no-print" id="btn-rerun-failed">Re-run failed cases</button>
+            <button class="btn btn-sm btn-primary no-print" id="btn-export-campaign-pdf">Export PDF</button></span></div>
         <div class="grid grid-2">
           <div class="card"><div id="camp-gauge" class="camp-gauge"></div><div class="metric-grid" id="camp-summary-grid"></div></div>
           <div class="card"><div class="card-head"><div class="card-title">Failure Criteria</div></div><div id="camp-failure-grid"></div></div>
@@ -305,7 +348,12 @@
           <div class="card" id="camp-hist-touchdown"></div>
           <div class="card" id="camp-hist-site"></div>
         </div>
-        <div class="section-title">Metric Distributions (median / p05 / p95)</div>
+        <div id="camp-drivers-wrap" style="display:none;">
+          <div class="section-title" id="camp-drivers-title">What drives the outcome</div>
+          <div class="card" style="overflow:auto;"><div class="help-text" id="camp-drivers-help"></div>
+            <table class="data-table" id="camp-drivers-table"><thead></thead><tbody></tbody></table></div>
+        </div>
+        <div class="section-title">Metric Distributions (median, 5th–95th percentile and 3σ tails)</div>
         <div class="card" style="max-height:280px;overflow:auto;">
           <table class="data-table" id="camp-metrics-table"><thead></thead><tbody></tbody></table>
         </div>
@@ -335,6 +383,58 @@
       </div>
       <div id="cmp-empty" class="help-text" style="margin-top:16px;">Pick two runs and press Compare.</div>
       <div id="cmp-results" style="display:none;"></div>
+    </section>
+
+    <section class="view hidden" id="view-validation">
+      <div class="card">
+        <div class="card-head"><div class="card-title">Simulated ascent vs Falcon 9 flight telemetry</div>
+          <button class="btn btn-sm btn-primary" id="btn-run-flight-validation">Run comparison</button></div>
+        <p class="help-text">Flies the default vehicle against four Falcon 9 flights recorded from SpaceX webcasts
+          (altitude and speed at 1 Hz) and compares lift-off to MECO plus key events. The first run takes about a
+          minute; the result is then kept until the app restarts.</p>
+        <div id="val-notes" class="help-text"></div>
+      </div>
+      <div id="val-empty" class="help-text" style="margin-top:16px;">Press <b>Run comparison</b> to fly the validation cases.</div>
+      <div id="val-results"></div>
+    </section>
+
+    <section class="view hidden" id="view-model">
+      <div class="card">
+        <div class="card-head"><div class="card-title">Known limits</div></div>
+        <ul class="limit-list" id="model-limits"></ul>
+      </div>
+      <div class="section-title">Physics and guidance models</div>
+      <div class="card" style="overflow:auto;">
+        <table class="data-table" id="model-table"><thead><tr><th>Area</th><th>Model</th><th>Basis</th><th>Validity limit</th><th>Pedigree</th></tr></thead><tbody></tbody></table>
+        <div class="help-text" style="margin-top:8px;">Pedigree uses NASA-STD-7009-style input scoring: 0 none, 1 engineering
+          estimate, 2 standard model or public data, 3 published reference data, 4 flight data.</div>
+      </div>
+      <div class="section-title">Credibility of inputs</div>
+      <div class="grid grid-2">
+        <div class="card" style="overflow:auto;"><div class="card-head"><div class="card-title">Model inputs</div><span class="badge" id="model-pedigree-score">—</span></div>
+          <table class="data-table" id="model-inputs-table"><thead><tr><th>Input</th><th>Pedigree</th><th>Source</th></tr></thead><tbody></tbody></table></div>
+        <div class="card" style="overflow:auto;"><div class="card-head"><div class="card-title">Monte Carlo dispersions (1σ)</div></div>
+          <table class="data-table" id="model-disp-table"><thead><tr><th>Parameter</th><th>1σ</th><th>Units</th><th>Pedigree</th><th>Source</th></tr></thead><tbody></tbody></table></div>
+      </div>
+      <div class="section-title">Your own landing guidance (plugins)</div>
+      <div class="card">
+        <div class="card-head"><div class="card-title">Plugins</div><button class="btn btn-sm" id="btn-plugins-reload">Reload</button></div>
+        <p class="help-text">Put a Python file in <code id="plugin-folder">—</code>, then pick it under <b>Mission Setup &rarr; Booster
+          Recovery &rarr; Landing guidance</b>, or in a Monte Carlo campaign to compare it with the built-in guidance on the same
+          dispersions. The plugin flies the landing burn; the simulator still enforces the tilt cone, throttle range and attitude dynamics.</p>
+        <table class="data-table" id="plugin-table"><thead><tr><th>Plugin</th><th>Description</th><th>Location</th><th>Status</th></tr></thead><tbody></tbody></table>
+        <pre class="code-block">NAME = "My guidance"
+DESCRIPTION = "What it does"
+
+def landing_command(state):
+    # Return the commanded thrust acceleration (m/s², ECI), including the counter-gravity part.
+    # state: t, altitude_m, up, position_error_m, velocity_mps, vertical_speed_mps,
+    #        horizontal_velocity_mps, mass_kg, propellant_kg, max_accel_mps2, gravity_mps2,
+    #        time_to_go_s, tilt_limit_deg, target_descent_rate_mps
+    a_vertical = state.gravity_mps2 + ...
+    return a_vertical * state.up + ...</pre>
+        <div class="help-text">Start from the bundled <code>example_zem_zev.py</code> (textbook ZEM/ZEV).</div>
+      </div>
     </section>
 
     <section class="view hidden" id="view-settings">
@@ -441,6 +541,6 @@
 <script src="/static/js/charts.js?v=0.4.0"></script>
 <script src="/static/js/rocket_viz.js?v=0.3.2"></script>
 <script src="/static/js/report_charts.js?v=0.1.0"></script>
-<script src="/static/js/app.js?v=0.9.0"></script>
+<script src="/static/js/app.js?v=0.10.0"></script>
 </body>
 </html>

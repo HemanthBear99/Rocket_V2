@@ -34,6 +34,12 @@ RETIRED_FIELDS = frozenset((
 
 def _with_overrides(config: SimulationConfig, **overrides: Any) -> SimulationConfig:
     overrides = {k: v for k, v in overrides.items() if k not in RETIRED_FIELDS}
+    modes = overrides.get("runtime_wind_profile_modes")
+    if isinstance(modes, list):
+        # JSON clients send lists; the frozen config holds hashable tuples.
+        overrides["runtime_wind_profile_modes"] = tuple(
+            tuple(mode) if isinstance(mode, list) else mode for mode in modes
+        )
     if overrides:
         config = SimulationConfig(**{**config.__dict__, **overrides})
     if config.auto_size_recovery_reserve:

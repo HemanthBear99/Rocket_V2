@@ -21,6 +21,7 @@ include = ["rlv_sim*"]
 
 [tool.setuptools.package-data]
 "rlv_sim.aero" = ["decks/*.json"]
+"rlv_sim.guidance" = ["plugin_examples/*.py"]
 "rlv_sim.validation" = ["data/*", "data/**/*"]
 
 [project.scripts]

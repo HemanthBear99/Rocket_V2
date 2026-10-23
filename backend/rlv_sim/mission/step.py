@@ -744,6 +744,7 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
     I_tensor = compute_inertia_tensor(
         state.m, vehicle_model=vehicle_model,
         stage1_landing_reserve_kg=stage1_landing_reserve_kg,
+        config=config,
     )
     inertia_diag = np.array([I_tensor[0, 0], I_tensor[1, 1], I_tensor[2, 2]])
 

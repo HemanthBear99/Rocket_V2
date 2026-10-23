@@ -8,18 +8,24 @@ authority for their equation forms and validity limits (`forces.py`,
 
 **Scope.** Records (a) which equation forms are standard textbook mechanics,
 (b) which are published reference data, and (c) which are project assumptions
-or engineering approximations. It does **not** claim a validation report against
-flight data — none exists for this vehicle.
+or engineering approximations. The comparison against Falcon 9 webcast telemetry is
+in `docs/VALIDATION.md` (also shown in the app's Flight Validation page).
 
 ## 1. Six-degree-of-freedom rigid-body dynamics
 
-`dynamics.py`: rotational `I*omega_dot = tau - omega x (I*omega)`, translational
-`r_ddot = F_total / m`, quaternion `q_dot = 0.5 * Omega(omega) * q`.
+`dynamics.py`: rotational `I*omega_dot = tau - omega x (I*omega) - I_dot*omega - tau_jet`,
+translational `r_ddot = F_total / m`, quaternion `q_dot = 0.5 * Omega(omega) * q`.
 
-**Validity limit.** Changing inertia (`I_dot` from propellant flow) is a
-first-order approximation, **not** a complete variable-mass angular-momentum
-derivation: a real vehicle also exchanges angular momentum with departing
-propellant. Equation forms correct; inertia model simplified.
+Jet damping `tau_jet` is per axis: pitch/yaw use
+`mdot * (l^2 + f*R^2/2 + r_e^2/4)` (l = CG to nozzle exit, R = engine-ring radius,
+f = fraction of engines on the ring, r_e = nozzle-exit radius); roll uses
+`mdot * (f*R^2 + r_e^2/2)`. The geometry is configurable
+(`stage1_engine_ring_radius_m`, `stage1_nozzle_exit_radius_m`,
+`stage2_nozzle_exit_radius_m`).
+
+**Validity limit.** Inertia varies linearly with propellant between configurable
+full/empty values (`stack_*_kgm2`, `booster_*_kgm2`, `booster_cg_*_m`); there is
+no slosh or flexible-body model.
 
 ## 2. Numerical integration
 
@@ -62,13 +68,21 @@ geometry, but its `length_m` default of 47 m is a documented estimate.
 Post-stall uses `compute_post_stall_normal_coefficient`: linear below stall
 onset, rising monotonically to a bounded ceiling above it. The earlier form
 blended an unbounded linear term against sin-squared cross-flow and was
+non-monotone (peaking near 25 deg, falling ~50% by 45 deg), giving negative
+aerodynamic stiffness in deep stall.
+
+`_guidance_ascent` is explicitly **not** IGM/PEG/collocation. `_guidance_orbit`
+is project steering logic. `_guidance_booster` is ZEM/ZEV-inspired with
+constants tuned for this vehicle.
+
 ## 6. Propulsion and variable mass
 
 `mass.py`: `mdot = T / (Isp * g0)` with a dry-mass floor. Stage-2 flow always
 uses the same thrust/Isp pair as the force model, so effective Isp cannot drift
 from configuration.
 
-**Validity limit.** Component inertias and CG stations are project assumptions.
+**Validity limit.** Component inertias and CG stations are project assumptions
+(configurable, see section 1).
 Thrust is a **single lumped magnitude** per stage, not nine discrete engines: no
 per-engine throttling, no out-of-family detection, no cluster behaviour.
 
@@ -118,22 +132,24 @@ correction; errors grow unphysically with time.
 Terminal guidance is ZEM/ZEV-style with a suicide-burn ignition solution,
 propellant reserves, and grid-fin / landing-leg deployment state machines.
 
-**Validity limit.** Tuned for this vehicle. Entry-descent time-to-go must reflect
+Below 150 m a critically damped position hold (`booster_terminal_position_hold_*`)
+corrects the remaining pad error, fades out by 30 m and caps its closing speed at
+what the tilt-limited thrust can brake. `booster_landing_guidance="plugin"` replaces
+the landing-burn law with a user plugin (`guidance/plugins.py`).
+
+**Validity limit.** Tuned for this vehicle. Guidance knows the true drag scale.
+Entry-descent time-to-go must reflect
 real ballistic time-to-impact; an altitude/descent-rate estimate over-commands
 the `6/t^2` ZEM gain several-fold and saturates the fins mid-descent.
 
 ## Appendix: what is NOT claimed
 
-- No published validation report exists against external reference data.
+- Validation against flight data covers the stage-1 ascent and event timing of
+  four Falcon 9 flights (webcast telemetry, `docs/VALIDATION.md`); there is no
+  wind-tunnel, CFD or landing-phase telemetry comparison.
 - Mach tables, grid-fin/leg drag scaling and the GRAM modifier are engineering
   approximations.
 - Stage-2 recovery (`enable_s2_recovery`) is experimental and propellant-starved
   by default.
 - Geometry and masses correspond closely to a Falcon 9 v1.0-class booster, but
   this is a research model and is not flight-qualified software.
-non-monotone (peaking near 25 deg, falling ~50% by 45 deg), giving negative
-aerodynamic stiffness in deep stall.
-
-`_guidance_ascent` is explicitly **not** IGM/PEG/collocation. `_guidance_orbit`
-is project steering logic. `_guidance_booster` is ZEM/ZEV-inspired with
-constants tuned for this vehicle.

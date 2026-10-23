@@ -28,6 +28,11 @@ a = Analysis(
     datas=[
         (str(repo_root / 'frontend'), 'frontend'),
         (str(backend_dir / 'rlv_sim' / 'aero' / 'decks'), 'rlv_sim/aero/decks'),
+        (str(backend_dir / 'rlv_sim' / 'validation' / 'data'), 'rlv_sim/validation/data'),
+        # Loaded from files at run time (guidance.plugins).
+        (str(backend_dir / 'rlv_sim' / 'guidance' / 'plugin_examples'), 'rlv_sim/guidance/plugin_examples'),
+        # Source for the settings schema's help text and bounds (config.schema).
+        (str(backend_dir / 'rlv_sim' / 'config' / 'definition.py'), 'rlv_sim/config'),
     ] + _optional_package_files,
     hiddenimports=[
         'uvicorn.logging',

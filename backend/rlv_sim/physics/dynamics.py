@@ -153,13 +153,20 @@ def compute_jet_damping_torque(m_dot: float, cg_pos_z: float, omega: np.ndarray,
     flow = -float(m_dot)
     if flow <= 0.0:
         return np.zeros(3)
+    cfg = ctx.config
     if ctx.vehicle_model == "orbiter" or ctx.stage == 2:
-        ring_fraction, ring_radius, exit_radius = 0.0, 0.0, C.STAGE2_NOZZLE_EXIT_RADIUS_M
+        ring_fraction, ring_radius = 0.0, 0.0
+        exit_radius = (cfg.stage2_nozzle_exit_radius_m if cfg is not None
+                       else C.STAGE2_NOZZLE_EXIT_RADIUS_M)
     else:
         n = max(_active_engine_count(ctx), 1)
         ring_fraction = (n - 1) / n
-        ring_radius = C.STAGE1_ENGINE_RING_RADIUS_M
-        exit_radius = C.STAGE1_NOZZLE_EXIT_RADIUS_M
+        if cfg is not None:
+            ring_radius = cfg.stage1_engine_ring_radius_m
+            exit_radius = cfg.stage1_nozzle_exit_radius_m
+        else:
+            ring_radius = C.STAGE1_ENGINE_RING_RADIUS_M
+            exit_radius = C.STAGE1_NOZZLE_EXIT_RADIUS_M
     ring_sq = ring_fraction * ring_radius ** 2
     c_transverse = flow * (cg_pos_z ** 2 + 0.5 * ring_sq + 0.25 * exit_radius ** 2)
     c_roll = flow * (ring_sq + 0.5 * exit_radius ** 2)
@@ -249,6 +256,7 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         m,
         vehicle_model=ctx.vehicle_model,
         stage1_landing_reserve_kg=_stage1_reserve,
+        config=_cfg,
     )
 
     try:
@@ -262,6 +270,7 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         m,
         vehicle_model=ctx.vehicle_model,
         stage1_landing_reserve_kg=_stage1_reserve,
+        config=_cfg,
     )
     from rlv_sim.physics.forces import _altitude_from_r
     altitude_m = _altitude_from_r(r, ctx.config)
@@ -306,6 +315,7 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         m_dot,
         vehicle_model=ctx.vehicle_model,
         stage1_landing_reserve_kg=_stage1_reserve,
+        config=_cfg,
     )
 
     jet_damping_torque = compute_jet_damping_torque(m_dot, cg_pos_z, omega, ctx)

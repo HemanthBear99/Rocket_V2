@@ -20,7 +20,8 @@ from rlv_sim.mission.full_mission import run_full_mission
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
-DOCS = ROOT.parent / "docs"
+# backend/rlv_sim/validation -> repo docs/
+DOCS = ROOT.parents[2] / "docs"
 
 # name -> payload mass to simulate (kg); None = unpublished, use sim default.
 FLIGHTS = {
@@ -93,6 +94,98 @@ def _fmt(x, f="{:.1f}"):
     return f.format(x) if x is not None else "–"
 
 
+_EVENT_ROWS = (
+    ("Boostback start (s)", "boostback_start"),
+    ("Entry burn start (s)", "entry_start"),
+    ("Landing burn start (s)", "landing_start"),
+    ("Touchdown (s)", "landing_end"),
+)
+
+
+def _flight_setups() -> list[tuple[str, float | None, dict, tuple | None, tuple]]:
+    """(name, payload, real data, throttle bucket, sim cache key) per flight."""
+    setups = []
+    for name, payload in FLIGHTS.items():
+        real = load_flight(name)
+        ev = real["events"]
+        bucket = ((ev["throttle_down_start"], ev["throttle_down_end"])
+                  if ev.get("throttle_down_start") else None)
+        setups.append((name, payload, real, bucket, (payload or 8000.0, bucket)))
+    return setups
+
+
+def _curve_rms(real: dict, sim: dict) -> tuple[float, float]:
+    """Altitude (km) and speed (m/s) RMS up to the earlier MECO, on the 1 Hz grid."""
+    t_end = min(real["meco"], sim["meco"])
+    m = real["t"] <= t_end
+    alt_rms = float(np.sqrt(np.mean((np.interp(real["t"][m], sim["t"], sim["alt"]) - real["alt"][m]) ** 2)))
+    v_rms = float(np.sqrt(np.mean((np.interp(real["t"][m], sim["t"], sim["v"]) - real["v"][m]) ** 2)))
+    return alt_rms, v_rms
+
+
+def _metric_rows(real: dict, sim: dict) -> list[tuple[str, float | None, float | None]]:
+    ev = real["events"]
+    rows = [
+        ("MECO time (s)", real["meco"], sim["meco"]),
+        ("MECO speed (m/s)", real["meco_v"], sim["meco_v"]),
+        ("MECO altitude (km)", real["meco_alt"], sim["meco_alt"]),
+        ("Peak q (kPa)", real["peak_q_kpa"], sim["peak_q_kpa"]),
+        ("Max-q time (s)", ev["maxq"], sim["maxq"]),
+        ("Booster apogee (km)", real["apogee_km"], sim["apogee_km"]),
+    ]
+    rows += [(label, ev[key], sim[key]) for label, key in _EVENT_ROWS if ev.get(key)]
+    return rows
+
+
+def _ascent_series(data: dict, step: int = 2) -> dict:
+    """Lift-off to MECO curves, every ``step``-th sample, rounded for JSON."""
+    mask = data["t"] <= data["meco"]
+    return {
+        "meco_s": data["meco"],
+        "t": data["t"][mask][::step].round(1).tolist(),
+        "altitude_km": data["alt"][mask][::step].round(3).tolist(),
+        "speed_mps": data["v"][mask][::step].round(1).tolist(),
+    }
+
+
+def compare_flights() -> dict:
+    """Simulated vs Falcon 9 webcast ascent, as JSON-ready data for the app."""
+    sims: dict = {}
+    flights = []
+    for name, payload, real, bucket, key in _flight_setups():
+        if key not in sims:
+            sims[key] = simulate(payload, bucket)
+        sim = sims[key]
+        alt_rms, v_rms = _curve_rms(real, sim)
+        flights.append({
+            "name": name,
+            "sim_payload_kg": payload or 8000.0,
+            "payload_published": payload is not None,
+            "throttle_bucket_s": list(bucket) if bucket else None,
+            "altitude_rms_km": alt_rms,
+            "speed_rms_mps": v_rms,
+            "real": _ascent_series(real),
+            "sim": _ascent_series(sim),
+            "metrics": [
+                {"quantity": label, "flight": real_v, "sim": sim_v,
+                 "difference_pct": (100.0 * (sim_v - real_v) / real_v) if sim_v is not None and real_v else None}
+                for label, real_v, sim_v in _metric_rows(real, sim)
+            ],
+        })
+    return {
+        "source": "shahar603/Telemetry-Data (public domain), SpaceX webcasts at 1 Hz",
+        "source_url": "https://github.com/shahar603/Telemetry-Data",
+        "notes": [
+            ("Sim flies the default vehicle (Falcon 9 FT stage masses, 9 x 845 kN); payload is matched "
+            "where published, otherwise 8 t."),
+            ("Target orbit, inclination and landing site are sim defaults, not the flight's, so booster "
+            "timeline differences are partly mission, not model."),
+            "Where the webcast data shows the max-q throttle-down window the sim flies it at 70% thrust.",
+        ],
+        "flights": flights,
+    }
+
+
 def main() -> None:
     import matplotlib
     matplotlib.use("Agg")
@@ -101,39 +194,17 @@ def main() -> None:
     fig, (ax_alt, ax_v) = plt.subplots(1, 2, figsize=(12, 4.5))
     rows, curve_rows = [], []
     sims: dict = {}
-    for name, payload in FLIGHTS.items():
-        real = load_flight(name)
-        ev0 = real["events"]
-        bucket = ((ev0["throttle_down_start"], ev0["throttle_down_end"])
-                  if ev0.get("throttle_down_start") else None)
-        key = (payload or 8000.0, bucket)
+    for name, payload, real, bucket, key in _flight_setups():
         if key not in sims:
             sims[key] = simulate(payload, bucket)
         sim = sims[key]
-        # Ascent-curve error up to the earlier MECO, on the flight's 1 Hz grid.
-        t_end = min(real["meco"], sim["meco"])
-        m = real["t"] <= t_end
-        alt_rms = float(np.sqrt(np.mean((np.interp(real["t"][m], sim["t"], sim["alt"]) - real["alt"][m]) ** 2)))
-        v_rms = float(np.sqrt(np.mean((np.interp(real["t"][m], sim["t"], sim["v"]) - real["v"][m]) ** 2)))
+        alt_rms, v_rms = _curve_rms(real, sim)
         curve_rows.append(f"| {name} | {_fmt(payload, '{:.0f}') if payload else '8000 (unpublished)'} "
                           f"| {f'{bucket[0]}-{bucket[1]} s' if bucket else 'none (not in data)'} "
                           f"| {alt_rms:.2f} | {v_rms:.0f} |")
-        ev = real["events"]
-        rows += [
-            f"| {name} | MECO time (s) | {real['meco']:.0f} | {sim['meco']:.1f} | {_pct(sim['meco'], real['meco'])} |",
-            f"| | MECO speed (m/s) | {real['meco_v']:.0f} | {sim['meco_v']:.0f} | {_pct(sim['meco_v'], real['meco_v'])} |",
-            (f"| | MECO altitude (km) | {real['meco_alt']:.1f} | {sim['meco_alt']:.1f} "
-            f"| {_pct(sim['meco_alt'], real['meco_alt'])} |"),
-            (f"| | Peak q (kPa) | {real['peak_q_kpa']:.1f} | {sim['peak_q_kpa']:.1f} "
-            f"| {_pct(sim['peak_q_kpa'], real['peak_q_kpa'])} |"),
-            f"| | Max-q time (s) | {ev['maxq']} | {sim['maxq']:.0f} | {_pct(sim['maxq'], ev['maxq'])} |",
-            (f"| | Booster apogee (km) | {_fmt(real['apogee_km'])} | {_fmt(sim['apogee_km'])} "
-            f"| {_pct(sim['apogee_km'], real['apogee_km'])} |"),
-        ]
-        for label, k in (("Boostback start (s)", "boostback_start"), ("Entry burn start (s)", "entry_start"),
-                         ("Landing burn start (s)", "landing_start"), ("Touchdown (s)", "landing_end")):
-            if ev.get(k):
-                rows.append(f"| | {label} | {ev[k]} | {_fmt(sim[k], '{:.0f}')} | {_pct(sim[k], ev[k])} |")
+        for index, (label, real_v, sim_v) in enumerate(_metric_rows(real, sim)):
+            rows.append(f"| {name if index == 0 else ''} | {label} | {_fmt(real_v)} | {_fmt(sim_v)} "
+                        f"| {_pct(sim_v, real_v)} |")
         mr = real["t"] <= real["meco"]
         ax_alt.plot(real["t"][mr], real["alt"][mr], lw=1, label=name)
         ax_v.plot(real["t"][mr], real["v"][mr], lw=1, label=name)

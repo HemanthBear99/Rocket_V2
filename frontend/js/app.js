@@ -15,7 +15,13 @@
     realtime: true,
     sim: { id: null, token: null, status: 'idle', startedAt: null, hasBooster: false },
     activeVehicleTab: 'primary',
-    campaign: { id: null, pollHandle: null },
+    campaign: { id: null, pollHandle: null, request: null, lastResults: null },
+    schema: [],
+    schemaMap: {},
+    plugins: [],
+    pluginFolder: '',
+    gfoldAvailable: false,
+    pendingSetup: null,
     charts: {},
     clockHandle: null,
   };
@@ -148,6 +154,8 @@
       report: ['Mission Report', 'Final pass/fail assessment and key flight metrics.'],
       campaign: ['Monte Carlo Campaigns', 'Batch dispersion analysis across randomized flight parameters.'],
       compare: ['Compare Runs', 'Overlay two saved missions or Monte Carlo campaigns side by side.'],
+      validation: ['Flight Validation', 'Simulated ascent against Falcon 9 flight telemetry.'],
+      model: ['Model & Limits', 'What is modelled, from which sources, how credible each input is, and where the model stops being valid.'],
       settings: ['Settings', 'License, backend connection and aerodynamic data.'],
     };
     const [t, s] = titles[name];
@@ -162,6 +170,9 @@
       $$('.tab-panel').forEach((p) => p.classList.remove('active'));
       tab.classList.add('active');
       $(`.tab-panel[data-panel="${tab.dataset.tab}"]`).classList.add('active');
+      if (tab.dataset.tab === 'advanced') renderAdvanced();
+      if (tab.dataset.tab === 'wind') renderWindForm();
+      if (tab.dataset.tab === 'recovery') renderGuidancePicker();
     });
   });
 
@@ -208,11 +219,8 @@
     const rC = $('#form-recovery'); rC.innerHTML = '';
     ['landing_lat', 'landing_lon'].forEach((k) => buildNumberField(rC, 'recovery', k, defaults.recovery[k]));
     ['grid_fins', 'landing_legs'].forEach((k) => buildToggleField(rC, 'recovery', k, defaults.recovery[k]));
-    const quick = $('#quick-gfold');
-    quick.innerHTML = '';
-    if (defaults.recovery.gfold_available) {
-      buildToggleField(quick, 'recovery', 'gfold_guidance', !!defaults.recovery.gfold_guidance);
-    }
+    if (defaults.recovery.gfold_available !== undefined) state.gfoldAvailable = !!defaults.recovery.gfold_available;
+    state.formValues.recovery.gfold_guidance = !!defaults.recovery.gfold_guidance;
     state.formValues.recovery.mode = 'RTLS';
     state.formValues.recovery.landing_burn_alt = 'auto';
     state.formValues.recovery.suicide_burn = true;
@@ -224,6 +232,11 @@
     $('#toggle-s2').checked = !!defaults.enable_s2_recovery;
     state.autoReserve = !!defaults.auto_recovery_reserve;
     $('#toggle-auto-reserve').checked = state.autoReserve;
+    pruneOverrides();
+    renderGuidancePicker();
+    renderWindForm();
+    renderAdvanced();
+    updateAdvancedCount();
   }
 
   async function loadDefaults() {
@@ -411,12 +424,335 @@
     if (state.advancedOverrides) {
       const names = Object.keys(state.advancedOverrides);
       toast(
-        `${names.length} advanced field${names.length === 1 ? '' : 's'} outside the form `
-        + `(e.g. ${names.slice(0, 3).join(', ')}) will still be applied on launch, `
-        + `just not shown in the UI.`,
+        `${names.length} setting${names.length === 1 ? '' : 's'} differ from the defaults `
+        + `(e.g. ${names.slice(0, 3).join(', ')}); see the All Settings tab.`,
         'success',
       );
     }
+  }
+
+  // ------------------------------------------------- all settings (schema)
+  // Every SimulationConfig field comes from /api/config/schema. Edits are
+  // stored in state.advancedOverrides only when they differ from the
+  // default, and travel to the backend as advanced_overrides on launch.
+  const WIND_FIELDS = {
+    runtime_wind_offset_mps: 'Mean wind offset',
+    booster_descent_drag_scale: 'Booster descent drag scale',
+    runtime_atmosphere_density_scale: 'Atmosphere density scale',
+    recovery_reserve_wind_sensitivity_kg_per_mps: 'Extra reserve per m/s headwind',
+    enable_stochastic_wind: 'Turbulence and gusts',
+    wind_turbulence_intensity: 'Turbulence intensity',
+    wind_gust_magnitude: 'Gust magnitude',
+    wind_seed: 'Turbulence random seed',
+  };
+  const WIND_MODES_FIELD = 'runtime_wind_profile_modes';
+  // Edited by the landing-guidance picker in the Booster Recovery tab.
+  const GUIDANCE_FIELDS = new Set(['booster_landing_guidance', 'booster_landing_plugin']);
+
+  function humanize(name) {
+    const text = name.replace(/_(kg_per_mps|kgm2|mps2|mps|kg|km|deg|pa_rad|pa|rad|m2|n|s|m)$/, '').replace(/_/g, ' ');
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  const sameValue = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+  function overrideValue(name) {
+    const o = state.advancedOverrides || {};
+    if (Object.prototype.hasOwnProperty.call(o, name)) return o[name];
+    const row = state.schemaMap[name];
+    return row ? row.default : undefined;
+  }
+
+  function setOverride(name, value) {
+    const o = { ...(state.advancedOverrides || {}) };
+    const row = state.schemaMap[name];
+    if (row && sameValue(value, row.default)) delete o[name]; else o[name] = value;
+    state.advancedOverrides = Object.keys(o).length ? o : null;
+    updateAdvancedCount();
+    clearTimeout(planTimer);
+    planTimer = setTimeout(refreshPlan, 400);
+  }
+
+  // Drop overrides that only restate the default (e.g. from an uploaded full config).
+  function pruneOverrides() {
+    if (!state.advancedOverrides) return;
+    const o = {};
+    Object.entries(state.advancedOverrides).forEach(([k, v]) => {
+      const row = state.schemaMap[k];
+      if (!row || !sameValue(v, row.default)) o[k] = v;
+    });
+    state.advancedOverrides = Object.keys(o).length ? o : null;
+  }
+
+  function changedSettingNames() {
+    return Object.keys(state.advancedOverrides || {}).filter((k) => state.schemaMap[k]);
+  }
+
+  function updateAdvancedCount() {
+    const n = changedSettingNames().length;
+    const el = $('#adv-count');
+    if (el) el.textContent = n ? `${n} changed` : '';
+  }
+
+  function boundsText(row) {
+    const parts = [];
+    if (row.min !== undefined && row.min !== null) parts.push(`${row.min_exclusive ? '>' : '≥'} ${row.min}`);
+    if (row.max !== undefined && row.max !== null) parts.push(`${row.max_exclusive ? '<' : '≤'} ${row.max}`);
+    return parts.join(', ');
+  }
+
+  function boundsError(row, value) {
+    if (row.min !== undefined && row.min !== null && (row.min_exclusive ? value <= row.min : value < row.min)) return `must be ${boundsText(row)}`;
+    if (row.max !== undefined && row.max !== null && (row.max_exclusive ? value >= row.max : value > row.max)) return `must be ${boundsText(row)}`;
+    if (row.kind === 'int' && !Number.isInteger(value)) return 'must be a whole number';
+    return null;
+  }
+
+  function fmtDefault(v) {
+    if (v === null || v === undefined) return 'auto';
+    if (Array.isArray(v)) return v.length ? JSON.stringify(v) : 'none';
+    return String(v);
+  }
+
+  /** One editor for a schema field; onChange() runs after a valid edit. */
+  function buildSchemaField(row, label, onChange) {
+    const wrap = document.createElement('div');
+    wrap.className = 'field schema-field';
+    wrap.dataset.name = row.name;
+    const value = overrideValue(row.name);
+    const changed = !sameValue(value, row.default);
+    wrap.classList.toggle('changed', changed);
+    const help = escapeHtml(row.description || '');
+    const bounds = boundsText(row);
+    let control;
+    if (row.kind === 'bool') {
+      control = `<label class="switch"><input type="checkbox" ${value ? 'checked' : ''}/><span class="track"><span class="thumb"></span></span></label>`;
+    } else if (row.kind === 'choice') {
+      control = `<select>${row.choices.map((c) => `<option value="${escapeHtml(c)}" ${c === value ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select>`;
+    } else if (row.kind === 'wind_modes') {
+      control = `<div class="help-text">${(value || []).length} mode(s) — edit in the Wind &amp; Dispersions tab</div>`;
+    } else if (row.kind === 'str') {
+      control = `<input type="text" value="${escapeHtml(value ?? '')}"/>`;
+    } else {
+      const step = row.kind === 'int' ? 1 : 'any';
+      control = `<input type="number" step="${step}" value="${value ?? ''}" placeholder="${row.nullable ? 'auto' : ''}"/>`;
+    }
+    wrap.innerHTML = `<label title="${escapeHtml(row.name)}">${escapeHtml(label || humanize(row.name))}
+        <span class="unit">${escapeHtml(row.unit || '')}</span></label>
+      ${control}
+      <div class="field-meta"><span>default ${escapeHtml(fmtDefault(row.default))}${bounds ? ` · ${escapeHtml(bounds)}` : ''}</span>
+        <button class="link-btn reset" type="button" ${changed ? '' : 'hidden'}>reset</button></div>
+      ${help ? `<div class="field-help">${help}</div>` : ''}
+      <div class="field-error"></div>`;
+    const input = $('input, select', wrap);
+    const err = $('.field-error', wrap);
+    const commit = (v) => {
+      setOverride(row.name, v);
+      const isChanged = !sameValue(v, row.default);
+      wrap.classList.toggle('changed', isChanged);
+      $('.reset', wrap).hidden = !isChanged;
+      if (onChange) onChange(v);
+    };
+    if (input && row.kind !== 'wind_modes') {
+      input.addEventListener(row.kind === 'bool' || row.kind === 'choice' ? 'change' : 'input', () => {
+        err.textContent = '';
+        wrap.classList.remove('invalid');
+        if (row.kind === 'bool') return commit(input.checked);
+        if (row.kind === 'choice' || row.kind === 'str') return commit(input.value);
+        if (input.value === '' && row.nullable) return commit(null);
+        const v = Number(input.value);
+        const problem = input.value === '' || !Number.isFinite(v) ? 'enter a number' : boundsError(row, v);
+        if (problem) { err.textContent = problem; wrap.classList.add('invalid'); return undefined; }
+        return commit(v);
+      });
+    }
+    $('.reset', wrap).addEventListener('click', () => {
+      commit(row.default);
+      const fresh = buildSchemaField(row, label, onChange);
+      wrap.replaceWith(fresh);
+    });
+    return wrap;
+  }
+
+  function renderWindForm() {
+    const box = $('#form-wind');
+    if (!box || !state.schema.length) return;
+    box.innerHTML = '';
+    Object.entries(WIND_FIELDS).forEach(([name, label]) => {
+      const row = state.schemaMap[name];
+      if (row) box.appendChild(buildSchemaField(row, label));
+    });
+    renderWindModes();
+  }
+
+  function windModes() {
+    return (overrideValue(WIND_MODES_FIELD) || []).map((m) => [Number(m[0]), Number(m[1]), Number(m[2])]);
+  }
+
+  function renderWindModes() {
+    const modes = windModes();
+    const body = $('#wind-modes-table tbody');
+    $('#wind-modes-empty').style.display = modes.length ? 'none' : 'block';
+    $('#wind-modes-table').style.display = modes.length ? '' : 'none';
+    body.innerHTML = modes.map((m, i) => `<tr data-i="${i}">
+        <td><input type="number" step="any" data-k="0" value="${m[0]}"/></td>
+        <td><input type="number" step="any" min="1" data-k="1" value="${m[1]}"/></td>
+        <td><input type="number" step="any" data-k="2" value="${+(m[2] * 180 / Math.PI).toFixed(2)}"/></td>
+        <td><button class="btn btn-sm btn-danger" data-remove="${i}">Remove</button></td></tr>`).join('');
+    $$('input', body).forEach((input) => input.addEventListener('input', () => {
+      const i = Number(input.closest('tr').dataset.i);
+      const k = Number(input.dataset.k);
+      const v = Number(input.value);
+      const bad = input.value === '' || !Number.isFinite(v) || (k === 1 && v <= 0);
+      input.classList.toggle('invalid', bad);
+      if (bad) return;
+      const next = windModes();
+      next[i][k] = k === 2 ? v * Math.PI / 180 : v;
+      setOverride(WIND_MODES_FIELD, next);
+    }));
+    $$('[data-remove]', body).forEach((btn) => btn.addEventListener('click', () => {
+      const next = windModes();
+      next.splice(Number(btn.dataset.remove), 1);
+      setOverride(WIND_MODES_FIELD, next);
+      renderWindModes();
+    }));
+  }
+
+  $('#btn-wind-add').addEventListener('click', () => {
+    const next = windModes();
+    if (next.length >= 12) { toast('Up to 12 wind modes', 'error'); return; }
+    next.push([2.0, 5000.0, 0.0]);
+    setOverride(WIND_MODES_FIELD, next);
+    renderWindModes();
+  });
+  $('#btn-wind-preset').addEventListener('click', () => {
+    // Same wavelengths the extended Monte Carlo dispersion uses.
+    const next = windModes().concat([[2, 2000, 0], [2, 5000, 0], [2, 12000, 0], [2, 25000, 0]]);
+    setOverride(WIND_MODES_FIELD, next.slice(0, 12));
+    renderWindModes();
+  });
+  $('#btn-wind-clear').addEventListener('click', () => { setOverride(WIND_MODES_FIELD, []); renderWindModes(); });
+
+  function renderAdvanced() {
+    const box = $('#adv-groups');
+    if (!box || !state.schema.length) return;
+    const query = ($('#adv-search').value || '').trim().toLowerCase();
+    const changedOnly = $('#adv-changed-only').checked;
+    const groups = {};
+    state.schema.forEach((row) => {
+      if (row.on_form || GUIDANCE_FIELDS.has(row.name)) return;
+      if (changedOnly && sameValue(overrideValue(row.name), row.default)) return;
+      if (query && !(`${row.name} ${row.name.replace(/_/g, ' ')} ${row.description} ${row.group}`.toLowerCase().includes(query))) return;
+      (groups[row.group] = groups[row.group] || []).push(row);
+    });
+    const open = new Set($$('details.adv-group[open]', box).map((d) => d.dataset.group));
+    box.innerHTML = '';
+    const names = Object.keys(groups).sort();
+    if (!names.length) { box.innerHTML = '<div class="help-text">No settings match.</div>'; return; }
+    names.forEach((group) => {
+      const rows = groups[group];
+      const nChanged = rows.filter((r) => !sameValue(overrideValue(r.name), r.default)).length;
+      const det = document.createElement('details');
+      det.className = 'adv-group';
+      det.dataset.group = group;
+      det.open = open.has(group) || Boolean(query) || changedOnly;
+      det.innerHTML = `<summary>${escapeHtml(group)} <span class="unit">${rows.length} setting${rows.length === 1 ? '' : 's'}${nChanged ? ` · <b>${nChanged} changed</b>` : ''}</span></summary><div class="grid grid-3 adv-grid"></div>`;
+      const grid = $('.adv-grid', det);
+      rows.forEach((row) => grid.appendChild(buildSchemaField(row)));
+      box.appendChild(det);
+    });
+  }
+  let advTimer = null;
+  $('#adv-search').addEventListener('input', () => { clearTimeout(advTimer); advTimer = setTimeout(renderAdvanced, 200); });
+  $('#adv-changed-only').addEventListener('change', renderAdvanced);
+  $('#btn-adv-reset').addEventListener('click', async () => {
+    const ok = await confirmModal('Reset all settings?', 'Every value in All Settings and Wind & Dispersions goes back to its default. The other tabs are not changed.');
+    if (!ok) return;
+    const keep = {};
+    Object.entries(state.advancedOverrides || {}).forEach(([k, v]) => { if (!state.schemaMap[k]) keep[k] = v; });
+    state.advancedOverrides = Object.keys(keep).length ? keep : null;
+    renderWindForm();
+    renderAdvanced();
+    renderGuidancePicker();
+    updateAdvancedCount();
+    toast('Settings reset to defaults', 'success');
+  });
+
+  // ------------------------------------------------- landing guidance picker
+  function guidanceOptionsHtml(selected) {
+    const opts = [['heuristic', 'Built-in: suicide burn with ZEM/ZEV divert', false]];
+    opts.push(['gfold', state.gfoldAvailable ? 'Built-in: G-FOLD convex descent' : 'G-FOLD convex descent (needs cvxpy)', !state.gfoldAvailable]);
+    state.plugins.forEach((p) => opts.push([`plugin:${p.name}`, `Plugin: ${p.title}${p.error ? ' (error)' : ''}`, Boolean(p.error)]));
+    return opts.map(([v, label, disabled]) => `<option value="${escapeHtml(v)}" ${v === selected ? 'selected' : ''} ${disabled ? 'disabled' : ''}>${escapeHtml(label)}</option>`).join('');
+  }
+
+  function currentGuidanceValue() {
+    if (overrideValue('booster_landing_guidance') === 'plugin') return `plugin:${overrideValue('booster_landing_plugin')}`;
+    return state.formValues.recovery.gfold_guidance ? 'gfold' : 'heuristic';
+  }
+
+  /** Apply a picker value ('heuristic' | 'gfold' | 'plugin:<name>') to a setup copy or the live form. */
+  function applyGuidance(value, setup) {
+    const overrides = { ...((setup ? setup.advanced_overrides : state.advancedOverrides) || {}) };
+    delete overrides.booster_landing_guidance;
+    delete overrides.booster_landing_plugin;
+    if (value.startsWith('plugin:')) {
+      overrides.booster_landing_guidance = 'plugin';
+      overrides.booster_landing_plugin = value.slice(7);
+    }
+    const gfold = value === 'gfold';
+    if (setup) {
+      setup.recovery = { ...setup.recovery, gfold_guidance: gfold };
+      setup.advanced_overrides = Object.keys(overrides).length ? overrides : undefined;
+      return setup;
+    }
+    state.formValues.recovery.gfold_guidance = gfold;
+    state.advancedOverrides = Object.keys(overrides).length ? overrides : null;
+    updateAdvancedCount();
+    return null;
+  }
+
+  function renderGuidancePicker() {
+    const box = $('#form-recovery');
+    if (!box) return;
+    let wrap = $('#guidance-picker', box);
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.className = 'field';
+      wrap.id = 'guidance-picker';
+      wrap.style.gridColumn = 'span 2';
+      box.prepend(wrap);
+    }
+    wrap.innerHTML = `<label>Landing guidance <span class="unit">landing burn</span></label>
+      <select id="guidance-select">${guidanceOptionsHtml(currentGuidanceValue())}</select>
+      <div class="field-help">Plugins are Python files in your plugin folder (see Model &amp; Limits).</div>`;
+    $('#guidance-select').addEventListener('change', (e) => applyGuidance(e.target.value));
+    const camp = $('#camp-guidance');
+    if (camp) {
+      const prev = camp.value || 'heuristic';
+      camp.innerHTML = guidanceOptionsHtml(prev);
+      if (camp.selectedOptions[0] && camp.selectedOptions[0].disabled) camp.value = 'heuristic';
+    }
+  }
+
+  async function loadSchemaAndPlugins() {
+    try {
+      state.schema = await api('/api/config/schema');
+      state.schemaMap = Object.fromEntries(state.schema.map((r) => [r.name, r]));
+    } catch (e) {
+      toast('Could not load the settings list: ' + e.message, 'error');
+    }
+    await refreshPlugins();
+  }
+
+  async function refreshPlugins() {
+    try {
+      const r = await api('/api/plugins');
+      state.plugins = r.plugins;
+      state.pluginFolder = r.folder;
+    } catch (e) { state.plugins = []; }
+    renderGuidancePicker();
+    renderPluginTable();
   }
 
   // ---------------------------------------------------------------- launch / websocket
@@ -637,7 +973,8 @@
   async function launchSimulation() {
     $('#launch-error').textContent = '';
     try {
-      const setup = currentSetup();
+      const setup = state.pendingSetup || currentSetup();
+      state.pendingSetup = null;
       const result = await api('/api/simulations/start', { method: 'POST', body: JSON.stringify(setup) });
       state.sim = { id: result.simulation_id, token: result.access_token, status: 'running', startedAt: Date.now(), hasBooster: false };
       state.activeVehicleTab = 'primary';
@@ -653,6 +990,7 @@
       connectTelemetryWs();
       toast('Simulation launched: ' + result.simulation_id, 'success');
     } catch (e) {
+      state.pendingSetup = null;
       $('#launch-error').textContent = e.message;
       toast('Launch failed: ' + e.message, 'error');
     }
@@ -946,16 +1284,10 @@
         runs: parseInt($('#camp-runs').value, 10),
         seed: parseInt($('#camp-seed').value, 10),
         workers: parseInt($('#camp-workers').value, 10),
-        setup: currentSetup(),
+        dispersions: $('#camp-dispersions').value,
+        setup: applyGuidance($('#camp-guidance').value || 'heuristic', JSON.parse(JSON.stringify(currentSetup()))),
       };
-      body.setup.recovery = { ...body.setup.recovery, gfold_guidance: $('#camp-guidance').value === 'gfold' };
-      const result = await api('/api/campaigns/start', { method: 'POST', body: JSON.stringify(body) });
-      state.campaign.id = result.campaign_id;
-      $('#camp-idle').style.display = 'none';
-      $('#camp-progress').style.display = 'block';
-      $('#camp-results').style.display = 'none';
-      toast('Campaign started: ' + result.campaign_id, 'success');
-      pollCampaign();
+      await startCampaign(body);
     } catch (e) {
       toast('Campaign launch failed: ' + e.message, 'error');
     }
@@ -1015,7 +1347,12 @@
       <div class="metric-cell"><div class="k">Runs</div><div class="v">${summary.runs}</div></div>
       <div class="metric-cell"><div class="k">Mission Success Rate</div><div class="v ${summary.mission_success_rate > 0.9 ? 'pass' : 'fail'}">${fmt(summary.mission_success_rate * 100, 1)}%</div></div>
       <div class="metric-cell"><div class="k">95% CI</div><div class="v">[${fmt(ci[0] * 100, 1)}, ${fmt(ci[1] * 100, 1)}]%</div></div>
-      <div class="metric-cell"><div class="k">Orbit / Landing Rate</div><div class="v">${fmt(summary.orbit_success_rate * 100, 0)}% / ${fmt(summary.landing_success_rate * 100, 0)}%</div></div>`;
+      <div class="metric-cell"><div class="k">Orbit / Landing Rate</div><div class="v">${fmt(summary.orbit_success_rate * 100, 0)}% / ${fmt(summary.landing_success_rate * 100, 0)}%</div></div>
+      <div class="metric-cell" title="One-sided Clopper-Pearson bound: with 90% confidence the true success rate is at least this."><div class="k">Success, 90% lower bound</div><div class="v">${fmt((summary.mission_success_lower_bound_90pct || 0) * 100, 1)}%</div></div>
+      <div class="metric-cell" title="Failure-free runs needed to demonstrate 99.73% (3σ) reliability at 90% confidence."><div class="k">Runs to show 99.73% @ 90%</div><div class="v">${summary.zero_failure_runs_for_99_73pct_at_90pct ?? '—'} <span class="unit">no failures</span></div></div>`;
+    state.campaign.lastResults = results;
+    $('#btn-rerun-failed').style.display = results.some((r) => !r.mission_success) && state.campaign.request ? '' : 'none';
+    renderDrivers(summary);
 
     const failureGrid = $('#camp-failure-grid');
     const failureCounts = summary.failure_criteria_counts || {};
@@ -1026,19 +1363,24 @@
     const metrics = summary.metrics || {};
     const metricRows = Object.entries(metrics).filter(([, v]) => v);
     metricsTable.querySelector('thead').innerHTML =
-      '<tr><th>Metric</th><th>Median</th><th>P05</th><th>P95</th><th>Min</th><th>Max</th></tr>';
+      '<tr><th>Metric</th><th>Median</th><th>P05</th><th>P95</th><th title="3σ low tail">P0.135</th><th title="3σ high tail">P99.865</th><th>Min</th><th>Max</th></tr>';
     metricsTable.querySelector('tbody').innerHTML = metricRows.length
-      ? metricRows.map(([name, s]) => `<tr><td>${escapeHtml(name)}</td><td>${fmt(s.median, 2)}</td><td>${fmt(s.p05, 2)}</td><td>${fmt(s.p95, 2)}</td><td>${fmt(s.min, 2)}</td><td>${fmt(s.max, 2)}</td></tr>`).join('')
-      : '<tr><td colspan="6">No metric data available.</td></tr>';
+      ? metricRows.map(([name, s]) => `<tr><td>${escapeHtml(name)}</td><td>${fmt(s.median, 2)}</td><td>${fmt(s.p05, 2)}</td><td>${fmt(s.p95, 2)}</td><td>${fmt(s.p00135, 2)}</td><td>${fmt(s.p99865, 2)}</td><td>${fmt(s.min, 2)}</td><td>${fmt(s.max, 2)}</td></tr>`).join('')
+      : '<tr><td colspan="8">No metric data available.</td></tr>';
 
     const table = $('#camp-table');
-    const cols = ['case_id', 'mode', 'mission_success', 'orbit_success', 'landing_success', 'wall_time_s', 'reason'];
-    table.querySelector('thead').innerHTML = `<tr>${cols.map((c) => `<th>${c === 'reason' ? 'Failure Reason' : c}</th>`).join('')}</tr>`;
+    const cols = ['case_id', 'mode', 'mission_success', 'orbit_success', 'landing_success', 'wall_time_s', 'reason', 'replay'];
+    table.querySelector('thead').innerHTML = `<tr>${cols.map((c) => `<th>${c === 'reason' ? 'Failure Reason' : c === 'replay' ? '' : c}</th>`).join('')}</tr>`;
     table.querySelector('tbody').innerHTML = results.slice(0, 300).map((row) => `<tr>${cols.map((c) => {
       if (c === 'mission_success' || c === 'orbit_success' || c === 'landing_success') {
         return `<td><span class="badge ${row[c] ? 'ok' : 'bad'}">${row[c] ? 'PASS' : 'FAIL'}</span></td>`;
       }
       if (c === 'wall_time_s') return `<td>${fmt(row[c], 2)}s</td>`;
+      if (c === 'replay') {
+        return state.campaign.request
+          ? `<td><button class="btn btn-sm" data-replay="${escapeHtml(row.case_id)}" title="Fly this case again with live telemetry">Replay</button></td>`
+          : '<td></td>';
+      }
       if (c === 'reason') {
         if (row.mission_success) return '<td>—</td>';
         const reason = [!row.orbit_success ? row.orbiter_reason : '', !row.landing_success ? row.booster_reason : ''].filter(Boolean).join(' / ');
@@ -1046,7 +1388,161 @@
       }
       return `<td>${escapeHtml(row[c])}</td>`;
     }).join('')}</tr>`).join('');
+    $$('[data-replay]', table).forEach((btn) => btn.addEventListener('click', () => replayCase(btn.dataset.replay)));
   }
+
+  // ------------------------------------------------- campaign: drivers & replay
+  const DRIVER_METRICS = [
+    ['touchdown_speed_mps', 'Touchdown speed', 'm/s'],
+    ['site_error_m', 'Pad error', 'm'],
+    ['booster_propellant_remaining_kg', 'Booster propellant left', 'kg'],
+    ['perigee_altitude_km', 'Perigee', 'km'],
+  ];
+
+  function signedBar(value, max, digits) {
+    const width = max > 0 ? Math.min(100, (100 * Math.abs(value)) / max) : 0;
+    return `<div class="sbar"><div class="sbar-track"><div class="sbar-fill ${value < 0 ? 'neg' : 'pos'}" style="width:${width.toFixed(1)}%"></div></div><span>${value > 0 ? '+' : ''}${fmt(value, digits)}</span></div>`;
+  }
+
+  function renderDrivers(summary) {
+    const wrap = $('#camp-drivers-wrap');
+    const effects = summary.one_sigma_effects;
+    const corr = summary.pearson_correlations;
+    const source = effects && Object.keys(effects).length ? effects : (corr && Object.keys(corr).length ? corr : null);
+    if (!source) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    const isEffect = source === effects;
+    $('#camp-drivers-help').textContent = isEffect
+      ? 'Change in each metric per 1σ of each dispersion (one-at-a-time sweep). Longer bars are the dominant drivers.'
+      : 'Correlation (−1 to 1) between each dispersion and each metric across the Monte Carlo runs. Values near 0 mean no linear influence.';
+    const metrics = DRIVER_METRICS.filter(([key]) => Object.values(source).some((m) => m[key] !== undefined));
+    const max = Object.fromEntries(metrics.map(([key]) => [key, Math.max(1e-12, ...Object.values(source).map((m) => Math.abs(m[key] || 0)))]));
+    const ranked = Object.entries(source).sort((a, b) => Math.abs(b[1][metrics[0]?.[0]] || 0) - Math.abs(a[1][metrics[0]?.[0]] || 0));
+    const table = $('#camp-drivers-table');
+    table.querySelector('thead').innerHTML = `<tr><th>Dispersion</th>${metrics.map(([, label, unit]) => `<th>${label}${isEffect ? ` (${unit} per σ)` : ''}</th>`).join('')}</tr>`;
+    table.querySelector('tbody').innerHTML = ranked.map(([param, m]) => `<tr><td>${escapeHtml(param.replace(/_/g, ' '))}</td>${metrics.map(([key]) =>
+      `<td>${m[key] === undefined ? '—' : signedBar(m[key], isEffect ? max[key] : 1, isEffect ? 2 : 2)}</td>`).join('')}</tr>`).join('');
+  }
+
+  async function launchSimulationWith(setup, label) {
+    // Shares launchSimulation's UI flow; used to replay one campaign case live.
+    state.pendingSetup = setup;
+    await launchSimulation();
+    if (label) toast(label, 'info');
+  }
+
+  function replayCase(caseId) {
+    const req = state.campaign.request;
+    if (!req) return;
+    const setup = JSON.parse(JSON.stringify(req.setup));
+    setup.campaign_case = { mode: req.mode, runs: req.runs, seed: req.seed, dispersions: req.dispersions, case_id: caseId };
+    setup.realtime_mode = state.realtime;
+    launchSimulationWith(setup, `Replaying ${caseId} with live telemetry`);
+  }
+
+  async function startCampaign(body) {
+    const result = await api('/api/campaigns/start', { method: 'POST', body: JSON.stringify(body) });
+    state.campaign.id = result.campaign_id;
+    state.campaign.request = body;
+    $('#camp-idle').style.display = 'none';
+    $('#camp-progress').style.display = 'block';
+    $('#camp-results').style.display = 'none';
+    toast('Campaign started: ' + result.campaign_id, 'success');
+    pollCampaign();
+  }
+
+  $('#btn-rerun-failed').addEventListener('click', async () => {
+    const req = state.campaign.request;
+    const failed = (state.campaign.lastResults || []).filter((r) => !r.mission_success).map((r) => r.case_id);
+    if (!req || !failed.length) { toast('No failed cases to re-run', 'info'); return; }
+    try {
+      await startCampaign({ ...req, case_ids: failed });
+    } catch (e) {
+      toast('Re-run failed: ' + e.message, 'error');
+    }
+  });
+
+  // ------------------------------------------------- flight validation view
+  $('#btn-run-flight-validation').addEventListener('click', async () => {
+    const btn = $('#btn-run-flight-validation');
+    btn.disabled = true;
+    btn.textContent = 'Flying validation cases…';
+    try {
+      renderFlightValidation(await api('/api/validation/flights'));
+    } catch (e) {
+      toast('Flight validation failed: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Run comparison';
+    }
+  });
+
+  function renderFlightValidation(report) {
+    $('#val-empty').style.display = 'none';
+    $('#val-notes').innerHTML = report.notes.map((n) => `<div>• ${escapeHtml(n)}</div>`).join('')
+      + `<div>Source: <a href="${escapeHtml(report.source_url)}" target="_blank" rel="noopener">${escapeHtml(report.source)}</a></div>`;
+    $('#val-results').innerHTML = report.flights.map((f, i) => `
+      <div class="section-title">${escapeHtml(f.name.replace(/_/g, ' '))}
+        <span class="unit">sim payload ${fmt(f.sim_payload_kg, 0)} kg${f.payload_published ? '' : ' (flight payload unpublished)'}
+        · ascent RMS error ${fmt(f.altitude_rms_km, 2)} km altitude, ${fmt(f.speed_rms_mps, 0)} m/s speed</span></div>
+      <div class="grid grid-2">
+        <div class="card" id="val-alt-${i}"></div>
+        <div class="card" id="val-spd-${i}"></div>
+      </div>
+      <div class="card" style="margin-top:12px;overflow:auto;"><table class="data-table"><thead><tr><th>Quantity</th><th>Flight</th><th>Sim</th><th>Difference</th></tr></thead><tbody>
+        ${f.metrics.map((m) => `<tr><td>${escapeHtml(m.quantity)}</td><td>${fmt(m.flight, 1)}</td><td>${fmt(m.sim, 1)}</td>
+          <td class="${m.difference_pct !== null && Math.abs(m.difference_pct) > 10 ? 'bad-text' : ''}">${m.difference_pct === null ? '—' : `${m.difference_pct > 0 ? '+' : ''}${fmt(m.difference_pct, 1)}%`}</td></tr>`).join('')}
+      </tbody></table></div>`).join('');
+    report.flights.forEach((f, i) => {
+      $(`#val-alt-${i}`).innerHTML = ReportCharts.lineChart([
+        { xs: f.real.t, ys: f.real.altitude_km, color: '#38e0ff', label: 'Flight' },
+        { xs: f.sim.t, ys: f.sim.altitude_km, color: '#ffb454', label: 'Sim' },
+      ], { title: 'Altitude to MECO', xlabel: 'Time (s)', ylabel: 'km' });
+      $(`#val-spd-${i}`).innerHTML = ReportCharts.lineChart([
+        { xs: f.real.t, ys: f.real.speed_mps, color: '#38e0ff', label: 'Flight' },
+        { xs: f.sim.t, ys: f.sim.speed_mps, color: '#ffb454', label: 'Sim' },
+      ], { title: 'Surface-relative speed to MECO', xlabel: 'Time (s)', ylabel: 'm/s' });
+    });
+  }
+
+  // ------------------------------------------------- model & limits view
+  const pedigreeBadge = (p) => `<span class="badge ${p >= 3 ? 'ok' : p >= 2 ? '' : 'bad'}">${p}</span>`;
+  let modelLoaded = false;
+
+  async function loadModelCard() {
+    try {
+      const card = await api('/api/model');
+      modelLoaded = true;
+      $('#model-limits').innerHTML = card.known_limits.map((l) => `<li>${escapeHtml(l)}</li>`).join('');
+      $('#model-table tbody').innerHTML = card.models.map((m) => `<tr><td><b>${escapeHtml(m.area)}</b></td><td>${escapeHtml(m.model)}</td>
+        <td>${escapeHtml(m.basis)}</td><td>${escapeHtml(m.limit)}</td><td>${pedigreeBadge(m.pedigree)}</td></tr>`).join('');
+      const cred = card.credibility;
+      $('#model-pedigree-score').textContent = `overall input pedigree ${cred.input_pedigree_score} / 4`;
+      $('#model-inputs-table tbody').innerHTML = Object.entries(cred.model_inputs).map(([k, v]) =>
+        `<tr><td>${escapeHtml(k.replace(/_/g, ' '))}</td><td>${pedigreeBadge(v.pedigree)}</td><td>${escapeHtml(v.source)}</td></tr>`).join('');
+      $('#model-disp-table tbody').innerHTML = Object.entries(cred.dispersions).map(([k, v]) =>
+        `<tr><td>${escapeHtml(k.replace(/_/g, ' '))}</td><td>${fmt(v.sigma, 3)}</td><td>${escapeHtml(v.units)}</td><td>${pedigreeBadge(v.pedigree)}</td><td>${escapeHtml(v.source)}</td></tr>`).join('');
+    } catch (e) {
+      toast('Could not load the model card: ' + e.message, 'error');
+    }
+  }
+
+  function renderPluginTable() {
+    const folder = $('#plugin-folder');
+    if (!folder) return;
+    folder.textContent = state.pluginFolder || '—';
+    $('#plugin-table tbody').innerHTML = state.plugins.length
+      ? state.plugins.map((p) => `<tr><td><b>${escapeHtml(p.title)}</b><div class="unit">${escapeHtml(p.name)}</div></td>
+          <td style="white-space:normal;">${escapeHtml(p.description || '—')}</td><td>${p.source === 'user' ? 'your folder' : 'bundled example'}</td>
+          <td>${p.error ? `<span class="badge bad" title="${escapeHtml(p.error)}">error</span> <span class="bad-text">${escapeHtml(p.error)}</span>` : '<span class="badge ok">ready</span>'}</td></tr>`).join('')
+      : '<tr><td colspan="4">No plugins found.</td></tr>';
+  }
+
+  $('#btn-plugins-reload').addEventListener('click', async () => {
+    await refreshPlugins();
+    toast(`${state.plugins.length} plugin(s) found`, 'success');
+  });
+  $$('.nav-item[data-view=model]').forEach((n) => n.addEventListener('click', () => { if (!modelLoaded) loadModelCard(); }));
 
   // ---------------------------------------------------------------- settings
   $('#set-base-url').value = state.baseUrl;
@@ -1429,6 +1925,7 @@
   // ---------------------------------------------------------------- init
   (async function init() {
     await checkBackend();
+    await loadSchemaAndPlugins();
     await loadDefaults();
     setInterval(checkBackend, 15000);
   })();

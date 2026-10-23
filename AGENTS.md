@@ -83,5 +83,10 @@ Config: `rlv_sim/config/definition.py` (frozen dataclass, validated) + `rlv_sim/
 ## Conventions
 - Match surrounding style; comments explain *why*. Physics/guidance constants carry a note on how they were tuned.
 - New config fields: add to `rlv_sim/config/definition.py` with a default that keeps current behaviour, validate them,
-  and only change defaults after a Monte Carlo comparison.
+  add a help line to `rlv_sim/config/field_docs.py` (a test checks every field has one; it shows in the app's All
+  Settings tab), and only change defaults after a Monte Carlo comparison.
+- Research features: settings schema `config/schema.py` (`/api/config/schema`), guidance plugins `guidance/plugins.py`
+  (`/api/plugins`, examples in `guidance/plugin_examples/`), model card `outputs/model_card.py` (`/api/model`; keep in
+  step with `docs/MATHEMATICAL_REFERENCES.md`), flight comparison `validation/flight_compare.compare_flights`
+  (`/api/validation/flights`), campaign cases `mission/campaign.build_cases` (CLI, server and single-case replay).
 - Commit messages: imperative subject, body with what/why and measured results.

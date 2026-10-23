@@ -111,6 +111,7 @@ class TestCampaignWorkersWired:
 
     def test_sequential_path_actually_runs_all_cases(self):
         from rlv_sim.config.factory import create_test_config
+        from rlv_sim.mission.campaign import build_cases
         from rlv_sim.server.app import _run_campaign_task
 
         base = create_test_config(dt=1.0, max_time=3.0, verbose=False)
@@ -119,6 +120,7 @@ class TestCampaignWorkersWired:
             "mode": "sensitivity",
             "runs": 0,
             "seed": 1,
+            "cases": build_cases("sensitivity"),
             "workers": 1,
             "status": "running",
             "cancel": False,
@@ -130,6 +132,7 @@ class TestCampaignWorkersWired:
 
     def test_parallel_path_actually_runs_all_cases(self):
         from rlv_sim.config.factory import create_test_config
+        from rlv_sim.mission.campaign import build_cases
         from rlv_sim.server.app import _run_campaign_task
 
         base = create_test_config(dt=1.0, max_time=3.0, verbose=False)
@@ -138,6 +141,7 @@ class TestCampaignWorkersWired:
             "mode": "sensitivity",
             "runs": 0,
             "seed": 1,
+            "cases": build_cases("sensitivity"),
             "workers": 2,
             "status": "running",
             "cancel": False,

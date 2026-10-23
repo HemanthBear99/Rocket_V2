@@ -127,6 +127,8 @@ Recovery phases use a finer max step (`_RECOVERY_FINE_STEP_PHASES`).
 - Grouped views: `VehicleProfile`, `MissionProfile`, `RecoveryProfile`, `PhysicsProfile`, `RuntimeProfile`; `from_profiles(...)`.
 - `config_factory`: `create_default_config` (research profile), `create_demo_config` (dt 0.1), `create_test_config` (dt 0.1, 10 s). `_with_overrides` drops 22 `RETIRED_FIELDS`, auto-sizes reserve if enabled.
 - `config_io.load_config_json`: JSON object of overrides; unknown keys raise.
+- `config/schema.config_schema()`: every field with kind, default, unit, bounds (mirrored from `validate()`), group and help text from `config/field_docs.FIELD_DOCS`; drives the app's All Settings tab.
+- Vehicle geometry and mass properties are fields (`stage1_engine_ring_radius_m`, nozzle-exit radii, `stack_*`/`booster_*` inertias, `booster_cg_*_m`); `physics/mass.py` and jet damping read them, falling back to `core.constants`.
 
 ### Outputs
 | Output | Source | Contents |
@@ -156,11 +158,16 @@ Flags: `--profile`, `--demo`, `--config-json`, `-o/--output-dir`, `-q`, `--no-pl
 - `/api/aero/import`, `/api/aero/decks`, `/api/aero/validation[/tier2]`
 - `/api/config/defaults`, `/api/config/validate`, `/api/mission/plan`
 - `/api/simulations/start`, `/{id}/pause|resume|stop`, `GET /{id}`; WebSocket `/ws/simulations/{id}/telemetry`
-- `/api/campaigns/start`, `GET /{id}`, `/{id}/cancel`
+- `/api/campaigns/start` (modes `monte_carlo|sensitivity|sweep_3sigma`, `dispersions`, `case_ids`), `GET /{id}`, `/{id}/cancel`
+- `/api/config/schema`, `/api/plugins`, `/api/model` (model card), `/api/validation/flights` (cached Falcon 9 comparison)
+- `SimulationSetup.advanced_overrides` accepts any config field (lists for wind modes, null for optional fields); `campaign_case` replays one campaign case.
 - Request models in `rlv_sim/server/api_models.py` (pydantic v2).
 
 ### Web UI (`frontend/`, mounted at `/static`)
-`app.js`, `charts.js`, `report_charts.js`, `rocket_viz.js` (Three.js). Views: config, telemetry, report, campaign, compare, settings.
+`app.js`, `charts.js`, `report_charts.js`, `rocket_viz.js` (Three.js). Views: config (tabs incl. Wind & Dispersions and All Settings), telemetry, report, campaign (drivers table, replay, re-run failed), compare, validation, model, settings.
+
+### Guidance plugins
+`guidance/plugins.py`: user files in `app_paths.user_plugin_dir()` (`%APPDATA%\Vyom\plugins`, `RLV_PLUGIN_DIR`) or `guidance/plugin_examples/`; `landing_command(state) -> accel` replaces the landing-burn law when `booster_landing_guidance="plugin"`. Selected by name only; no upload or path loading.
 
 ### Desktop and release
 1. `pip install -e .[desktop]` (extras: `desktop`, `test`, `fast`=numba, `gfold`=cvxpy).

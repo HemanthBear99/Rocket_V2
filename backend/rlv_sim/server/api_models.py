@@ -71,6 +71,18 @@ class PhysicsSetup(BaseModel):
     sensor_noise: bool
 
 
+class CampaignCaseRef(BaseModel):
+    """One case of a campaign, regenerated from its seed to replay it alone."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: str = Field(default="monte_carlo", pattern="^(monte_carlo|sensitivity|sweep_3sigma)$")
+    runs: int = Field(default=100, gt=0, le=2000)
+    seed: int = Field(default=42, ge=0)
+    dispersions: Literal["legacy", "extended"] = "legacy"
+    case_id: str = Field(min_length=1, max_length=64)
+
+
 class SimulationSetup(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -88,7 +100,11 @@ class SimulationSetup(BaseModel):
     # outside the form schema, so they aren't silently dropped on launch.
     # Passed straight to create_default_config()/dataclasses.replace(), which
     # raises TypeError on an unknown field name -- surfaced as a 422 below.
-    advanced_overrides: dict[str, float | int | bool | str] | None = None
+    # None clears an optional field; nested lists carry
+    # runtime_wind_profile_modes ([[amplitude, wavelength, phase], ...]).
+    advanced_overrides: dict[str, float | int | bool | str | None | list[list[float]]] | None = None
+    # Replay one campaign case: its dispersions are applied on top of this setup.
+    campaign_case: CampaignCaseRef | None = None
 
 
 class CampaignRequest(BaseModel):
@@ -102,14 +118,20 @@ class CampaignRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    mode: str = Field(default="monte_carlo", pattern="^(monte_carlo|sensitivity)$")
+    mode: str = Field(default="monte_carlo", pattern="^(monte_carlo|sensitivity|sweep_3sigma)$")
     runs: int = Field(default=100, gt=0, le=2000)
     seed: int = Field(default=42, ge=0)
     workers: int = Field(default=1, ge=1, le=16)
+    # legacy = 6 dispersions; extended adds descent drag, separation dv,
+    # GPS noise and altitude-varying wind modes (see mission.campaign).
+    dispersions: Literal["legacy", "extended"] = "legacy"
+    # Run only these cases of the campaign (replay failures).
+    case_ids: list[str] | None = Field(default=None, max_length=2000)
     setup: SimulationSetup | None = None
 
 
 __all__ = [
+    "CampaignCaseRef",
     "CampaignRequest",
     "MissionSetup",
     "PhysicsSetup",

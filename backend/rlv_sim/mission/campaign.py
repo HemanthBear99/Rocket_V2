@@ -195,6 +195,43 @@ def sample_monte_carlo_cases(
     return cases
 
 
+CAMPAIGN_MODES = ("monte-carlo", "sensitivity", "sweep-3sigma")
+
+
+def build_cases(
+    mode: str,
+    *,
+    runs: int = _DEFAULT_MC_RUNS,
+    seed: int = _DEFAULT_MC_SEED,
+    dispersions: str = "legacy",
+    parameters: Iterable[str] | None = None,
+    case_ids: Iterable[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Cases for a campaign mode, optionally narrowed to ``case_ids`` (replay).
+
+    Sensitivity sweeps cover the legacy parameters, or all of them with the
+    extended dispersion set, unless ``parameters`` names them.
+    """
+    mode = mode.replace("_", "-")
+    if mode not in CAMPAIGN_MODES:
+        raise ValueError(f"mode must be one of {CAMPAIGN_MODES}, got {mode!r}")
+    if mode == "monte-carlo":
+        cases = sample_monte_carlo_cases(runs, seed, dispersions=dispersions)
+    else:
+        if dispersions not in DISPERSION_SETS:
+            raise ValueError(f"dispersions must be one of {DISPERSION_SETS}, got {dispersions!r}")
+        if parameters is None:
+            parameters = ALL_PARAMETERS if dispersions == "extended" else PARAMETERS
+        cases = build_sensitivity_cases(parameters, sigma=3.0 if mode == "sweep-3sigma" else 1.0)
+    if case_ids is not None:
+        wanted = {case_id for case_id in case_ids if case_id}
+        cases = [case for case in cases if case["case_id"] in wanted]
+        missing = wanted - {case["case_id"] for case in cases}
+        if missing:
+            raise ValueError(f"Unknown case id(s): {', '.join(sorted(missing))}")
+    return cases
+
+
 def apply_case(base: SimulationConfig, case: dict[str, Any]) -> SimulationConfig:
     """Convert dimensionless case z-scores into physical runtime overrides."""
     z = case.get("z_scores", {})
@@ -758,22 +795,20 @@ def main(argv: list[str] | None = None) -> int:
         **_parse_overrides(args.set),
     )
     seed = args.seed if args.seed is not None else _DEFAULT_MC_SEED
-    if args.mode in ("sensitivity", "sweep-3sigma"):
-        parameters = tuple(
-            part.strip() for part in args.parameters.split(",") if part.strip()
+    parameters = None
+    if args.parameters != ",".join(PARAMETERS):
+        parameters = tuple(part.strip() for part in args.parameters.split(",") if part.strip())
+    try:
+        cases = build_cases(
+            args.mode,
+            runs=args.runs if args.runs is not None else _DEFAULT_MC_RUNS,
+            seed=seed,
+            dispersions=args.dispersions,
+            parameters=parameters,
+            case_ids=[part.strip() for part in args.case_ids.split(",")] if args.case_ids else None,
         )
-        if args.dispersions == "extended" and args.parameters == ",".join(PARAMETERS):
-            parameters = ALL_PARAMETERS
-        cases = build_sensitivity_cases(parameters, sigma=3.0 if args.mode == "sweep-3sigma" else 1.0)
-    else:
-        runs = args.runs if args.runs is not None else _DEFAULT_MC_RUNS
-        cases = sample_monte_carlo_cases(runs, seed, dispersions=args.dispersions)
-    if args.case_ids:
-        wanted = {part.strip() for part in args.case_ids.split(",") if part.strip()}
-        cases = [case for case in cases if case["case_id"] in wanted]
-        missing = wanted - {case["case_id"] for case in cases}
-        if missing:
-            raise SystemExit(f"Unknown case id(s): {', '.join(sorted(missing))}")
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
 
     timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     output_dir = args.output_dir or f"plots/campaign_{timestamp}"

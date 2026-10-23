@@ -22,6 +22,7 @@ from rlv_sim.core.utils import (
     vec_norm,
 )
 from rlv_sim.guidance import gfold as _gfold
+from rlv_sim.guidance import plugins as _plugins
 from rlv_sim.guidance.common import (
     GuidanceState,
     _resolve_guidance_state,
@@ -1106,6 +1107,27 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         ctx, gs, desired_dir, throttle, t_go, g_loc, full_throttle_mdot,
         landing_target_descent_rate,
     )
+    if cfg.booster_landing_guidance == "plugin":
+        desired_dir, throttle = _plugins.landing_command(
+            cfg.booster_landing_plugin,
+            _plugins.LandingState(
+                t=float(ctx.t),
+                altitude_m=float(h),
+                up=site_vertical.copy(),
+                position_error_m=r_err_horiz.copy(),
+                velocity_mps=np.array(ctx.v_ground, dtype=float),
+                vertical_speed_mps=v_vert_rel,
+                horizontal_velocity_mps=v_horiz_site.copy(),
+                mass_kg=float(ctx.m),
+                propellant_kg=float(ctx.propellant_remaining),
+                max_accel_mps2=t_accel,
+                gravity_mps2=g_loc,
+                time_to_go_s=float(t_go),
+                tilt_limit_deg=touchdown_cone_deg,
+                target_descent_rate_mps=landing_target_descent_rate,
+            ),
+        )
+        landing_guidance_mode = "plugin"
 
     if h < 10.0 and v_descent < landing_target_descent_rate:
         desired_dir = vertical

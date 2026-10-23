@@ -9,9 +9,16 @@ component locations and geometric idealizations are project assumptions unless
 separately identified as measured or published data.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from rlv_sim.core import constants as C
+
+if TYPE_CHECKING:
+    from rlv_sim.config.definition import SimulationConfig
 
 S1_DRY_CG_Z = 24.0
 S1_PROP_CG_Z = 19.0
@@ -108,10 +115,31 @@ def is_propellant_exhausted(m: float, dry_mass: float = C.DRY_MASS) -> bool:
     return m <= dry_mass
 
 
+class _ReferenceMassProperties:
+    """Reference-vehicle mass properties for callers without a config."""
+
+    stack_ixx_full_kgm2 = C.IXX_FULL
+    stack_ixx_empty_kgm2 = C.IXX_EMPTY
+    stack_izz_full_kgm2 = C.IZZ_FULL
+    stack_izz_empty_kgm2 = C.IZZ_EMPTY
+    booster_cg_full_m = C.STAGE1_RECOVERY_CG_FULL
+    booster_cg_empty_m = C.STAGE1_RECOVERY_CG_EMPTY
+    booster_ixx_full_kgm2 = C.STAGE1_RECOVERY_IXX_FULL
+    booster_ixx_empty_kgm2 = C.STAGE1_RECOVERY_IXX_EMPTY
+    booster_izz_full_kgm2 = C.STAGE1_RECOVERY_IZZ_FULL
+    booster_izz_empty_kgm2 = C.STAGE1_RECOVERY_IZZ_EMPTY
+
+
+def _mass_properties(config):
+    """The config's geometry fields, or the reference vehicle's."""
+    return config if config is not None else _ReferenceMassProperties
+
+
 def compute_center_of_mass(
     m: float,
     vehicle_model: str = "stacked",
     stage1_landing_reserve_kg: float | None = None,
+    config: SimulationConfig | None = None,
 ) -> float:
     """
     Compute center-of-mass location (m from vehicle base).
@@ -135,10 +163,8 @@ def compute_center_of_mass(
         )
         reserve = max(float(reserve_source), 1.0)
         s1_frac = max(0.0, min(1.0, (m - C.STAGE1_DRY_MASS) / reserve))
-        return (
-            C.STAGE1_RECOVERY_CG_EMPTY
-            + s1_frac * (C.STAGE1_RECOVERY_CG_FULL - C.STAGE1_RECOVERY_CG_EMPTY)
-        )
+        p = _mass_properties(config)
+        return p.booster_cg_empty_m + s1_frac * (p.booster_cg_full_m - p.booster_cg_empty_m)
 
     s1_dry, s1_prop, s2_dry, s2_prop = _stacked_component_masses(m)
     masses = np.array([s1_dry, s1_prop, s2_dry, s2_prop], dtype=float)
@@ -151,6 +177,7 @@ def compute_inertia_tensor(
     m: float,
     vehicle_model: str = "stacked",
     stage1_landing_reserve_kg: float | None = None,
+    config: SimulationConfig | None = None,
 ) -> np.ndarray:
     """
     Compute principal inertia tensor diag([Ixx, Iyy, Izz]) in body frame.
@@ -176,14 +203,9 @@ def compute_inertia_tensor(
         )
         reserve = max(float(reserve_source), 1.0)
         s1_frac = max(0.0, min(1.0, (m - C.STAGE1_DRY_MASS) / reserve))
-        ixx = (
-            C.STAGE1_RECOVERY_IXX_EMPTY
-            + s1_frac * (C.STAGE1_RECOVERY_IXX_FULL - C.STAGE1_RECOVERY_IXX_EMPTY)
-        )
-        izz = (
-            C.STAGE1_RECOVERY_IZZ_EMPTY
-            + s1_frac * (C.STAGE1_RECOVERY_IZZ_FULL - C.STAGE1_RECOVERY_IZZ_EMPTY)
-        )
+        p = _mass_properties(config)
+        ixx = p.booster_ixx_empty_kgm2 + s1_frac * (p.booster_ixx_full_kgm2 - p.booster_ixx_empty_kgm2)
+        izz = p.booster_izz_empty_kgm2 + s1_frac * (p.booster_izz_full_kgm2 - p.booster_izz_empty_kgm2)
         return np.diag([ixx, ixx, izz])
 
     # Default / "stacked" (S1+S2 ascent) branch, reached via guard-clause
@@ -197,13 +219,14 @@ def compute_inertia_tensor(
     s1_prop = float(np.clip(m - C.DRY_MASS, 0.0, C.STAGE1_PROPELLANT_MASS))
     prop_frac = max(0.0, min(1.0, s1_prop / C.STAGE1_PROPELLANT_MASS))
 
-    izz = C.IZZ_EMPTY + prop_frac * (C.IZZ_FULL - C.IZZ_EMPTY)
+    p = _mass_properties(config)
+    izz = p.stack_izz_empty_kgm2 + prop_frac * (p.stack_izz_full_kgm2 - p.stack_izz_empty_kgm2)
 
     # Linear in propellant mass fraction, same convention as izz above and as
     # the orbiter/booster branches of this function - the standard first-order
     # approximation given no per-component shape/radius data to derive a
     # rigorous parallel-axis result instead.
-    ixx = C.IXX_EMPTY + prop_frac * (C.IXX_FULL - C.IXX_EMPTY)
+    ixx = p.stack_ixx_empty_kgm2 + prop_frac * (p.stack_ixx_full_kgm2 - p.stack_ixx_empty_kgm2)
     return np.diag([ixx, ixx, izz])
 
 
@@ -212,6 +235,7 @@ def compute_inertia_derivative(
     mdot: float,
     vehicle_model: str = "stacked",
     stage1_landing_reserve_kg: float | None = None,
+    config: SimulationConfig | None = None,
 ) -> np.ndarray:
     """
     Compute time derivative of the principal inertia tensor diag([dIxx/dt, dIyy/dt, dIzz/dt]).
@@ -240,14 +264,16 @@ def compute_inertia_derivative(
         reserve = max(float(reserve_source), 1.0)
         if m <= C.STAGE1_DRY_MASS or m >= C.STAGE1_DRY_MASS + reserve:
             return np.zeros((3, 3))
-        d_ixx_dm = (C.STAGE1_RECOVERY_IXX_FULL - C.STAGE1_RECOVERY_IXX_EMPTY) / reserve
-        d_izz_dm = (C.STAGE1_RECOVERY_IZZ_FULL - C.STAGE1_RECOVERY_IZZ_EMPTY) / reserve
+        p = _mass_properties(config)
+        d_ixx_dm = (p.booster_ixx_full_kgm2 - p.booster_ixx_empty_kgm2) / reserve
+        d_izz_dm = (p.booster_izz_full_kgm2 - p.booster_izz_empty_kgm2) / reserve
         return np.diag([d_ixx_dm * mdot, d_ixx_dm * mdot, d_izz_dm * mdot])
 
     # Stacked ascent model
     if m <= C.DRY_MASS or m >= C.DRY_MASS + C.STAGE1_PROPELLANT_MASS:
         return np.zeros((3, 3))
 
-    d_ixx_dm = (C.IXX_FULL - C.IXX_EMPTY) / C.STAGE1_PROPELLANT_MASS
-    d_izz_dm = (C.IZZ_FULL - C.IZZ_EMPTY) / C.STAGE1_PROPELLANT_MASS
+    p = _mass_properties(config)
+    d_ixx_dm = (p.stack_ixx_full_kgm2 - p.stack_ixx_empty_kgm2) / C.STAGE1_PROPELLANT_MASS
+    d_izz_dm = (p.stack_izz_full_kgm2 - p.stack_izz_empty_kgm2) / C.STAGE1_PROPELLANT_MASS
     return np.diag([d_ixx_dm * mdot, d_ixx_dm * mdot, d_izz_dm * mdot])

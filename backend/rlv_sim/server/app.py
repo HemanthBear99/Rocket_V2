@@ -10,7 +10,7 @@ import uuid
 from collections import defaultdict, deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import asynccontextmanager
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from dataclasses import asdict as _dc_asdict
 from typing import Any
 
@@ -43,14 +43,17 @@ from rlv_sim.aero.validation import (
 )
 from rlv_sim.config.definition import SimulationConfig
 from rlv_sim.config.factory import create_default_config, create_demo_config
+from rlv_sim.config.schema import config_schema
 from rlv_sim.core import constants as C
 from rlv_sim.guidance import gfold as _gfold
+from rlv_sim.guidance import plugins as _plugins
 from rlv_sim.mission import campaign as campaign_mod
 from rlv_sim.mission.full_mission import MissionProgress, run_full_mission
+from rlv_sim.outputs.model_card import model_card
 from rlv_sim.outputs.summary import assess_full_mission
 from rlv_sim.outputs.telemetry import extract_mission_progress
 from rlv_sim.server.api_models import CampaignRequest, SimulationSetup
-from rlv_sim.server.app_paths import frontend_dir
+from rlv_sim.server.app_paths import frontend_dir, user_plugin_dir
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rlv_server")
@@ -394,7 +397,16 @@ def map_config(setup: SimulationSetup) -> SimulationConfig:
         # it should not be silently clobbered by a form default.
         overrides.update(setup.advanced_overrides)
 
-    return create_default_config(**overrides)
+    config = create_default_config(**overrides)
+    if setup.campaign_case is not None:
+        ref = setup.campaign_case
+        case = campaign_mod.build_cases(
+            ref.mode, runs=ref.runs, seed=ref.seed, dispersions=ref.dispersions,
+            case_ids=[ref.case_id],
+        )[0]
+        config = replace(campaign_mod.apply_case(config, case), verbose=config.verbose,
+                         enable_run_manifest=config.enable_run_manifest)
+    return config
 
 async def _publish(sim_meta: dict, payload: dict) -> None:
     """Publish telemetry to all active client queues without allowing them to stall the simulation."""
@@ -689,6 +701,41 @@ async def validate_config_upload(file: UploadFile = File(...)) -> dict[str, Any]
     except (json.JSONDecodeError, ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=f"Invalid configuration: {exc}") from exc
     return {"valid": True, "config": asdict(config)}
+
+
+@app.get("/api/config/schema", dependencies=[Depends(require_api_key)])
+async def config_schema_endpoint() -> list[dict[str, Any]]:
+    """Every SimulationConfig field: type, default, unit, bounds, group, help."""
+    return config_schema()
+
+
+@app.get("/api/plugins", dependencies=[Depends(require_api_key)])
+async def list_guidance_plugins() -> dict[str, Any]:
+    """Landing-guidance plugins in the user plugin folder and the bundled examples."""
+    return {"folder": str(user_plugin_dir()), "plugins": _plugins.list_plugins()}
+
+
+_flight_validation_cache: dict[str, Any] = {}
+_flight_validation_lock = asyncio.Lock()
+
+
+@app.get("/api/validation/flights", dependencies=[Depends(require_api_key)])
+async def flight_validation() -> dict[str, Any]:
+    """Simulated ascent vs Falcon 9 webcast telemetry (runs ~4 missions once, then cached)."""
+    async with _flight_validation_lock:
+        if "result" not in _flight_validation_cache:
+            from rlv_sim.validation.flight_compare import compare_flights
+
+            _flight_validation_cache["result"] = await asyncio.get_running_loop().run_in_executor(
+                None, compare_flights,
+            )
+    return _flight_validation_cache["result"]
+
+
+@app.get("/api/model", dependencies=[Depends(require_api_key)])
+async def model_card_endpoint() -> dict[str, Any]:
+    """Models, sources, credibility scores and known limits."""
+    return model_card()
 
 
 async def run_simulation_task(sim_id: str, sim_meta: dict) -> None:
@@ -1058,10 +1105,7 @@ def _run_campaign_task(campaign_id: str, meta: dict) -> None:
     """
     try:
         base = meta["config"]
-        if meta["mode"] == "sensitivity":
-            cases = campaign_mod.build_sensitivity_cases()
-        else:
-            cases = campaign_mod.sample_monte_carlo_cases(meta["runs"], meta["seed"])
+        cases = meta["cases"]
         meta["total"] = len(cases)
         meta["completed"] = 0
         meta["completed_success"] = 0
@@ -1123,6 +1167,10 @@ async def start_campaign(request: CampaignRequest):
         )
     try:
         base = map_config(request.setup) if request.setup else create_default_config()
+        cases = campaign_mod.build_cases(
+            request.mode, runs=request.runs, seed=request.seed,
+            dispersions=request.dispersions, case_ids=request.case_ids,
+        )
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -1133,9 +1181,11 @@ async def start_campaign(request: CampaignRequest):
         "runs": request.runs,
         "seed": request.seed,
         "workers": request.workers,
+        "dispersions": request.dispersions,
+        "cases": cases,
         "status": "running",
         "completed": 0,
-        "total": request.runs if request.mode == "monte_carlo" else 0,
+        "total": len(cases),
         "started_at": time.monotonic(),
         "cancel": False,
     }
@@ -1157,6 +1207,10 @@ async def get_campaign(campaign_id: str):
         "completed": meta.get("completed", 0),
         "completed_success": meta.get("completed_success", 0),
         "total": meta.get("total", 0),
+        "mode": meta["mode"],
+        "runs": meta["runs"],
+        "seed": meta["seed"],
+        "dispersions": meta["dispersions"],
     }
     if meta["status"] in ("completed", "cancelled"):
         response["summary"] = meta.get("summary")

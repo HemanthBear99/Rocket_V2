@@ -47,6 +47,16 @@ def user_aero_dir() -> Path:
     return sub_dir("aero_decks")
 
 
+def user_plugin_dir() -> Path:
+    """Landing-guidance plugins (see guidance.plugins). RLV_PLUGIN_DIR overrides."""
+    override = os.environ.get("RLV_PLUGIN_DIR")
+    if override:
+        path = Path(override)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    return sub_dir("plugins")
+
+
 def frontend_dir() -> Path:
     """Location of the web UI (repo ``frontend/``).
 
