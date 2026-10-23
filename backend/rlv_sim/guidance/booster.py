@@ -825,7 +825,9 @@ def _gfold_command(ctx: _BoosterContext, gs: GuidanceState, t_go: float,
 def _lateral_divert(v_horiz_site, t_stop, h, t_go, a_divert_zev, a_divert_zem_zev,
                     a_horiz_budget, *, tau_min, terminal_horizontal_capture,
                     terminal_inside_pad_capture, pad_reachable,
-                    r_err_horiz=None, position_hold_tau_min_s=0.0):
+                    r_err_horiz=None, position_hold_tau_min_s=0.0,
+                    position_hold_floor_m=0.0, vertical_priority=False,
+                    position_hold_speed_cap_mps=float("inf")):
     """Horizontal divert acceleration for the landing burn, budget-limited.
 
     With ``position_hold_tau_min_s`` > 0 the final approach keeps correcting
@@ -833,28 +835,52 @@ def _lateral_divert(v_horiz_site, t_stop, h, t_go, a_divert_zev, a_divert_zem_ze
     drops below the floor. Velocity nulling alone (the default) freezes any
     position error left at ~150 m, which caused 50-70 m pad misses with
     propellant to spare; the floor avoids the 1/t_go^2 blow-up of ZEM/ZEV.
+    The hold also covers the inside-pad capture branches, which otherwise
+    null velocity only and let a fast arrival coast past the pad. It yields
+    to vertical priority and fades into velocity nulling between 2x and 1x
+    ``position_hold_floor_m``, so the last metres null sideways speed instead
+    of chasing position (hard landings otherwise). The hold's closing speed
+    r/(2 tau) is capped at ``position_hold_speed_cap_mps`` so a far-off pad is
+    not chased faster than the tilt-limited thrust can brake before the floor.
+
+    Returns (a_divert, hold_active).
     """
+    final_approach = h < 150.0 or t_go < 5.0
     if terminal_horizontal_capture:
         a_divert = -v_horiz_site / max(t_stop, tau_min, 1e-6)
     elif terminal_inside_pad_capture:
         a_divert = a_divert_zev
-    elif h < 150.0 or t_go < 5.0:
+    elif final_approach:
         # Final approach: null horizontal velocity only. ZEM/ZEV's position
         # term grows as 1/t_go^2 and, with the thrust pinned at the tilt
         # limit, kept accelerating toward an off-pad target instead of
         # braking (tailwind cases touched down at ~30 m/s sideways).
-        if position_hold_tau_min_s > 0.0 and r_err_horiz is not None:
-            tau = max(0.5 * t_go, position_hold_tau_min_s)
-            a_divert = r_err_horiz / tau ** 2 - 2.0 * v_horiz_site / tau
-        else:
-            a_divert = a_divert_zev
+        a_divert = a_divert_zev
     else:
         a_divert = a_divert_zem_zev if pad_reachable else a_divert_zev
+
+    hold_active = False
+    in_terminal = final_approach or terminal_horizontal_capture or terminal_inside_pad_capture
+    if (position_hold_tau_min_s > 0.0 and r_err_horiz is not None
+            and in_terminal and not vertical_priority):
+        floor = max(position_hold_floor_m, 0.0)
+        weight = 1.0 if floor <= 0.0 else float(np.clip((h - floor) / floor, 0.0, 1.0))
+        if weight > 0.0:
+            tau = max(0.5 * t_go, position_hold_tau_min_s)
+            # Critically damped hold written as velocity tracking:
+            # 2/tau * (r/(2 tau) - v) == r/tau^2 - 2v/tau, with r/(2 tau) capped.
+            v_ref = r_err_horiz / (2.0 * tau)
+            v_ref_mag = float(vec_norm(v_ref))
+            if v_ref_mag > position_hold_speed_cap_mps:
+                v_ref = v_ref * (max(position_hold_speed_cap_mps, 0.0) / v_ref_mag)
+            a_hold = 2.0 * (v_ref - v_horiz_site) / tau
+            a_divert = weight * a_hold + (1.0 - weight) * a_divert
+            hold_active = True
 
     a_divert_mag = float(vec_norm(a_divert))
     if a_divert_mag > a_horiz_budget and a_divert_mag > 1e-6:
         a_divert = a_divert * (a_horiz_budget / a_divert_mag)
-    return a_divert
+    return a_divert, hold_active
 
 
 def _apply_landing_guidance_mode(ctx, gs, desired_dir, throttle, t_go, g_loc,
@@ -1035,7 +1061,21 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         float(cfg.booster_terminal_hcapture_tstop_min_s),
         float(cfg.booster_terminal_hcapture_tstop_max_s),
     ))
-    a_divert = _lateral_divert(
+    # Closing speed the hold may build: half of what the tilt-limited
+    # horizontal thrust can brake in the time left above the fade-out floor.
+    touchdown_cone_deg = min(
+        float(cfg.booster_terminal_attitude_error_max_deg),
+        float(cfg.landing_leg_max_tilt_deg),
+    )
+    hold_floor_m = float(cfg.booster_terminal_position_hold_floor_m)
+    a_hold_brake = min(
+        a_horiz_budget,
+        float(np.tan(np.radians(touchdown_cone_deg))) * max(a_vert_needed, g_loc),
+    )
+    t_above_floor = max(h - hold_floor_m, 0.0) / max(v_descent, 1.0)
+    hold_speed_cap = 0.5 * a_hold_brake * t_above_floor
+
+    a_divert, position_hold_active = _lateral_divert(
         v_horiz_site, t_stop, h, t_go, a_divert_zev, a_divert_zem_zev, a_horiz_budget,
         tau_min=tau_min,
         terminal_horizontal_capture=terminal_horizontal_capture,
@@ -1043,13 +1083,18 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         pad_reachable=pad_reachable,
         r_err_horiz=r_err_horiz,
         position_hold_tau_min_s=float(cfg.booster_terminal_position_hold_tau_s),
+        position_hold_floor_m=hold_floor_m,
+        vertical_priority=landing_vertical_priority,
+        position_hold_speed_cap_mps=hold_speed_cap,
     )
 
     if v_descent < 1.0 and v_horiz_mag < 1.0:
         throttle = 0.0
         desired_dir = vertical
     else:
-        if terminal_horizontal_capture:
+        if terminal_horizontal_capture and position_hold_active:
+            a_cmd = (g_loc - v_vert_rel / max(t_stop, 1e-6)) * vertical + a_divert
+        elif terminal_horizontal_capture:
             v_terminal = v_vert_rel * vertical + v_horiz_site
             a_cmd = g_loc * vertical - v_terminal / max(t_stop, 1e-6)
         else:
@@ -1069,10 +1114,6 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
     # Landing-leg stability is a hard vehicle constraint.  Keep the
     # commanded thrust axis inside the configured touchdown cone while
     # retaining the ZEM/ZEV lateral direction within that cone.
-    touchdown_cone_deg = min(
-        float(cfg.booster_terminal_attitude_error_max_deg),
-        float(cfg.landing_leg_max_tilt_deg),
-    )
     desired_dir = _limit_direction_cone(
         desired_dir,
         vertical,

@@ -202,7 +202,11 @@ class SimulationConfig:
     booster_terminal_divert_time_constant_s: float = 1.5  # MC 90% -> 94%
     # Final-approach position hold time-constant floor (s); 0 = velocity
     # nulling only below 150 m (see guidance.booster._lateral_divert).
-    booster_terminal_position_hold_tau_s: float = 0.0
+    # 3.0: MC (seed 42) 95% -> 98% at nominal drag, 87% -> 88% at drag 0.68.
+    booster_terminal_position_hold_tau_s: float = 3.0
+    # Altitude (m) the position hold fades out by: full hold above 2x this,
+    # pure velocity nulling below it, so touchdown is never spent chasing position.
+    booster_terminal_position_hold_floor_m: float = 30.0
     booster_entry_divert_tilt_deg: float = 60.0  # 30 -> 60: MC 78% -> 90% (tailwind pad misses)
     booster_landing_ignition_safety_factor: float = 1.52
     # Fraction of landing thrust the ignition estimator plans on. Below 1.0 the
@@ -476,6 +480,7 @@ class SimulationConfig:
             ("stage1_landing_fuel_reserve_kg", "nonneg"),
             ("recovery_reserve_wind_sensitivity_kg_per_mps", "nonneg"),
             ("booster_terminal_position_hold_tau_s", "nonneg"),
+            ("booster_terminal_position_hold_floor_m", "nonneg"),
             ("orbit_target_altitude_m", "positive"),
             ("orbit_altitude_tolerance_m", "nonneg"),
         ))
