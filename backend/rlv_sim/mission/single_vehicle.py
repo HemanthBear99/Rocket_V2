@@ -92,6 +92,7 @@ def run_simulation(initial_state: State | None = None, dt: float | None = None, 
         AbortMonitor(
             q_alpha_threshold=config.abort_q_alpha_threshold,
             attitude_threshold_deg=config.abort_attitude_threshold,
+            max_tumble_rate=config.abort_max_body_rate_rad_s,
         )
         if config.enable_abort_modes
         else None

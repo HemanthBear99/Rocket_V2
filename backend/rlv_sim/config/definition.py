@@ -372,6 +372,8 @@ class SimulationConfig:
     enable_abort_modes: bool = False
     abort_q_alpha_threshold: float = 60000.0
     abort_attitude_threshold: float = 30.0
+    # Body-rate magnitude (rad/s) above which the abort monitor declares a tumble.
+    abort_max_body_rate_rad_s: float = 1.0
 
     quaternion_norm_tolerance: float = C.QUATERNION_NORM_TOL
 
@@ -670,6 +672,7 @@ class SimulationConfig:
             ("landing_altimeter_velocity_sigma_mps", "nonneg"),
             ("abort_q_alpha_threshold", "nonneg"),
             ("abort_attitude_threshold", "nonneg"),
+            ("abort_max_body_rate_rad_s", "positive"),
             ("runtime_thrust_scale", "positive"),
             ("runtime_isp_scale", "positive"),
             ("runtime_atmosphere_density_scale", "positive"),

@@ -566,6 +566,9 @@ FIELD_DOCS: dict[str, str] = {
     "abort_q_alpha_threshold": (
         "Dynamic pressure and angle-of-attack product that triggers an abort when abort modes are on."
     ),
+    "abort_max_body_rate_rad_s": (
+        "Body angular-rate magnitude above which the abort monitor ends the run as a tumble."
+    ),
     "abort_attitude_threshold": (
         "Attitude error that triggers an abort when abort modes are on."
     ),

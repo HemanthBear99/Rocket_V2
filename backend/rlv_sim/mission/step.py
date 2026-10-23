@@ -102,6 +102,7 @@ def _run_guidance(
         state,
         config,
         dt,
+        vehicle_type=str(getattr(mission_mgr, "vehicle_type", "stacked")),
     )
     nav_estimate = gs.navigation_state.estimate
     use_nav_for_guidance = (
@@ -545,7 +546,11 @@ def _check_runtime_safety_limits(
     aoa_rad = axisymmetric_angle_of_attack(body_z, v_rel) if v_rel_mag > 10.0 else 0.0
     q_alpha = 0.5 * rho_atm * v_rel_mag ** 2 * aoa_rad
 
-    if config.abort_on_q_alpha_limit and q_alpha > config.q_alpha_max:
+    # The booster's recovery flight has its own (higher) q-alpha gate,
+    # booster_recovery_max_q_alpha_pa_rad, applied by the mission assessment.
+    in_booster_recovery = current_phase is not None and str(
+        getattr(current_phase, "name", current_phase)).startswith("BOOSTER_")
+    if config.abort_on_q_alpha_limit and not in_booster_recovery and q_alpha > config.q_alpha_max:
         return (
             f"Q-alpha limit exceeded: {q_alpha:.3g} > "
             f"{config.q_alpha_max:.3g} Pa*rad"

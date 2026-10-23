@@ -250,23 +250,48 @@ def _apply_altimeter_correction(
     )
 
 
+# Seed offsets per vehicle: after separation the orbiter and booster carry
+# their own receivers, which must not replay the same noise sequence.
+_VEHICLE_SEED_OFFSET = {"stacked": 0, "orbiter": 10, "booster": 20}
+
+
+def _sensor_seed(config: SimulationConfig, vehicle_type: str, sensor: int) -> int | None:
+    if config.gps_seed is None:
+        return None
+    return int(config.gps_seed) + _VEHICLE_SEED_OFFSET.get(vehicle_type, 0) + sensor
+
+
+def _model_gravity(r: np.ndarray, config: SimulationConfig) -> np.ndarray:
+    """Gravity the vehicle's own physics applies (EGM96/J2/central per config)."""
+    from rlv_sim.physics.forces import compute_gravity_force
+
+    return compute_gravity_force(
+        r, 1.0, enable_j2=bool(config.enable_j2), j2=float(config.j2_coefficient),
+        gravity_model=str(config.gravity_model),
+    )
+
+
+def _nav_gravity(r: np.ndarray) -> np.ndarray:
+    """Gravity model inside the navigation filter: point mass only."""
+    return -C.MU_EARTH * r / max(float(vec_norm(r)) ** 3, 1.0)
+
+
 def update_navigation_estimate(
     nav_state: NavigationState | None,
     state,
     config: SimulationConfig,
     dt: float,
+    vehicle_type: str = "stacked",
 ) -> NavigationState:
     """Update the per-vehicle navigation estimate from truth and sensors."""
     nav_state = nav_state or NavigationState()
 
     if nav_state.gps_receiver is None:
-        nav_state.gps_receiver = GPSReceiver(seed=config.gps_seed)
+        nav_state.gps_receiver = GPSReceiver(seed=_sensor_seed(config, vehicle_type, 0))
     if nav_state.imu_propagator is None:
-        imu_seed = None if config.gps_seed is None else config.gps_seed + 1
-        nav_state.imu_propagator = IMUPropagator(seed=imu_seed)
+        nav_state.imu_propagator = IMUPropagator(seed=_sensor_seed(config, vehicle_type, 1))
     if nav_state.landing_altimeter is None:
-        alt_seed = None if config.gps_seed is None else config.gps_seed + 2
-        nav_state.landing_altimeter = LandingAltimeter(seed=alt_seed)
+        nav_state.landing_altimeter = LandingAltimeter(seed=_sensor_seed(config, vehicle_type, 2))
 
     sensors_enabled = (
         bool(config.enable_gps)
@@ -312,16 +337,20 @@ def update_navigation_estimate(
         ) / truth_elapsed
 
         r_current = np.asarray(state.r, dtype=float)
-        r_norm = float(vec_norm(r_current))
-        g_accel = -C.MU_EARTH * r_current / max(r_norm ** 3, 1.0)
-        specific_force = true_accel_eci - g_accel
+        # The IMU senses specific force: total acceleration minus the true
+        # gravity the physics applied. Navigation then adds its own
+        # (point-mass) gravity model, so higher-order gravity terms become
+        # navigation error, as on a real vehicle.
+        specific_force = true_accel_eci - _model_gravity(r_current, config)
         measured_specific_force = nav_state.imu_propagator.measure_acceleration(
             specific_force,
             config,
             elapsed,
         )
 
-        a_total_est = measured_specific_force + g_accel
+        a_total_est = measured_specific_force + _nav_gravity(
+            np.asarray(nav_state.estimate.position_eci_m, dtype=float)
+        )
         previous_position = np.asarray(nav_state.estimate.position_eci_m, dtype=float)
         previous_velocity = np.asarray(nav_state.estimate.velocity_eci_mps, dtype=float)
         propagated_velocity = previous_velocity + a_total_est * elapsed
@@ -344,6 +373,26 @@ def update_navigation_estimate(
         )
     elif nav_state.estimate is None:
         nav_state.estimate = _truth_estimate(state, gps_available=False)
+    elif bool(config.enable_gps):
+        # GPS without IMU: coast the last fix forward on the gravity model
+        # instead of holding a stale position between fixes.
+        elapsed = max(float(state.t) - float(nav_state.estimate.time_s), 0.0)
+        if elapsed > 0.0:
+            p0 = np.asarray(nav_state.estimate.position_eci_m, dtype=float)
+            v0 = np.asarray(nav_state.estimate.velocity_eci_mps, dtype=float)
+            g = _nav_gravity(p0)
+            nav_state.estimate = NavigationEstimate(
+                position_eci_m=p0 + v0 * elapsed + 0.5 * g * elapsed ** 2,
+                velocity_eci_mps=v0 + g * elapsed,
+                time_s=float(state.t),
+                gps_available=False,
+                uses_truth_fallback=False,
+                position_error_m=0.0,
+                velocity_error_mps=0.0,
+                imu_available=False,
+                altimeter_available=False,
+                altimeter_altitude_m=None,
+            )
 
     if nav_state.estimate is not None and bool(config.enable_landing_altimeter):
         altimeter_measurement = nav_state.landing_altimeter.measure(state, config)

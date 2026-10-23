@@ -136,6 +136,7 @@ def _make_abort_monitor(config: SimulationConfig) -> AbortMonitor | None:
     return AbortMonitor(
         q_alpha_threshold=config.abort_q_alpha_threshold,
         attitude_threshold_deg=config.abort_attitude_threshold,
+        max_tumble_rate=config.abort_max_body_rate_rad_s,
     )
 
 
