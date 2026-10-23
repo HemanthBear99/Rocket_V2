@@ -146,7 +146,7 @@ def test_jet_damping_uses_configured_nozzle_geometry():
     cfg = create_test_config(stage1_engine_ring_radius_m=0.0, stage1_nozzle_exit_radius_m=1.0)
     ctx = DynamicsContext(
         thrust_on=True, throttle=1.0, dry_mass=None, stage=1, vehicle_model="booster",
-        booster_aero_mode="LANDING", thrust_magnitude_override=None, grid_fin_command=None,
+        booster_aero_mode="BOOSTER_LANDING", thrust_magnitude_override=None, grid_fin_command=None,
         config=cfg,
     )
     tau = compute_jet_damping_torque(-100.0, 20.0, np.array([0.0, 0.0, 1.0]), ctx)

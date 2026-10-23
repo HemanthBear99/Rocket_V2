@@ -127,11 +127,11 @@ def _active_engine_count(ctx: DynamicsContext) -> int:
         return 1
     if ctx.vehicle_model == "booster":
         mode = (ctx.booster_aero_mode or "").upper()
-        if mode == "BOOSTBACK":
+        if mode == "BOOSTER_BOOSTBACK":
             return int(cfg.boostback_engine_count if cfg is not None else C.BOOSTBACK_ENGINE_COUNT)
-        if mode == "ENTRY":
+        if mode == "BOOSTER_ENTRY":
             return int(cfg.entry_engine_count if cfg is not None else C.ENTRY_ENGINE_COUNT)
-        if mode == "LANDING":
+        if mode == "BOOSTER_LANDING":
             return int(cfg.landing_engine_count if cfg is not None else C.LANDING_ENGINE_COUNT)
     return int(cfg.stage1_engine_count if cfg is not None else C.STAGE1_ENGINE_COUNT)
 

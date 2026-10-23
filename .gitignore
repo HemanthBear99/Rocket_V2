@@ -33,3 +33,6 @@ aero_decks/user_*.json
 # license signing keys must never be committed
 *.pem
 .boostback_signing/
+
+# GitNexus index
+.gitnexus/
