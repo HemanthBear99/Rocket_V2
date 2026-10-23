@@ -39,6 +39,7 @@ from rlv_sim.mission.manager_helpers import (
     check_attitude_aligned,
     compute_orbit_metrics,
     compute_radial_velocity,
+    orbit_within_acceptance,
 )
 
 logger = logging.getLogger(__name__)
@@ -110,6 +111,9 @@ class MissionManager:
         # Booster touchdown measurements, set by check_termination.
         self.touchdown_speed_mps: float | None = None
         self.touchdown_site_error_m: float | None = None
+        # Outcome recorded at contact (mission.step.check_termination).
+        self.touchdown_status: str | None = None
+        self.touchdown_success: bool = False
         self._last_radial_velocity = 0.0
         self._phase_entry_time = 0.0
         self._launch_site = rotating_launch_site_eci(0.0, config=self.config)
@@ -279,11 +283,8 @@ class MissionManager:
         target_alt = self.config.orbit_target_altitude_m
         alt_tol = self.config.orbit_altitude_tolerance_m
         ecc_max = self.config.orbit_ecc_max
-        orbit_ok = (
-            energy < 0 and
-            abs(perigee_alt - target_alt) <= alt_tol and
-            abs(apogee_alt - target_alt) <= alt_tol and
-            ecc <= ecc_max
+        orbit_ok = orbit_within_acceptance(
+            energy, perigee_alt, apogee_alt, ecc, target_alt, alt_tol, ecc_max,
         )
 
         if orbit_ok:

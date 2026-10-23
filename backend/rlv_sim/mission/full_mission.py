@@ -647,10 +647,8 @@ def _run_full_mission_body(dt: float | None = None, max_time: float | None = Non
         booster_final_state=booster_state,
         booster_reason=booster_reason,
         orbiter_success=_orbiter_outcome_success(orbiter_state, orbiter_mgr, config),
-        booster_landing_success=_booster_landing_success(
-            booster_log,
-            booster_reason,
-        ),
+        booster_landing_success=_booster_landing_success(booster.mission_manager),
+        booster_touchdown_status=booster.mission_manager.touchdown_status,
         booster_touchdown_speed_mps=booster.mission_manager.touchdown_speed_mps,
         booster_site_error_m=booster.mission_manager.touchdown_site_error_m,
     )

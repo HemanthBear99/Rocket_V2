@@ -24,7 +24,10 @@ from rlv_sim.guidance.common import (
     compute_local_vertical,
 )
 from rlv_sim.guidance.recovery import estimate_suicide_burn
-from rlv_sim.mission.manager_helpers import compute_orbit_metrics
+from rlv_sim.mission.manager_helpers import (
+    compute_orbit_metrics,
+    orbit_within_acceptance,
+)
 
 
 def _circularization_command(
@@ -117,12 +120,8 @@ def _select_insertion_mode(
     # computes the tangential speed for the requested semi-major axis, and the
     # mission manager independently verifies both apsides and eccentricity.
     apo_burn_limit = upper_alt
-    orbit_ok = (
-        metrics["energy"] < 0.0
-        and perigee_alt > 100000.0  # Ensure perigee is outside atmosphere
-        and abs(perigee_alt - target_alt) <= alt_tol
-        and abs(apogee_alt - target_alt) <= alt_tol
-        and ecc <= ecc_max
+    orbit_ok = orbit_within_acceptance(
+        metrics["energy"], perigee_alt, apogee_alt, ecc, target_alt, alt_tol, ecc_max,
     )
     if apogee_alt >= raise_apogee_cutoff:
         gs.apogee_raise_complete = True

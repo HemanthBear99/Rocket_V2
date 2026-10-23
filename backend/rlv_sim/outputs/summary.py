@@ -23,7 +23,7 @@ from rlv_sim.guidance.recovery import (
 )
 from rlv_sim.mission.manager_helpers import compute_orbit_metrics
 from rlv_sim.mission.models import FullMissionResult, SimulationLog
-from rlv_sim.vehicle.recovery_hardware import LandingLegStatus
+from rlv_sim.vehicle.recovery_hardware import LandingLegStatus, hard_landing_speed_limit
 
 
 @dataclass
@@ -187,31 +187,6 @@ def assess_orbit(
     )
 
 
-def hard_landing_speed_limit(config: SimulationConfig) -> float:
-    """Upper edge of the survivable-but-hard touchdown band, in m/s.
-
-    The hard/crash boundary used to be a bare 10.0 m/s literal while the
-    pass/fail gate above it used config.landing_leg_max_touchdown_speed_mps.
-    Because that field is only validated as > 0, any configured limit above
-    10 m/s made the hard_landing / hard_offsite_landing / crash_landing /
-    offsite_crash_landing bands UNREACHABLE -- a 12 m/s impact was reported
-    as landing_success (verified by execution).
-
-    Derive the boundary from the configured success limit instead, keeping
-    the original 10 m/s value at the 6 m/s default so existing
-    classification behaviour is unchanged, and always leaving a non-empty
-    band above the success gate.
-    """
-    success_limit = float(config.landing_leg_max_touchdown_speed_mps)
-    # Keep the legacy 10 m/s boundary EXACTLY for any success limit at or below
-    # it (so the default 6 m/s profile reports identical statuses to before this
-    # fix), and only scale upward once a user configures a limit above 10 m/s,
-    # which is the case the old hardcoded literal made unreachable.
-    if success_limit <= 10.0:
-        return 10.0
-    return success_limit * 2.0
-
-
 def classify_landing(
     speed_mps: float,
     site_error_m: float,
@@ -223,6 +198,8 @@ def classify_landing(
     site_error = float(site_error_m)
     pad_hit = site_error <= float(config.booster_pad_tolerance_m)
     site_km = site_error / 1000.0
+    # Without pad enforcement a soft touchdown anywhere counts as a landing.
+    pad_required = bool(config.booster_enforce_pad_landing)
 
     if speed <= float(config.landing_leg_max_touchdown_speed_mps):
         if pad_hit:
@@ -249,16 +226,21 @@ def classify_landing(
     failed: list[str] = []
     if speed > float(config.landing_leg_max_touchdown_speed_mps):
         failed.append("touchdown_speed")
-    if not pad_hit:
+    if not pad_hit and pad_required:
         failed.append("pad_error")
     if propellant_remaining_kg is not None:
         margin = float(config.booster_landing_propellant_margin_kg)
         if float(propellant_remaining_kg) < margin:
             failed.append("propellant_margin")
 
-    success = status == "landing_success" and not failed
-    if status == "landing_success" and not success:
-        reason += f" - but propellant margin below {config.booster_landing_propellant_margin_kg:.0f} kg reserve"
+    soft = status in ("landing_success", "offsite_touchdown")
+    success = soft and not failed
+    if soft and "propellant_margin" in failed:
+        # Never phrase a failed landing as a success.
+        reason = (
+            f"LANDED BELOW PROPELLANT MARGIN - Touchdown at {speed:.2f} m/s "
+            f"(site error {site_error:.0f} m, margin {config.booster_landing_propellant_margin_kg:.0f} kg)"
+        )
 
     return LandingAssessment(
         success=success,
@@ -382,14 +364,14 @@ def _attitude_gate_failed(result: FullMissionResult, config: SimulationConfig) -
     terminal_error = _terminal_touchdown_tilt_deg(result)
     if terminal_error is None:
         return False
-    return float(terminal_error) > float(config.booster_terminal_attitude_error_max_deg)
+    # Leg stability limit, the same gate touchdown contact applies.
+    return float(terminal_error) > float(config.landing_leg_max_tilt_deg)
 
 
 def _contact_status_from_log(result: FullMissionResult) -> str | None:
-    status = _last_or_none(result.booster_log.get_series("touchdown_contact_status"))
-    if status:
-        return str(status)
-    return None
+    """Touchdown contact status recorded by the mission at contact."""
+    status = getattr(result, "booster_touchdown_status", None)
+    return str(status) if status else None
 
 
 def _leg_status_from_log(result: FullMissionResult) -> str | None:
@@ -403,6 +385,7 @@ def _landing_with_contact_gates(
     landing: LandingAssessment,
     result: FullMissionResult,
     terminal_attitude_error: float | None,
+    config: SimulationConfig,
 ) -> LandingAssessment:
     """Overlay explicit contact/leg gates on the speed-and-pad landing result."""
     contact_status = _contact_status_from_log(result)
@@ -412,7 +395,8 @@ def _landing_with_contact_gates(
     reason = landing.reason
     success = landing.success
 
-    if leg_status is not None and leg_status != LandingLegStatus.LOCKED.value:
+    legs_fitted = bool(config.enable_landing_legs)
+    if legs_fitted and leg_status is not None and leg_status != LandingLegStatus.LOCKED.value:
         if "landing_legs" not in failed:
             failed.append("landing_legs")
         status = "leg_deployment_failure"
@@ -568,7 +552,7 @@ def assess_full_mission(
     max_recovery_q = _max_or_none(result.booster_log.get_series("dynamic_pressure"))
     max_recovery_q_alpha = _max_or_none(result.booster_log.get_series("q_alpha"))
     terminal_attitude_error = _terminal_touchdown_tilt_deg(result)
-    landing = _landing_with_contact_gates(landing, result, terminal_attitude_error)
+    landing = _landing_with_contact_gates(landing, result, terminal_attitude_error, config)
 
     _bst_alt = float(result.booster_final_state.altitude)
     _bst_reason_u = (result.booster_reason or "").upper()

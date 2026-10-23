@@ -232,7 +232,6 @@ class SimulationLog:
             'planner_time_to_go_s': float(guidance.get('planner_time_to_go_s', 0.0)),
             'landing_guidance_mode': str(guidance.get('landing_guidance_mode', '')),
             'gfold_time_of_flight_s': float(guidance.get('gfold_time_of_flight_s', 0.0)),
-            'touchdown_contact_status': str(guidance.get('touchdown_contact_status', '')),
             'nav_position_error_m': float(guidance.get('nav_position_error_m', 0.0)),
             'nav_velocity_error_mps': float(guidance.get('nav_velocity_error_mps', 0.0)),
             'gps_available': 1.0 if bool(guidance.get('gps_available', False)) else 0.0,
@@ -282,3 +281,4 @@ class FullMissionResult:
     # Measured at booster touchdown (None if the booster never touched down).
     booster_touchdown_speed_mps: float | None = None
     booster_site_error_m: float | None = None
+    booster_touchdown_status: str | None = None

@@ -270,6 +270,20 @@ def compute_grid_fin_force(
     return lift_mag * force_direction + drag
 
 
+def hard_landing_speed_limit(config: SimulationConfig) -> float:
+    """Upper edge of the survivable-but-hard touchdown band, in m/s.
+
+    10 m/s for any success limit at or below 10 m/s (the default is 6), else
+    twice the success limit, so the hard band above the success gate is never
+    empty. The single definition used by touchdown contact and the mission
+    summary (they once disagreed: 12 vs 10 m/s at the default).
+    """
+    success_limit = float(config.landing_leg_max_touchdown_speed_mps)
+    if success_limit <= 10.0:
+        return 10.0
+    return success_limit * 2.0
+
+
 def assess_touchdown_contact(
     state,
     config: SimulationConfig,
@@ -330,15 +344,7 @@ def assess_touchdown_contact(
         else:
             status = "offsite_touchdown"
             reason = f"OFFSITE TOUCHDOWN - Landed {site_km:.2f} km from target at {touchdown_speed:.2f} m/s"
-    elif touchdown_speed < max(
-        10.0,
-        float(config.landing_leg_max_touchdown_speed_mps) * 2.0,
-    ):
-        # Same config-derived boundary as mission_summary.hard_landing_speed_limit.
-        # A bare 10.0 literal here made the hard/crash bands unreachable for any
-        # configured landing_leg_max_touchdown_speed_mps above 10 m/s. Kept
-        # local (rather than imported) to avoid a mission_summary <-> recovery_hardware
-        # import cycle.
+    elif touchdown_speed < hard_landing_speed_limit(config):
         if pad_hit:
             status = "hard_landing"
             reason = f"HARD LANDING - Touchdown at {touchdown_speed:.1f} m/s (site error {site_error:.0f} m)"

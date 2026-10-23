@@ -37,7 +37,6 @@ from rlv_sim.guidance.recovery import (
     target_landing_site_eci,
 )
 from rlv_sim.mission.manager import MissionManager, MissionPhase
-from rlv_sim.mission.models import SimulationLog
 from rlv_sim.outputs.summary import (
     classify_landing,
     format_orbit_failure_reason,
@@ -82,15 +81,11 @@ def _orbiter_outcome_success(state: State, mission_mgr: MissionManager, config: 
     return phase == MissionPhase.ORBIT_ACHIEVED
 
 
-def _booster_landing_success(log: SimulationLog, reason: str = "") -> bool:
-    """Return the terminal booster landing outcome.
-
-    Touchdown is detected before another telemetry row is appended, so the
-    final contact status never lands in the log at the moment of touchdown.
-    The explicit termination reason is the sole source of truth.
+def _booster_landing_success(mission_mgr) -> bool:
+    """Terminal booster landing outcome, recorded by check_termination at
+    contact: contact gates (legs, tilt) plus speed, pad and propellant margin.
     """
-    del log
-    return str(reason).startswith("LANDING SUCCESS")
+    return bool(getattr(mission_mgr, "touchdown_success", False))
 
 
 def _run_guidance(
@@ -223,7 +218,6 @@ def _run_booster_hardware(
         guidance_predicted = float(guidance.get('predicted_landing_error_m', 0.0))
         if guidance_predicted <= 0.0:
             guidance['predicted_landing_error_m'] = great_circle_distance_m(state.r, target_site)
-        guidance['touchdown_contact_status'] = ''
 
     return guidance, gs, grid_fin_command
 
@@ -479,13 +473,16 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
                 leg_state=getattr(mission_mgr, "booster_landing_leg_state", None),
                 terminal_attitude_error_deg=terminal_attitude_error,
             )
-            if contact.status == "landing_success":
+            mission_mgr.touchdown_status = contact.status
+            mission_mgr.touchdown_success = False
+            if contact.status in ("landing_success", "offsite_touchdown"):
                 landing = classify_landing(
                     v_touchdown_rel,
                     site_error_m,
                     cfg,
                     propellant_remaining_kg=propellant_remaining,
                 )
+                mission_mgr.touchdown_success = landing.success
                 return True, landing.reason
 
             if v_touchdown_rel > hard_landing_speed_limit(cfg):
@@ -500,15 +497,6 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
                     f"at {v_touchdown_rel:.2f} m/s"
                 )
 
-            if (
-                contact.status == "offsite_touchdown"
-                and cfg.booster_enforce_pad_landing
-            ):
-                site_error_km = site_error_m / 1000.0
-                return True, (
-                    f"OFFSITE LANDING - Missed pad by {site_error_km:.2f} km "
-                    f"at {v_touchdown_rel:.2f} m/s"
-                )
             return True, contact.reason
 
     if mission_mgr.vehicle_type == "ascent_only":
