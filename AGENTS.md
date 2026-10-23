@@ -44,7 +44,8 @@ Config: `rlv_sim/config/definition.py` (frozen dataclass, validated) + `rlv_sim/
 - Full mission ≈ 35 s.
 
 ## Build & release
-- Desktop exe (from `desktop/`): `../backend/.venv/Scripts/python.exe -m PyInstaller desktop_app.spec --noconfirm -y` → `desktop/dist/Vyom.exe` (~180 MB).
+- Desktop exe (from `desktop/`): `../backend/.venv/Scripts/python.exe -m PyInstaller desktop_app.spec --noconfirm -y` → `desktop/dist/Vyom.exe` (~32 MB without cvxpy; numba is excluded from the bundle).
+  Needs `uv pip install -e ".[desktop]"` in `backend/`.
 - Installer (from `desktop/`): `"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" installer\vyom.iss` → `desktop/dist/VyomSetup-0.3.0.exe`.
   Same AppId as the old Boostback installer, so it upgrades in place.
 - Version lives in `backend/rlv_sim/__init__.py`, `backend/pyproject.toml`, `desktop/version_info.txt`, `desktop/installer/vyom.iss`, website copy.
@@ -70,9 +71,9 @@ Config: `rlv_sim/config/definition.py` (frozen dataclass, validated) + `rlv_sim/
 - No wind-tunnel/CFD data; aero is geometry/literature based. Product is "not for flight-critical use".
 
 ## Open work (owner's backlog, highest value first)
-1. Rebuild `desktop/dist/Vyom.exe` and `VyomSetup-0.3.0.exe` after the Vyom rename (old Boostback builds were deleted; no current build exists).
-2. Make landing guidance robust with realistic descent drag (scale 0.68) so it can become default (target ≥94% MC).
-3. Adaptive recovery reserve / leaner boostback: 3 remaining MC failures are headwind fuel starvation.
+1. ~~Rebuild the exe and installer~~ — done 2026-10-23 (`Vyom.exe` + `VyomSetup-0.3.0.exe`, smoke-tested).
+2. Make landing guidance robust with realistic descent drag (scale 0.68) so it can become default (target ≥94% MC; now 88%: tailwind cases arrive 100–380 m off target at 250 m).
+3. ~~Adaptive recovery reserve~~ — done (wind-aware reserve, 383 kg per m/s headwind).
 4. Stage-2 sizing in the mission planner (12 t payload currently fails; planner should propose the fix).
 5. Website: real app screenshots/recording section, Open Graph image, Vercel deploy.
 6. Code-signing certificate (owner to buy) → sign exe/installer in the build.

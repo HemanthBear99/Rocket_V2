@@ -48,7 +48,9 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['matplotlib.tests', 'numpy.tests'],
+    # numba (optional speed-up) would JIT-compile inside the frozen exe with
+    # no on-disk cache; keep the bundle on the pure-Python paths.
+    excludes=['matplotlib.tests', 'numpy.tests', 'numba', 'llvmlite'],
     noarchive=False,
     cipher=block_cipher,
 )
