@@ -78,6 +78,11 @@ class MissionManager:
     """
 
     NEAR_PAD_HANDOFF_ALTITUDE_M = 7030.0
+    # Near-pad handoff accepts a predicted miss the landing burn can still
+    # divert (~6 deg of lateral offset per altitude), not pad precision: with a
+    # smooth impact prediction a pad-tolerance-only gate never opened and the
+    # burn fell back to a late suicide-burn ignition.
+    NEAR_PAD_HANDOFF_MISS_PER_ALTITUDE = 0.1
 
     # Extra lead time (s) added to the powered-descent lead when predicting the
     # boostback landing point; empirically tuned for the default vehicle.
@@ -564,7 +569,10 @@ class MissionManager:
                 propellant_remaining
                 > self.config.booster_landing_reserve_kg * 0.75
                 and impact.miss_distance_m
-                <= self.config.booster_pad_tolerance_m
+                <= max(
+                    self.config.booster_pad_tolerance_m,
+                    self.NEAR_PAD_HANDOFF_MISS_PER_ALTITUDE * state.altitude,
+                )
                 and impact.time_to_impact_s >= 8.0
             )
 

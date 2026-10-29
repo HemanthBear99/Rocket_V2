@@ -50,64 +50,66 @@ logger = logging.getLogger(__name__)
 #
 # Fully-normalized tesseral coefficients C_nm, S_nm. This is a truncated
 # complete expansion to low degree/order. The EGM96 reference defines the
-# (n,m) = (2,0) term as the principal oblateness term; its normalized value
-# is derived from the unnormalized J2 = 1.082626173e-3 via
-#     C_20 = -J2 / sqrt(5)
-# Higher-order coefficients are the published EGM96 normalized values
-# (zeroed beyond the truncation). Source: NIMA/NASA EGM96 (complete to
-# degree and order 360); here we embed a degree-6 truncation for speed,
-# which captures oblateness, triaxiality, and the dominant gravity anomalies.
+# (n,m) = (2,0) term as the principal oblateness term (C_20 = -J2 / sqrt(5),
+# J2 = 1.0826267e-3). All values are the published EGM96 normalized
+# coefficients (complete to degree and order 360); here we embed a degree-6
+# truncation for speed, which captures oblateness, triaxiality, and the
+# dominant gravity anomalies. Evaluated in the Earth-fixed frame.
 # ---------------------------------------------------------------------------
 _EGM96_MAX_DEG = 6
 
-# Fully-normalized EGM96 coefficients C_nm, S_nm. C_20 is derived from the
-# canonical J2 = 1.082626173e-3:  C_20 = -J2 / sqrt(5).
+# Fully-normalized EGM96 coefficients C_nm, S_nm, degree/order 2-6, copied
+# verbatim from the official model file (Lemoine et al. 1998, NASA/TP-1998-
+# 206861; tide-free; ICGEM copy EGM96.gfc). The earlier table differed from
+# EGM96 in most terms (S32/S33 had the wrong sign, C53/C62 were missing).
 _EGM96_C = {
-    (2, 0): -0.484165143403758e-03,
-    (2, 1): -0.186987654058389e-09,
-    (2, 2): 0.243938357328313e-05,
-    (3, 0): 0.957170110506111e-06,
-    (3, 1): 0.203012444506208e-05,
-    (3, 2): 0.904627519539148e-06,
-    (3, 3): 0.721403509886931e-06,
-    (4, 0): 0.539782597177617e-06,
-    (4, 1): -0.536280500699696e-06,
-    (4, 2): 0.350808224973665e-06,
-    (4, 3): 0.237264769072511e-06,
-    (4, 4): -0.156020388814889e-06,
-    (5, 0): 0.686750604359933e-07,
-    (5, 1): -0.589452687666875e-07,
-    (5, 2): 0.654447476808239e-07,
-    (5, 4): -0.584933124017353e-07,
-    (5, 5): 0.102230282975025e-06,
-    (6, 0): -0.437543275321895e-07,
-    (6, 1): -0.385725121146447e-07,
-    (6, 3): 0.295185648830200e-07,
-    (6, 4): -0.528517761146810e-07,
-    (6, 5): -0.397187127590200e-07,
-    (6, 6): 0.162250284465700e-07,
+    (2, 0): -0.484165371736e-03,
+    (2, 1): -0.186987635955e-09,
+    (2, 2): 0.243914352398e-05,
+    (3, 0): 0.957254173792e-06,
+    (3, 1): 0.202998882184e-05,
+    (3, 2): 0.904627768605e-06,
+    (3, 3): 0.721072657057e-06,
+    (4, 0): 0.539873863789e-06,
+    (4, 1): -0.536321616971e-06,
+    (4, 2): 0.350694105785e-06,
+    (4, 3): 0.990771803829e-06,
+    (4, 4): -0.188560802735e-06,
+    (5, 0): 0.685323475630e-07,
+    (5, 1): -0.621012128528e-07,
+    (5, 2): 0.652438297612e-06,
+    (5, 3): -0.451955406071e-06,
+    (5, 4): -0.295301647654e-06,
+    (5, 5): 0.174971983203e-06,
+    (6, 0): -0.149957994714e-06,
+    (6, 1): -0.760879384947e-07,
+    (6, 2): 0.481732442832e-07,
+    (6, 3): 0.571730990516e-07,
+    (6, 4): -0.862142660109e-07,
+    (6, 5): -0.267133325490e-06,
+    (6, 6): 0.967616121092e-08,
 }
 _EGM96_S = {
-    (2, 1): 0.121639158509667e-08,
-    (2, 2): -0.140028336829753e-05,
-    (3, 1): 0.248302905898171e-06,
-    (3, 2): 0.750037150681267e-06,
-    (3, 3): -0.365235018466910e-06,
-    (4, 1): 0.105892194943372e-06,
-    (4, 2): 0.303046866334966e-06,
-    (4, 3): -0.553483595144639e-06,
-    (4, 4): 0.328627661792302e-06,
-    (5, 1): 0.539891095438227e-07,
-    (5, 2): -0.568426229717463e-07,
-    (5, 3): 0.0,
-    (5, 4): 0.147124179078449e-06,
-    (5, 5): -0.882741339242633e-07,
-    (6, 1): 0.167219920800182e-07,
-    (6, 2): -0.552304035528301e-07,
-    (6, 3): 0.747165190261761e-07,
-    (6, 4): -0.380205404950532e-07,
-    (6, 5): -0.431940511798099e-07,
-    (6, 6): 0.334651568695225e-07,
+    (2, 1): 0.119528012031e-08,
+    (2, 2): -0.140016683654e-05,
+    (3, 1): 0.248513158716e-06,
+    (3, 2): -0.619025944205e-06,
+    (3, 3): 0.141435626958e-05,
+    (4, 1): -0.473440265853e-06,
+    (4, 2): 0.662671572540e-06,
+    (4, 3): -0.200928369177e-06,
+    (4, 4): 0.308853169333e-06,
+    (5, 1): -0.944226127525e-07,
+    (5, 2): -0.323349612668e-06,
+    (5, 3): -0.214847190624e-06,
+    (5, 4): 0.496658876769e-07,
+    (5, 5): -0.669384278219e-06,
+    (6, 1): 0.262890545501e-07,
+    (6, 2): -0.373728201347e-06,
+    (6, 3): 0.902694517163e-08,
+    (6, 4): -0.471408154267e-06,
+    (6, 5): -0.536488432483e-06,
+    (6, 6): -0.237192006935e-06,
 }
 
 _AOA_POST_STALL_START_RAD = np.radians(20.0)
@@ -397,7 +399,23 @@ for (_n, _m), (_a_n, _b_n) in _EGM96_RECURRENCE.items():
     _EGM96_REC_B[_n, _m] = _b_n
 
 
-def compute_egm96_gravity_accel(r: np.ndarray, max_deg: int = _EGM96_MAX_DEG) -> np.ndarray:
+def compute_egm96_gravity_accel(r: np.ndarray, max_deg: int = _EGM96_MAX_DEG, t: float = 0.0) -> np.ndarray:
+    """EGM96 acceleration in ECI at mission time t (ECI and ECEF coincide at t=0).
+
+    The geopotential is fixed to the rotating Earth, so the tesseral (m>0)
+    terms are evaluated in ECEF and the result rotated back to ECI.
+    """
+    theta = C.EARTH_ROTATION_RATE * float(t)
+    if theta == 0.0:
+        return _egm96_accel_ecef(r, max_deg)
+    c, s_ = np.cos(theta), np.sin(theta)
+    r = np.asarray(r, dtype=float)
+    r_ecef = np.array([c * r[0] + s_ * r[1], -s_ * r[0] + c * r[1], r[2]])
+    a = _egm96_accel_ecef(r_ecef, max_deg)
+    return np.array([c * a[0] - s_ * a[1], s_ * a[0] + c * a[1], a[2]])
+
+
+def _egm96_accel_ecef(r: np.ndarray, max_deg: int = _EGM96_MAX_DEG) -> np.ndarray:
     """Spherical-harmonic (EGM96 truncated) gravitational acceleration.
 
     Uses fully-normalized associated Legendre functions with the standard
@@ -487,7 +505,8 @@ def compute_egm96_gravity_accel(r: np.ndarray, max_deg: int = _EGM96_MAX_DEG) ->
 
 def compute_gravity_force(r: np.ndarray, m: float, enable_j2: bool = False,
                           j2: float = 1.08263e-3,
-                          gravity_model: str = "central") -> np.ndarray:
+                          gravity_model: str = "central",
+                          t: float = 0.0) -> np.ndarray:
     """
     Compute gravitational force.
 
@@ -537,7 +556,7 @@ def compute_gravity_force(r: np.ndarray, m: float, enable_j2: bool = False,
         return F_central + m * a_j2
 
     if model == "egm96":
-        return m * compute_egm96_gravity_accel(r)
+        return m * compute_egm96_gravity_accel(r, t=t)
 
     # Unknown model: fall back to central.
     return F_central
@@ -1123,13 +1142,14 @@ def _compute_force_breakdown(
     grid_fin_command=None,
     config=None,
     control_torque_xy: np.ndarray | None = None,
+    t: float = 0.0,
 ) -> ForceBreakdown:
     """Compute the same force components used by the live dynamics path."""
     model = gravity_model
     if (model or "central").lower() == "central" and enable_j2:
         model = "j2"
     F_grav = compute_gravity_force(r, m, enable_j2=enable_j2, j2=j2_coefficient,
-                                   gravity_model=model)
+                                   gravity_model=model, t=t)
     F_thrust = compute_thrust_force(
         q,
         r,

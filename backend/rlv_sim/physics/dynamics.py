@@ -182,7 +182,8 @@ def compute_jet_damping_torque(m_dot: float, cg_pos_z: float, omega: np.ndarray,
 def compute_linear_acceleration(r: np.ndarray, v: np.ndarray, q: np.ndarray,
                                 m: float,
                                 ctx: DynamicsContext,
-                                torque: np.ndarray | None = None) -> np.ndarray:
+                                torque: np.ndarray | None = None,
+                                t: float = 0.0) -> np.ndarray:
     """
     Compute linear acceleration from Newton's second law (ECI frame).
 
@@ -215,6 +216,7 @@ def compute_linear_acceleration(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         vehicle_model=ctx.vehicle_model,
         booster_aero_mode=ctx.booster_aero_mode,
         thrust_magnitude_override=ctx.thrust_magnitude_override,
+        t=t,
         enable_j2=_cfg.enable_j2 if _cfg is not None else False,
         j2_coefficient=_cfg.j2_coefficient if _cfg is not None else 1.08263e-3,
         gravity_model=_cfg.gravity_model if _cfg is not None else "central",
@@ -233,7 +235,7 @@ def compute_linear_acceleration(r: np.ndarray, v: np.ndarray, q: np.ndarray,
 
 def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
                              omega: np.ndarray, m: float, torque: np.ndarray,
-                             ctx: DynamicsContext) -> StateDerivative:
+                             ctx: DynamicsContext, t: float = 0.0) -> StateDerivative:
     """
     Compute all state derivatives for the full dynamics.
 
@@ -330,7 +332,7 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
 
     omega_dot = compute_angular_acceleration(omega, torque + tau_aero, I_tensor, I_inv, I_dot, jet_damping_torque)
     r_dot = v
-    v_dot = compute_linear_acceleration(r, v, q, m, ctx, torque)
+    v_dot = compute_linear_acceleration(r, v, q, m, ctx, torque, t=t)
     q_dot = quaternion_derivative(q, omega)
 
     return StateDerivative(r_dot, v_dot, q_dot, omega_dot, m_dot)
@@ -357,7 +359,7 @@ def state_derivative_vector(state_vec: np.ndarray, t: float,
 
     q = quaternion_normalize(q)
 
-    derivs = compute_state_derivative(r, v, q, omega, m, torque, ctx)
+    derivs = compute_state_derivative(r, v, q, omega, m, torque, ctx, t=t)
 
     return np.concatenate([
         derivs.r_dot,

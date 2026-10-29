@@ -357,6 +357,12 @@ def _predictor_tables():
     )
 
 
+# Fraction of the coast-to-entry drag-scale gap applied when predicting impact
+# from a pre-entry phase (0 = coast drag, 1 = entry drag). 0-0.5 all land;
+# 0.75+ makes the 0.95x-thrust booster overshoot boostback (19.5 km entry miss).
+PRE_ENTRY_DESCENT_DRAG_BLEND = 0.25
+
+
 def _propagate_2body_to_surface(
     r: np.ndarray,
     v: np.ndarray,
@@ -383,10 +389,17 @@ def _propagate_2body_to_surface(
     include_drag = mass_kg is not None and float(mass_kg) > 0.0
     drag_scale = 1.0
     if include_drag:
-        drag_scale, _ = _booster_recovery_aero_scale(
-            aero_mode,
-            config=config,
-        )
+        # The fall being predicted is flown in the descent configuration
+        # (fins out, entry drag), whatever phase the prediction starts from.
+        # Using boostback/coast drag (1.0 vs ~3.6) made boostback cut off
+        # several km short once the impact-time error was fixed; full entry
+        # drag overshot it instead, so pre-entry phases blend the two.
+        if str(aero_mode or "").upper() in ("BOOSTER_FLIP", "BOOSTER_BOOSTBACK", "BOOSTER_COAST"):
+            coast_scale, _ = _booster_recovery_aero_scale(aero_mode, config=config)
+            entry_scale, _ = _booster_recovery_aero_scale("BOOSTER_ENTRY", config=config)
+            drag_scale = coast_scale + PRE_ENTRY_DESCENT_DRAG_BLEND * (entry_scale - coast_scale)
+        else:
+            drag_scale, _ = _booster_recovery_aero_scale(aero_mode, config=config)
 
     if _numba_kernels.AVAILABLE and _predictor_kernel_supported(include_drag, config):
         hit, r_surface, flight_time = _numba_kernels.propagate_to_surface(
@@ -440,7 +453,7 @@ def _propagate_2body_to_surface(
             f = float(np.clip(f, 0.0, 1.0))
             r_surface = r_new + f * (r_cur - r_new)
             r_surface = R * r_surface / max(float(vec_norm(r_surface)), 1.0)
-            return r_surface, elapsed - dt * (1.0 - f)
+            return r_surface, elapsed - f * dt  # crossing is f*dt before the step end
 
         r_cur, v_cur = r_new, v_new
 

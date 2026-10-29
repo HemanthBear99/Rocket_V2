@@ -136,4 +136,7 @@ def test_entry_drag_credit_saves_propellant_and_still_lands():
         return res.booster_final_state.m - cfg.stage1_dry_mass
 
     lean = leftover(booster_entry_drag_credit=True, booster_entry_target_descent_rate_mps=300.0)
-    assert lean > leftover() + 2000.0
+    # The braking entry-capture law (6 ZEM/t^2 - 2 v/t) keeps a gravity-floored
+    # divert authority under drag credit, which spends part of the saving
+    # (~+750 kg vs the old law's >2 t); a lower floor misses the pad by 3+ km.
+    assert lean > leftover() + 500.0

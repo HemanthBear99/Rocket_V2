@@ -261,13 +261,13 @@ def _sensor_seed(config: SimulationConfig, vehicle_type: str, sensor: int) -> in
     return int(config.gps_seed) + _VEHICLE_SEED_OFFSET.get(vehicle_type, 0) + sensor
 
 
-def _model_gravity(r: np.ndarray, config: SimulationConfig) -> np.ndarray:
+def _model_gravity(r: np.ndarray, config: SimulationConfig, t: float = 0.0) -> np.ndarray:
     """Gravity the vehicle's own physics applies (EGM96/J2/central per config)."""
     from rlv_sim.physics.forces import compute_gravity_force
 
     return compute_gravity_force(
         r, 1.0, enable_j2=bool(config.enable_j2), j2=float(config.j2_coefficient),
-        gravity_model=str(config.gravity_model),
+        gravity_model=str(config.gravity_model), t=t,
     )
 
 
@@ -341,7 +341,7 @@ def update_navigation_estimate(
         # gravity the physics applied. Navigation then adds its own
         # (point-mass) gravity model, so higher-order gravity terms become
         # navigation error, as on a real vehicle.
-        specific_force = true_accel_eci - _model_gravity(r_current, config)
+        specific_force = true_accel_eci - _model_gravity(r_current, config, float(state.t))
         measured_specific_force = nav_state.imu_propagator.measure_acceleration(
             specific_force,
             config,

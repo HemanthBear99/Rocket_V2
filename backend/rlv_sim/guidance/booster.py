@@ -498,7 +498,11 @@ def _ballistic_impact(ctx: _BoosterContext):
 
 # Weight of the straight-line ZEV term in entry terminal capture (see note in
 # _entry_guidance). 1.0 is classic ZEM/ZEV; 0.0 is ZEM-only.
-ENTRY_CAPTURE_ZEV_GAIN = 0.5
+
+
+# Entry capture switches from the drag-aware ballistic miss to the pad-frame
+# law below this altitude (MC seed 42: 12 km 100%, 8 km and 5 km worse).
+ENTRY_CAPTURE_SWITCH_ALT_M = 12000.0
 
 
 def _entry_guidance(ctx: _BoosterContext) -> dict:
@@ -671,10 +675,33 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
             # classic +2v/t ZEV term assumes straight-line propagation; mixed
             # with the (much smaller) drag-aware ZEM it accelerated the booster
             # along its horizontal velocity and grew the miss during entry.
-            a_divert = (
-                (6.0 / (t_go_capture ** 2)) * impact_miss
-                + ENTRY_CAPTURE_ZEV_GAIN * (2.0 / t_go_capture) * v_horiz_site
-            )
+            if altitude > ENTRY_CAPTURE_SWITCH_ALT_M:
+                # Drag-dominated descent: zero-effort-miss/velocity law on the
+                # drag-aware ballistic miss (it already carries the current
+                # motion), braking the sideways velocity over the ballistic
+                # time: a = 6 ZEM/t^2 - 2 v/t. The old law added +v/t, pushing
+                # along the drift. Free-final-velocity variants (3 or 6 ZEM/t^2
+                # alone) saved propellant but arrived too fast: MC 85-87%.
+                t_go_capture = float(np.clip(impact.time_to_impact_s, 8.0, 180.0))
+                a_divert = (
+                    (6.0 / (t_go_capture ** 2)) * impact_miss
+                    - (2.0 / t_go_capture) * v_horiz_site
+                )
+            else:
+                # Thrust-dominated final descent: pad-frame ZEM/ZEV with zero
+                # final velocity, as in the landing burn, a = 6 r/t^2 - 4 v/t,
+                # over the powered (braked) time to touchdown.
+                t_go_capture = float(np.clip(
+                    estimate_booster_touchdown_time(
+                        ctx.r, ctx.v, ctx.m, cfg.landing_thrust_n, safety_factor=1.0,
+                    ),
+                    8.0,
+                    180.0,
+                ))
+                a_divert = (
+                    (6.0 / (t_go_capture ** 2)) * r_to_site_horiz
+                    - (4.0 / t_go_capture) * v_horiz_site
+                )
             a_divert_mag = float(vec_norm(a_divert))
             if a_divert_mag > 1e-9:
                 max_divert_accel = (
@@ -698,9 +725,13 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
                     g_local + net_vertical_braking - a_drag_up,
                     0.0,
                 )
+                # Tilt-limited lateral authority, floored at gravity as in the
+                # landing burn: with drag credit the vertical demand can be
+                # tiny, which left no authority to divert (4 km misses).
                 max_divert_accel = min(
                     max_divert_accel,
-                    a_vertical_capture * np.tan(np.radians(float(cfg.booster_entry_divert_tilt_deg))),
+                    max(a_vertical_capture, g_local)
+                    * np.tan(np.radians(float(cfg.booster_entry_divert_tilt_deg))),
                 )
                 if a_divert_mag > max_divert_accel:
                     a_divert *= max_divert_accel / a_divert_mag

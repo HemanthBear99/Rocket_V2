@@ -36,3 +36,4 @@ aero_decks/user_*.json
 
 # GitNexus index
 .gitnexus/
+.coverage

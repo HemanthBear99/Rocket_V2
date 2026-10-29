@@ -255,7 +255,7 @@ def propagate_to_surface(r0, v0, max_steps, dt, include_drag, drag_scale, mass_k
             f = min(max(f, 0.0), 1.0)
             r_surface = r_new + f * (r_cur - r_new)
             r_surface = r_earth * r_surface / max(_norm3(r_surface), 1.0)
-            return True, r_surface, elapsed - dt * (1.0 - f)
+            return True, r_surface, elapsed - f * dt
         r_cur = r_new
         v_cur = v_new
     return False, r_cur, elapsed
