@@ -931,7 +931,8 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
                                wind_offset_mps: float = 0.0,
                                omega: np.ndarray = None,
                                config=None,
-                               fin_deg: float = 0.0) -> np.ndarray:
+                               fin_deg: float = 0.0,
+                               vehicle_model: str = "stacked") -> np.ndarray:
     """
     Compute aerodynamic moment about the Center of Mass (Body Frame).
 
@@ -1016,11 +1017,11 @@ def compute_aerodynamic_moment(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         # of ~31 m). It previously fired for ANY vehicle whose axial flow was
         # negative, so the orbiter -- whose CG is ~58-63 m -- silently had its
         # CP overwritten with booster geometry. Gate it on the vehicle actually
-        # being the booster, identified by its CG being in the Stage-1 recovery
-        # range (the caller supplies the correct per-model CG), and use the
-        # same configured value for the broadside limit so a user override of
-        # booster_tail_first_cp_z_m is not silently discarded at broadside.
-        if vz < -C.SMALL_VELOCITY_TOL and cg_pos_z <= C.STAGE1_RECOVERY_CP + 1.0:
+        # being the booster (by vehicle model, not by a CG band that a mass or
+        # geometry change could move), and use the same configured value for
+        # the broadside limit so a user override of booster_tail_first_cp_z_m
+        # is not silently discarded at broadside.
+        if vz < -C.SMALL_VELOCITY_TOL and vehicle_model == "booster":
             tail_cp = float(getattr(config, "booster_tail_first_cp_z_m", C.STAGE1_RECOVERY_CP))
             broadside_fraction = float(np.sin(alpha) ** 2)
             broadside_cp = min(cp_effective, tail_cp)

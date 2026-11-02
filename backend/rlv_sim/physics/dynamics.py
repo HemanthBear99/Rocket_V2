@@ -297,6 +297,7 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
             wind_offset_mps=_cfg.runtime_wind_offset_mps if _cfg is not None else 0.0,
             omega=omega,
             config=ctx.config,
+            vehicle_model=ctx.vehicle_model,
         )
         if ctx.vehicle_model == "booster":
             _, moment_scale = _booster_recovery_aero_scale(ctx.booster_aero_mode, config=ctx.config)
