@@ -99,15 +99,25 @@ def _load(name: str) -> ModuleType:
 
 
 def plugin_error(name: str) -> str | None:
-    """Config-validation message for an unusable plugin name, else None."""
+    """Config-validation message for an unusable plugin name, else None.
+
+    Checks the name and that the file exists, without running it: validation
+    is reachable from the web API, so plugin code runs only at mission start
+    (require_loadable).
+    """
     if not _NAME_RE.match(name or ""):
         return ("booster_landing_plugin must name a plugin (letters, digits, '_' or '-') "
                 f"when booster_landing_guidance='plugin', got {name!r}")
-    try:
-        _load(name)
-    except Exception as exc:  # noqa: BLE001 - any import failure is a config error
-        return f"booster_landing_plugin {name!r}: {exc}"
+    if _find(name) is None:
+        return f"booster_landing_plugin {name!r}: Guidance plugin {name!r} not found"
     return None
+
+
+def require_loadable(config) -> None:
+    """Import the configured plugin at mission start, so a broken plugin fails
+    before launch rather than at the landing burn."""
+    if getattr(config, "booster_landing_guidance", "") == "plugin":
+        _load(config.booster_landing_plugin)
 
 
 def list_plugins() -> list[dict[str, Any]]:

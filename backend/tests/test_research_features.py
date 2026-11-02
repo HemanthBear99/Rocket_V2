@@ -95,8 +95,12 @@ def test_plugin_failures_are_reported(plugin_dir, body, message):
 def test_plugin_names_are_validated(plugin_dir):
     assert "must name a plugin" in plugins.plugin_error("../evil")
     assert "not found" in plugins.plugin_error("missing")
-    (plugin_dir / "nofunc.py").write_text("X = 1\n")
-    assert "no landing_command" in plugins.plugin_error("nofunc")
+    # Validation must not execute plugin code; a broken plugin fails at mission start.
+    (plugin_dir / "nofunc.py").write_text("raise SystemExit('executed during validation')\n")
+    assert plugins.plugin_error("nofunc") is None
+    cfg = create_test_config(booster_landing_guidance="plugin", booster_landing_plugin="nofunc")
+    with pytest.raises(SystemExit, match="executed during validation"):
+        plugins.require_loadable(cfg)
     assert plugins.plugin_error("example_zem_zev") is None
     with pytest.raises(ValueError, match="booster_landing_plugin"):
         create_test_config(booster_landing_guidance="plugin", booster_landing_plugin="missing")

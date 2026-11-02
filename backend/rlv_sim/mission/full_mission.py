@@ -17,6 +17,7 @@ from rlv_sim.core import constants as C
 from rlv_sim.core.state import State
 from rlv_sim.core.utils import surface_relative_speed, wind_profile_context
 from rlv_sim.guidance import gfold as _gfold
+from rlv_sim.guidance import plugins as _plugins
 from rlv_sim.guidance.abort import AbortMonitor
 from rlv_sim.guidance.common import compute_local_vertical, create_guidance_state
 from rlv_sim.mission.manager import MissionManager, MissionPhase
@@ -573,6 +574,7 @@ def _run_full_mission_body(dt: float | None = None, max_time: float | None = Non
         max_time = config.max_time
     config.validate()
     _gfold.require_available(config)
+    _plugins.require_loadable(config)
     if dt <= 0:
         raise ValueError(f"dt must be positive, got {dt}")
     if max_time <= 0:
