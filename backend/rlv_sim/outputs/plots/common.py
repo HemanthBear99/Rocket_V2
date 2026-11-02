@@ -66,7 +66,7 @@ class TrajectoryData:
 
         attitude_error: Attitude tracking error in degrees
 
-        torque: Control torque magnitude in NÂ·m
+        torque: Control torque magnitude in N·m
 
         gamma_cmd: Commanded flight path angle from horizontal in degrees
 

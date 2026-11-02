@@ -391,7 +391,7 @@ def _booster_touchdown_speed(booster_log) -> float:
 
     This function recomputes v_rel from the *post-integration* position_x/y/z and
 
-    velocity_x/y/z arrays â€” the same vectors that check_termination uses â€” giving
+    velocity_x/y/z arrays — the same vectors that check_termination uses — giving
 
     a result consistent with the terminal's "Touchdown at X m/s" line.
 
@@ -570,7 +570,7 @@ def plot_booster_velocity_profile(booster_log, separation_time: float, output_di
 
     speed at touchdown (~465 m/s at equator) reflects Earth rotation, NOT a
 
-    crash â€” the surface-relative touchdown speed is ~3-5 m/s.
+    crash — the surface-relative touchdown speed is ~3-5 m/s.
 
     """
 
@@ -722,7 +722,7 @@ def plot_booster_landing_zoom(booster_log, output_dir: str, window_s: float = 14
 
     ax1.set_xlabel('Time (s)')
 
-    ax1.set_title('Booster Landing Segment â€” Surface-Relative Speed (Zoomed)',
+    ax1.set_title('Booster Landing Segment — Surface-Relative Speed (Zoomed)',
 
                   fontweight='bold')
 
@@ -792,14 +792,14 @@ def plot_booster_velocity_components(booster_log, output_dir: str) -> str:
 
 def plot_booster_ignition_prediction(booster_log, output_dir: str) -> str:
 
-    """Actual altitude vs predicted ignition altitude â€” zoomed to descent phase.
+    """Actual altitude vs predicted ignition altitude — zoomed to descent phase.
 
 
     The predicted ignition altitude is the energy-based estimate of how much
 
     altitude is needed to decelerate to zero from the current speed.  Values
 
-    range from ~1â€“12 km, so this plot clips to the post-apogee descent where
+    range from ~1–12 km, so this plot clips to the post-apogee descent where
 
     the comparison is meaningful (apogee to touchdown).
 
@@ -941,7 +941,7 @@ def plot_rtls_trajectory_profile(ascent_log, orbiter_log, booster_log,
 
                                   separation_time: float, output_dir: str) -> str:
 
-    """RTLS Trajectory Profile â€” Altitude vs Downrange Distance.
+    """RTLS Trajectory Profile — Altitude vs Downrange Distance.
 
 
     Replicates the classic RTLS altitude-vs-downrange diagram showing the
@@ -1815,12 +1815,12 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
                            separation_time: float, output_dir: str) -> str:
 
-    """Full Mission Arc schematic â€” S1 ascent, RTLS flyback, and S2 orbital trajectory.
+    """Full Mission Arc schematic — S1 ascent, RTLS flyback, and S2 orbital trajectory.
 
 
     Replicates the three-arc mission overview diagram showing stage separation,
 
-    flyback burn (â‘ ), reentry burn (â‘¡), landing burn (â‘¢), and the KÃ¡rmÃ¡n line.
+    flyback burn (①), reentry burn (②), landing burn (③), and the Kármán line.
 
     """
 
@@ -1920,7 +1920,7 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
     ax.axhline(100, color='gray', linestyle='--', linewidth=1.2, alpha=0.7, zorder=2)
 
-    ax.text(x_max - 5, 101.5, "100 km KÃ¡rmÃ¡n line",
+    ax.text(x_max - 5, 101.5, "100 km Kármán line",
 
             fontsize=9, ha='right', va='bottom', color='gray')
 
@@ -1962,7 +1962,7 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
                    color='#2244CC', s=90, zorder=7)
 
-        ax.annotate("â‘  flyback burn",
+        ax.annotate("① flyback burn",
 
                     xy=(dr_b[boostback_idx], h_b[boostback_idx]),
 
@@ -1976,7 +1976,7 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
                    color='#2244CC', s=90, zorder=7)
 
-        ax.annotate("â‘¡ reentry burn",
+        ax.annotate("② reentry burn",
 
                     xy=(dr_b[entry_idx], h_b[entry_idx]),
 
@@ -1992,7 +1992,7 @@ def plot_full_mission_arc(ascent_log, orbiter_log, booster_log,
 
                    color='#2244CC', s=90, zorder=7)
 
-        ax.annotate("â‘¢ landing burn",
+        ax.annotate("③ landing burn",
 
                     xy=(dr_b[landing_idx], h_b[landing_idx]),
 

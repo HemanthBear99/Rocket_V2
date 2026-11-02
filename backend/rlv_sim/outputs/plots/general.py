@@ -252,7 +252,7 @@ def plot_pitch_angle(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_xlabel('Time (s)')
 
-    ax.set_ylabel('Pitch Angle (Â° from Vertical)')
+    ax.set_ylabel('Pitch Angle (° from Vertical)')
 
     ax.set_title('Pitch Angle Evolution', fontweight='bold')
 
@@ -485,7 +485,7 @@ def plot_physics_check(data: TrajectoryData, output_dir: str) -> str:
 
              label='Velocity Angle (Wind-Relative)')
 
-    ax1.set_ylabel('Angle from Vertical (Â°)')
+    ax1.set_ylabel('Angle from Vertical (°)')
 
     ax1.set_title('Pitch vs Wind-Relative Velocity Vector', fontweight='bold')
 
@@ -509,9 +509,9 @@ def plot_physics_check(data: TrajectoryData, output_dir: str) -> str:
 
     line2 = ax2.axhline(y=10, color='orange', linestyle='--',
 
-                label='10Â° Safety Threshold')
+                label='10° Safety Threshold')
 
-    ax2.set_ylabel('Angle of Attack (Â°)')
+    ax2.set_ylabel('Angle of Attack (°)')
 
     ax2.set_ylim(0, min(15, max(12, np.nanmax(alpha_masked)*1.2 if not np.all(np.isnan(alpha_masked)) else 12)))
 
@@ -620,9 +620,9 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     ax1.plot(data.time, velocity_tilt_from_vertical, 'g-', linewidth=2, label='Velocity Tilt (from vertical)')
 
-    ax1.plot(data.time, gamma_implies_pitch, 'r:', linewidth=2, label='90Â° - Î³_cmd')
+    ax1.plot(data.time, gamma_implies_pitch, 'r:', linewidth=2, label='90° - γ_cmd')
 
-    ax1.set_ylabel('Angle from Vertical (Â°)')
+    ax1.set_ylabel('Angle from Vertical (°)')
 
     ax1.set_title('Comparison: Thrust Pitch vs Velocity Tilt')
 
@@ -634,13 +634,13 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     gamma_measured = 90.0 - velocity_tilt_from_vertical
 
-    ax2.plot(data.time, data.gamma_cmd, 'purple', linewidth=2, label='Î³ Command')
+    ax2.plot(data.time, data.gamma_cmd, 'purple', linewidth=2, label='γ Command')
 
-    ax2.plot(data.time, gamma_measured, 'orange', linewidth=2, label='Î³ Measured (from velocity)')
+    ax2.plot(data.time, gamma_measured, 'orange', linewidth=2, label='γ Measured (from velocity)')
 
-    ax2.plot(data.time, data.gamma_rel, 'k--', linewidth=1.5, alpha=0.7, label='Î³ Relative (logged)')
+    ax2.plot(data.time, data.gamma_rel, 'k--', linewidth=1.5, alpha=0.7, label='γ Relative (logged)')
 
-    ax2.set_ylabel('Flight Path Angle Î³ (Â° from horizontal)')
+    ax2.set_ylabel('Flight Path Angle γ (° from horizontal)')
 
     ax2.set_title('Flight Path Angle: Command vs Actual')
 
@@ -662,13 +662,13 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     ax3.plot(data.time, gamma_tracking_error, 'b--', linewidth=1.5,
 
-             label='|Î³_cmd - Î³_meas|')
+             label='|γ_cmd - γ_meas|')
 
-    ax3.axhline(10, color='orange', linestyle='--', linewidth=1.5, label='10Â° Warning')
+    ax3.axhline(10, color='orange', linestyle='--', linewidth=1.5, label='10° Warning')
 
     ax3.set_xlabel('Time (s)')
 
-    ax3.set_ylabel('Angle Difference (Â°)')
+    ax3.set_ylabel('Angle Difference (°)')
 
     ax3.set_title('Alignment & Tracking Error')
 
@@ -688,15 +688,15 @@ def plot_pitch_gamma_diagnostic(data: TrajectoryData, output_dir: str) -> str:
 
     summary = (f"At S1 MECO:\n"
 
-               f"  Pitch (from vert): {final_pitch:.1f}Â°\n"
+               f"  Pitch (from vert): {final_pitch:.1f}°\n"
 
-               f"  Vel tilt (from vert): {final_v_tilt:.1f}Â°\n"
+               f"  Vel tilt (from vert): {final_v_tilt:.1f}°\n"
 
-               f"  Î³ command: {final_gamma:.1f}Â° (from horiz)\n"
+               f"  γ command: {final_gamma:.1f}° (from horiz)\n"
 
                f"  Downrange: {max_downrange:.1f} km\n\n"
 
-               f"Expected: pitch â‰ˆ vel_tilt â‰ˆ (90-Î³)")
+               f"Expected: pitch ≈ vel_tilt ≈ (90-γ)")
 
     ax3.text(0.98, 0.97, summary, transform=ax3.transAxes, fontsize=9,
 
@@ -795,7 +795,7 @@ def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_xlabel('Time (s)')
 
-    ax.set_ylabel('Pitch (Â° from Vertical)')
+    ax.set_ylabel('Pitch (° from Vertical)')
 
     ax.set_title('Pitch Angle')
 
@@ -813,7 +813,7 @@ def plot_comprehensive_dashboard(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_xlabel('Time (s)')
 
-    ax.set_ylabel(r'$\gamma$ (Â° from Horizontal)')
+    ax.set_ylabel(r'$\gamma$ (° from Horizontal)')
 
     ax.set_title('Flight Path Angle')
 
@@ -973,7 +973,7 @@ def plot_ascent_profile(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_xlabel('Time (s)', fontsize=11)
 
-    ax.set_ylabel('Pitch Angle (Â° from Vertical)', fontsize=11)
+    ax.set_ylabel('Pitch Angle (° from Vertical)', fontsize=11)
 
     ax.set_title('Pitch Angle Evolution', fontweight='bold', fontsize=12)
 
@@ -1023,15 +1023,15 @@ def plot_control_dynamics(data: TrajectoryData, output_dir: str) -> str:
 
     ax.plot(data.time, data.attitude_error, 'c-', linewidth=2, label='Attitude Error')
 
-    ax.axhline(y=1.0, color='orange', linestyle='--', linewidth=2, label='1Â° Threshold')
+    ax.axhline(y=1.0, color='orange', linestyle='--', linewidth=2, label='1° Threshold')
 
     max_error = np.max(data.attitude_error)
 
     ax.axhline(y=max_error, color='red', linestyle=':', linewidth=1.5, alpha=0.7,
 
-               label=f'Max: {max_error:.2f}Â°')
+               label=f'Max: {max_error:.2f}°')
 
-    ax.set_ylabel('Attitude Error (Â°)', fontsize=11)
+    ax.set_ylabel('Attitude Error (°)', fontsize=11)
 
     ax.set_title('Attitude Tracking Error', fontweight='bold', fontsize=12)
 
@@ -1049,9 +1049,9 @@ def plot_control_dynamics(data: TrajectoryData, output_dir: str) -> str:
 
     ax.axhline(y=C.MAX_TORQUE/1e6, color='red', linestyle='--', linewidth=1.5,
 
-               label=f'Saturation: {C.MAX_TORQUE/1e6:.1f} MNÂ·m')
+               label=f'Saturation: {C.MAX_TORQUE/1e6:.1f} MN·m')
 
-    ax.set_ylabel('Torque (MNÂ·m)', fontsize=11)
+    ax.set_ylabel('Torque (MN·m)', fontsize=11)
 
     ax.set_title('Control Torque Magnitude', fontweight='bold', fontsize=12)
 
@@ -1063,9 +1063,9 @@ def plot_control_dynamics(data: TrajectoryData, output_dir: str) -> str:
 
     ax = axes[2]
 
-    ax.plot(data.time, data.gamma_cmd, 'b-', linewidth=2.5, label='Î³ Command')
+    ax.plot(data.time, data.gamma_cmd, 'b-', linewidth=2.5, label='γ Command')
 
-    ax.plot(data.time, data.gamma_rel, 'g--', linewidth=2, label='Î³ Actual')
+    ax.plot(data.time, data.gamma_rel, 'g--', linewidth=2, label='γ Actual')
 
     ax.axhline(y=90, color='gray', linestyle=':', alpha=0.5)
 
@@ -1073,7 +1073,7 @@ def plot_control_dynamics(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_xlabel('Time (s)', fontsize=11)
 
-    ax.set_ylabel('Flight Path Angle (Â°)', fontsize=11)
+    ax.set_ylabel('Flight Path Angle (°)', fontsize=11)
 
     ax.set_title('Guidance Commands', fontweight='bold', fontsize=12)
 
@@ -1135,7 +1135,7 @@ def plot_flight_path_readme(data: TrajectoryData, output_dir: str) -> str:
 
     ax.set_xlabel('Time (s)', fontsize=12)
 
-    ax.set_ylabel(r'Flight Path Angle $\gamma$ (Â° from Horizontal)', fontsize=12)
+    ax.set_ylabel(r'Flight Path Angle $\gamma$ (° from Horizontal)', fontsize=12)
 
     ax.set_title('Flight Path Angle Evolution', fontweight='bold', fontsize=14)
 
@@ -1149,11 +1149,11 @@ def plot_flight_path_readme(data: TrajectoryData, output_dir: str) -> str:
 
     textstr = (r'$\gamma$ Definition:' + '\n'
 
-               r'$\gamma = 90Â°$: Vertical climb' + '\n'
+               r'$\gamma = 90°$: Vertical climb' + '\n'
 
-               r'$\gamma = 0Â°$: Horizontal flight' + '\n'
+               r'$\gamma = 0°$: Horizontal flight' + '\n'
 
-               r'$\gamma < 0Â°$: Descent')
+               r'$\gamma < 0°$: Descent')
 
     ax.text(0.02, 0.35, textstr, transform=ax.transAxes, fontsize=10,
 
@@ -1174,7 +1174,7 @@ def plot_flight_path_readme(data: TrajectoryData, output_dir: str) -> str:
 
 def plot_quaternion_norm(data: TrajectoryData, output_dir: str) -> str:
 
-    """Quaternion norm history â€” validates numerical integration integrity.
+    """Quaternion norm history — validates numerical integration integrity.
 
 
     A deviation from ||q|| = 1 indicates numerical drift in the attitude
@@ -2118,7 +2118,7 @@ def plot_propellant_fraction(data: TrajectoryData, output_dir: str) -> str:
 
         textstr = (f'At S1 MECO: {s1_remaining[meco_idx]:.1f}% ascent propellant\n'
 
-                   f'(RTLS reserve {reserve_kg/1000:.0f} t retained â€” not counted above)')
+                   f'(RTLS reserve {reserve_kg/1000:.0f} t retained — not counted above)')
 
     ax.text(0.98, 0.50, textstr, transform=ax.transAxes, fontsize=10,
 
@@ -2144,7 +2144,7 @@ def plot_drag_coefficient_vs_mach(data: TrajectoryData, output_dir: str) -> str:
 
     Shows the Mach-dependent Cd look-up table values, including the transonic
 
-    drag rise â€” a critical phenomenon for launch vehicles.
+    drag rise — a critical phenomenon for launch vehicles.
 
     """
 
@@ -2458,7 +2458,7 @@ def plot_natural_frequency(data: TrajectoryData, output_dir: str) -> str:
 
     Uses the *scheduled* gains (Kp, Kd scaled proportionally to inertia)
 
-    so that Ï‰n and Î¶ correctly show constant values â€” confirming that
+    so that ωn and ζ correctly show constant values — confirming that
 
     gain scheduling is working as designed.
 
