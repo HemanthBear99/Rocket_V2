@@ -36,6 +36,7 @@ from rlv_sim.guidance.recovery import (
     target_landing_site_eci,
 )
 from rlv_sim.mission.manager_helpers import (
+    MIN_PERIGEE_ALTITUDE_M,
     check_attitude_aligned,
     compute_orbit_metrics,
     compute_radial_velocity,
@@ -316,7 +317,7 @@ class MissionManager:
         elif (
             state.altitude < 80000.0
             and radial_velocity < -50.0
-            and perigee_alt < 100000.0
+            and perigee_alt < MIN_PERIGEE_ALTITUDE_M
         ):
             self.orbit_failure_reason = (
                 f"reentered during insertion: alt={state.altitude/1000:.1f}km, "

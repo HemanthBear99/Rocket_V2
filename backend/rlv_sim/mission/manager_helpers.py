@@ -75,6 +75,11 @@ def compute_orbit_metrics(state: State) -> dict:
     }
 
 
+# Kármán line: a perigee below it decays in the atmosphere, so the orbit is
+# not accepted and an insertion falling below it is treated as reentry.
+MIN_PERIGEE_ALTITUDE_M = 100_000.0
+
+
 def orbit_within_acceptance(energy: float, perigee_alt: float, apogee_alt: float,
                             ecc: float, target_alt: float, alt_tol: float, ecc_max: float) -> bool:
     """The orbit acceptance band, shared by the phase manager and insertion guidance:
@@ -82,7 +87,7 @@ def orbit_within_acceptance(energy: float, perigee_alt: float, apogee_alt: float
     tolerance of the target, and eccentricity within the limit."""
     return (
         energy < 0.0
-        and perigee_alt > 100_000.0
+        and perigee_alt > MIN_PERIGEE_ALTITUDE_M
         and abs(perigee_alt - target_alt) <= alt_tol
         and abs(apogee_alt - target_alt) <= alt_tol
         and ecc <= ecc_max
