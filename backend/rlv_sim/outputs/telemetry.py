@@ -34,7 +34,7 @@ def extract_telemetry_point(state: Any, guidance: dict, phase_name: str, config:
     v_rel_mag = float(vec_norm(v_rel))
 
     q_dyn = compute_dynamic_pressure(rho_atm, v_rel_mag)
-    r_nose = C.REFERENCE_DIAMETER / 2.0
+    r_nose = float(config.vehicle_diameter_m) / 2.0
     q_heat = compute_aerodynamic_heating(rho_atm, v_rel_mag, r_nose)
 
     pitch_angle_rad = guidance.get('pitch_angle', 0.0)

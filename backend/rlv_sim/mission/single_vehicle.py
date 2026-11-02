@@ -223,7 +223,7 @@ def run_simulation(initial_state: State | None = None, dt: float | None = None, 
 
             logger.info(f"SEPARATION MASS EVENT at t={state.t:.2f}s: "
                        f"mass {mass_before:.0f} -> {state.m:.0f} kg "
-                       f"(dropped S1 dry={C.STAGE1_DRY_MASS:.0f}kg + "
+                       f"(dropped S1 dry={config.stage1_dry_mass:.0f}kg + "
                        f"landing fuel={config.stage1_landing_fuel_reserve_kg:.0f}kg)")
             if config.enable_separation_dynamics:
                 logger.info(
@@ -233,7 +233,7 @@ def run_simulation(initial_state: State | None = None, dt: float | None = None, 
                 )
             if verbose:
                 print(f"  *** STAGE SEPARATION: {mass_before:.0f} -> {state.m:.0f} kg | "
-                      f"Switched to S2 engine ({C.STAGE2_THRUST/1e3:.0f} kN, Isp={C.STAGE2_ISP_VAC}s)")
+                      f"Switched to S2 engine ({config.stage2_thrust_vac/1e3:.0f} kN, Isp={config.stage2_isp_vac}s)")
 
         state, guidance, control, actuator, gs = simulation_step(
             state, actuator, mission_mgr, step_dt,

@@ -130,7 +130,8 @@ class SimulationLog:
         else:
             aoa_rad = 0.0
 
-        r_nose = C.REFERENCE_DIAMETER / 2.0
+        cfg_diameter = getattr(state.sim_config, "vehicle_diameter_m", None)
+        r_nose = (cfg_diameter if cfg_diameter is not None else C.REFERENCE_DIAMETER) / 2.0
         if rho_atm > 1e-12 and v_rel_mag > 100.0:
             q_heat = 1.7415e-4 * np.sqrt(rho_atm / max(r_nose, 0.01)) * v_rel_mag ** 3
         else:

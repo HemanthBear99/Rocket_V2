@@ -241,8 +241,12 @@ def apply_case(base: SimulationConfig, case: dict[str, Any]) -> SimulationConfig
     isp_scale = base.runtime_isp_scale * (
         1.0 + float(z.get("isp", 0.0)) * _MC_ISP_DISPERSION
     )
+    liftoff_mass = (
+        base.stage1_dry_mass + base.stage1_prop_mass + base.stage2_dry_mass
+        + base.stage2_prop_mass + base.payload_mass
+    )
     mass_offset = base.runtime_initial_mass_offset_kg + (
-        float(z.get("mass", 0.0)) * C.INITIAL_MASS * _MC_MASS_DISPERSION
+        float(z.get("mass", 0.0)) * liftoff_mass * _MC_MASS_DISPERSION
     )
     wind_offset = base.runtime_wind_offset_mps + (
         float(z.get("wind", 0.0)) * _MC_WIND_DISPERSION

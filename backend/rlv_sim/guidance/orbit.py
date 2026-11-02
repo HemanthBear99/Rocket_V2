@@ -419,9 +419,13 @@ def compute_deorbit_guidance(
     if gs.deorbit_start_mass is None:
         gs.deorbit_start_mass = float(m)
 
+    isp = (
+        float(config.stage2_isp_vac) * float(config.runtime_isp_scale)
+        if config is not None else C.STAGE2_ISP_VAC
+    )
     dv_used = max(
         0.0,
-        float(C.STAGE2_ISP_VAC * C.G0 * np.log(max(gs.deorbit_start_mass, 1.0) / max(m, 1.0))),
+        float(isp * C.G0 * np.log(max(gs.deorbit_start_mass, 1.0) / max(m, 1.0))),
     )
     dv_cap_mps = 300.0
 
