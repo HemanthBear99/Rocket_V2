@@ -38,6 +38,20 @@ def test_gps_only_estimate_coasts_between_fixes():
     assert nav.estimate.time_s == pytest.approx(0.5)
 
 
+def test_gps_only_coast_reports_error_against_truth():
+    cfg = create_test_config(enable_gps=True, gps_update_period_s=1.0, gps_seed=3,
+                             gps_position_sigma_m=0.0, gps_velocity_sigma_mps=0.0)
+    s0 = _state(cfg=cfg)
+    nav = update_navigation_estimate(None, s0, cfg, 0.1)
+    # Truth deviates from the coasted path (e.g. thrust the filter cannot see).
+    kick = np.array([0.0, 0.0, 100.0])
+    s1 = _state(t=0.5, r=s0.r + s0.v * 0.5 + kick, v=s0.v + 0.1 * kick, cfg=cfg)
+    est = update_navigation_estimate(nav, s1, cfg, 0.1).estimate
+    assert est.position_error_m == pytest.approx(np.linalg.norm(est.position_eci_m - s1.r))
+    assert est.velocity_error_mps == pytest.approx(np.linalg.norm(est.velocity_eci_mps - s1.v))
+    assert est.position_error_m > 90.0
+
+
 def test_body_rate_abort_threshold_is_configurable():
     monitor = AbortMonitor(max_tumble_rate=0.2)
     r = np.array([C.R_EARTH + 200_000.0, 0.0, 0.0])
