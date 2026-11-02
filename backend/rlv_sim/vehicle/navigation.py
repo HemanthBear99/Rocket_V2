@@ -381,14 +381,16 @@ def update_navigation_estimate(
             p0 = np.asarray(nav_state.estimate.position_eci_m, dtype=float)
             v0 = np.asarray(nav_state.estimate.velocity_eci_mps, dtype=float)
             g = _nav_gravity(p0)
+            p1 = p0 + v0 * elapsed + 0.5 * g * elapsed ** 2
+            v1 = v0 + g * elapsed
             nav_state.estimate = NavigationEstimate(
-                position_eci_m=p0 + v0 * elapsed + 0.5 * g * elapsed ** 2,
-                velocity_eci_mps=v0 + g * elapsed,
+                position_eci_m=p1,
+                velocity_eci_mps=v1,
                 time_s=float(state.t),
                 gps_available=False,
                 uses_truth_fallback=False,
-                position_error_m=0.0,
-                velocity_error_mps=0.0,
+                position_error_m=float(vec_norm(p1 - state.r)),
+                velocity_error_mps=float(vec_norm(v1 - state.v)),
                 imu_available=False,
                 altimeter_available=False,
                 altimeter_altitude_m=None,

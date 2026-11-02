@@ -273,13 +273,13 @@ def compute_grid_fin_force(
 def hard_landing_speed_limit(config: SimulationConfig) -> float:
     """Upper edge of the survivable-but-hard touchdown band, in m/s.
 
-    10 m/s for any success limit at or below 10 m/s (the default is 6), else
+    10 m/s for any success limit below 10 m/s (the default is 6), else
     twice the success limit, so the hard band above the success gate is never
     empty. The single definition used by touchdown contact and the mission
     summary (they once disagreed: 12 vs 10 m/s at the default).
     """
     success_limit = float(config.landing_leg_max_touchdown_speed_mps)
-    if success_limit <= 10.0:
+    if success_limit < 10.0:
         return 10.0
     return success_limit * 2.0
 

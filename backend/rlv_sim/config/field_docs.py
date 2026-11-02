@@ -264,8 +264,8 @@ FIELD_DOCS: dict[str, str] = {
         "above it are flagged."
     ),
     "booster_terminal_attitude_error_max_deg": (
-        "Maximum attitude error allowed at terminal descent; larger errors are flagged in the "
-        "results."
+        "Tilt limit the landing guidance flies within at terminal descent (the smaller of this "
+        "and landing_leg_max_tilt_deg). The touchdown tilt gate uses landing_leg_max_tilt_deg."
     ),
     "booster_landing_propellant_margin_kg": (
         "Extra propellant held above the landing reserve as a safety buffer for the landing burn."

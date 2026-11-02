@@ -1,5 +1,7 @@
 """One authority for the landing outcome: flags, reasons and assessment agree."""
 
+from dataclasses import replace
+
 import pytest
 
 from rlv_sim.config.factory import create_test_config
@@ -32,6 +34,8 @@ def test_pad_enforcement_decides_offsite_soft_landing(enforce, expected):
 def test_one_hard_landing_band():
     cfg = create_test_config()
     assert hard_landing_speed_limit(cfg) == 10.0
+    # A 10 m/s success limit must still leave a hard band above it.
+    assert hard_landing_speed_limit(replace(cfg, landing_leg_max_touchdown_speed_mps=10.0)) == 20.0
     assert classify_landing(11.0, 5.0, cfg).status == "crash_landing"
 
 
