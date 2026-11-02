@@ -9,7 +9,11 @@ from rlv_sim.server import licensing, storage
 
 def test_scenario_round_trip_and_bad_ids():
     meta = storage.save_scenario("Heavy payload / 11 t", {"vehicle": {"payload_mass": 11000}})
-    assert meta["id"] == "heavy_payload_11_t"
+    assert meta["id"].startswith("heavy_payload_11_t_")
+    # Saving the same name again must not overwrite the first scenario.
+    again = storage.save_scenario("Heavy payload / 11 t", {"vehicle": {"payload_mass": 1}})
+    assert again["id"] != meta["id"]
+    storage.delete_scenario(again["id"])
     assert storage.get_scenario(meta["id"])["setup"]["vehicle"]["payload_mass"] == 11000
     assert any(s["id"] == meta["id"] for s in storage.list_scenarios())
     storage.delete_scenario(meta["id"])

@@ -143,6 +143,10 @@ def assess_orbit(
         failed.append("eccentricity")
     if metrics["energy"] >= 0.0:
         failed.append("bound_orbit")
+    # An aborted or invalid run is a failure even if its last state happens
+    # to sit inside the orbit tolerance.
+    if termination_reason and any(k in termination_reason.upper() for k in ("ABORT", "VALIDATION")):
+        failed.append("termination")
 
     success = not failed
     target_km = target / 1000.0

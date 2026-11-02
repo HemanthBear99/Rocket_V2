@@ -10,8 +10,8 @@ import uuid
 from collections import defaultdict, deque
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import asynccontextmanager
-from dataclasses import asdict, replace
 from dataclasses import asdict as _dc_asdict
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
@@ -42,7 +42,11 @@ from rlv_sim.aero.validation import (
     run_tier2_report as run_aero_tier2_report,
 )
 from rlv_sim.config.definition import SimulationConfig
-from rlv_sim.config.factory import create_default_config, create_demo_config
+from rlv_sim.config.factory import (
+    config_to_dict,
+    create_default_config,
+    create_demo_config,
+)
 from rlv_sim.config.schema import config_schema
 from rlv_sim.core import constants as C
 from rlv_sim.guidance import gfold as _gfold
@@ -144,17 +148,25 @@ def require_api_key(api_key: str | None = Depends(_api_key_header)) -> None:
         raise HTTPException(status_code=401, detail="A valid API key is required")
 
 
+# Allowance for multipart framing around an uploaded body.
+MULTIPART_OVERHEAD_BYTES = 16384
+
+
 @app.middleware("http")
 async def protect_and_measure_requests(request: Request, call_next):
     """Apply small public-API resource limits and emit request timing logs."""
     request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
     started = time.monotonic()
     max_body_bytes = int(os.getenv("RLV_MAX_REQUEST_BYTES", "65536"))
-    if request.url.path == "/api/config/validate":
+    route_limits = {"/api/runs": MAX_RUN_RECORD_BYTES, "/api/aero/import": MAX_AERO_UPLOAD_BYTES}
+    if request.url.path in route_limits:
+        # These routes enforce their own, larger limits on the body they read.
+        max_body_bytes = max(max_body_bytes, route_limits[request.url.path] + MULTIPART_OVERHEAD_BYTES)
+    elif request.url.path == "/api/config/validate":
         # Config uploads have their own, larger limit; allow multipart overhead.
         max_body_bytes = max(
             max_body_bytes,
-            int(os.getenv("RLV_MAX_CONFIG_UPLOAD_BYTES", "262144")) + 16384,
+            int(os.getenv("RLV_MAX_CONFIG_UPLOAD_BYTES", "262144")) + MULTIPART_OVERHEAD_BYTES,
         )
     content_length = request.headers.get("content-length")
     if content_length:
@@ -578,7 +590,8 @@ MAX_RUN_RECORD_BYTES = 5_000_000
 
 
 @app.post("/api/aero/import", dependencies=[Depends(require_api_key)])
-async def aero_import(file: UploadFile = File(...), name: str | None = None) -> dict[str, Any]:  # noqa: B008 - FastAPI idiom
+async def aero_import(file: UploadFile = File(...), name: str | None = None,  # noqa: B008 - FastAPI idiom
+                      overwrite: bool = False) -> dict[str, Any]:
     """Import wind-tunnel / CFD aero data (CSV or deck JSON) as an aero deck."""
     from rlv_sim.aero.deck_import import import_deck
 
@@ -589,7 +602,9 @@ async def aero_import(file: UploadFile = File(...), name: str | None = None) -> 
     if len(raw) > MAX_AERO_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Aero data file is too large")
     try:
-        return import_deck(raw, filename, name)
+        return import_deck(raw, filename, name, overwrite=overwrite)
+    except FileExistsError as exc:
+        raise HTTPException(status_code=409, detail=f"{exc}; pass overwrite=true to replace it") from exc
     except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=422, detail=f"Invalid aero data: {exc}") from exc
 
@@ -697,7 +712,7 @@ async def validate_config_upload(file: UploadFile = File(...)) -> dict[str, Any]
         config = create_default_config(**payload)
     except (json.JSONDecodeError, ValueError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=f"Invalid configuration: {exc}") from exc
-    return {"valid": True, "config": asdict(config)}
+    return {"valid": True, "config": config_to_dict(config)}
 
 
 @app.get("/api/config/schema", dependencies=[Depends(require_api_key)])
@@ -1132,7 +1147,19 @@ def _run_campaign_task(campaign_id: str, meta: dict) -> None:
                             pending.cancel()
                         executor.shutdown(wait=False, cancel_futures=True)
                         break
-                    _record(futures[future], future.result())
+                    case_id = futures[future]
+                    try:
+                        _record(case_id, future.result())
+                    except Exception as exc:  # noqa: BLE001 - a dead worker loses one case, not the campaign
+                        _record(case_id, {
+                            "case_id": case_id,
+                            "status": "error",
+                            "mission_success": False,
+                            "orbit_success": False,
+                            "landing_success": False,
+                            "failed_criteria": ["simulation_error"],
+                            "error": f"{type(exc).__name__}: {exc}",
+                        })
 
         results = [
             results_by_id[case["case_id"]]

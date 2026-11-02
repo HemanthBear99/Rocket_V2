@@ -27,6 +27,7 @@ a file from an arbitrary path or upload code.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import math
 import re
@@ -121,7 +122,11 @@ def require_loadable(config) -> None:
 
 
 def list_plugins() -> list[dict[str, Any]]:
-    """Every plugin file in the user and bundled folders, with load status."""
+    """Every plugin file in the user and bundled folders, with load status.
+
+    Read from the source without importing: this is served by the web API,
+    so listing must not run plugin code.
+    """
     seen: set[str] = set()
     rows = []
     for source, folder in _plugin_dirs():
@@ -131,15 +136,32 @@ def list_plugins() -> list[dict[str, Any]]:
                 continue
             seen.add(name)
             row: dict[str, Any] = {"name": name, "source": source, "path": str(path)}
-            try:
-                module = _load(name)
-                row["title"] = str(getattr(module, "NAME", name))
-                row["description"] = str(getattr(module, "DESCRIPTION", ""))
-                row["error"] = None
-            except Exception as exc:  # noqa: BLE001 - report, don't crash the listing
-                row["title"], row["description"], row["error"] = name, "", str(exc)
+            row.update(_describe(path, name))
             rows.append(row)
     return rows
+
+
+def _describe(path: Path, name: str) -> dict[str, Any]:
+    """NAME, DESCRIPTION and a static check for landing_command, via ast."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except (SyntaxError, UnicodeDecodeError, OSError) as exc:
+        return {"title": name, "description": "", "error": str(exc)}
+    strings: dict[str, str] = {}
+    has_command = False
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "landing_command":
+            has_command = True
+        elif (isinstance(node, ast.Assign) and len(node.targets) == 1
+              and isinstance(node.targets[0], ast.Name)):
+            try:
+                value = ast.literal_eval(node.value)
+            except ValueError:
+                continue
+            if isinstance(value, str):
+                strings[node.targets[0].id] = value
+    error = None if has_command else f"Guidance plugin {name!r} has no landing_command(state) function"
+    return {"title": strings.get("NAME", name), "description": strings.get("DESCRIPTION", ""), "error": error}
 
 
 def landing_command(name: str, state: LandingState) -> tuple[np.ndarray, float]:

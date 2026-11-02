@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -35,7 +36,8 @@ def _read(path: Path) -> dict[str, Any]:
 
 # ------------------------------------------------------------------ scenarios
 def save_scenario(name: str, setup: dict[str, Any]) -> dict[str, Any]:
-    item_id = _slug(name)
+    # A unique suffix: saving under an existing name must not destroy the old one.
+    item_id = f"{_slug(name)}_{uuid.uuid4().hex[:8]}"
     record = {"id": item_id, "name": name.strip() or item_id, "saved_at": _now(), "setup": setup}
     _path("scenarios", item_id).write_text(json.dumps(record), encoding="utf-8")
     return {k: record[k] for k in ("id", "name", "saved_at")}
@@ -62,7 +64,7 @@ def save_run(kind: str, name: str, payload: dict[str, Any], headline: dict[str, 
     if kind not in RUN_KINDS:
         raise ValueError(f"kind must be one of {RUN_KINDS}")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    item_id = f"{kind}_{stamp}_{_slug(name)}"
+    item_id = f"{kind}_{stamp}_{_slug(name)}_{uuid.uuid4().hex[:8]}"
     record = {"id": item_id, "kind": kind, "name": name.strip() or item_id, "saved_at": _now(),
               "headline": headline, "payload": payload}
     _path("runs", item_id).write_text(json.dumps(record), encoding="utf-8")

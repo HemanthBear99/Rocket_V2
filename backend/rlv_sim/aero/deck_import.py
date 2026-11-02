@@ -72,6 +72,14 @@ def validate_deck(deck: dict[str, Any]) -> list[str]:
         values = axes.get(name)
         if not values:
             errors.append(f"axis {name!r} missing or empty")
+            continue
+        try:
+            values = [float(v) for v in values]
+        except (TypeError, ValueError):
+            errors.append(f"axis {name!r} must contain only numbers")
+            continue
+        if not all(math.isfinite(v) for v in values):
+            errors.append(f"axis {name!r} contains non-finite values")
         elif any(b <= a for a, b in itertools.pairwise(values)):
             errors.append(f"axis {name!r} must be strictly increasing")
     if errors:
@@ -113,7 +121,8 @@ def _slug(name: str) -> str:
     return slug or "deck"
 
 
-def import_deck(raw: bytes, filename: str, name: str | None = None) -> dict[str, Any]:
+def import_deck(raw: bytes, filename: str, name: str | None = None,
+                overwrite: bool = False) -> dict[str, Any]:
     """Parse, validate, save and compare one uploaded deck."""
     text = raw.decode("utf-8-sig")
     deck = json.loads(text) if filename.lower().endswith(".json") else parse_csv(text)
@@ -123,6 +132,9 @@ def import_deck(raw: bytes, filename: str, name: str | None = None) -> dict[str,
     if errors:
         raise ValueError("; ".join(errors))
     path = user_aero_dir() / f"{USER_PREFIX}{_slug(name or Path(filename).stem)}.json"
+    if path.exists() and not overwrite:
+        # Saved scenarios point at this path; replacing it would change their aero.
+        raise FileExistsError(f"An imported deck named {path.stem!r} already exists")
     path.write_text(json.dumps(deck), encoding="utf-8")
     db = AeroDatabase(str(path))
     checks = [c.__dict__ for c in run_deck_interpolation_checks(db)]

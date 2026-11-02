@@ -922,14 +922,14 @@
     strip.innerHTML = steps.map((p, i) => {
       const cls = idx === -1 ? '' : (i < idx ? 'done' : i === idx ? 'now' : '');
       const connector = i > 0 ? '<span class="timeline-connector"></span>' : '';
-      return `${connector}<span class="timeline-step ${cls}"><span class="dot"></span><span class="lbl">${PHASE_LABELS[p] || p}</span></span>`;
+      return `${connector}<span class="timeline-step ${cls}"><span class="dot"></span><span class="lbl">${escapeHtml(PHASE_LABELS[p] || p)}</span></span>`;
     }).join('');
   }
 
   function updateVizReadout(id, phase, alt, vel, thr) {
     const el = $(id);
     if (!el) return;
-    el.innerHTML = `<span class="ph">${PHASE_LABELS[phase] || phase || '—'}</span>ALT ${fmt(alt / 1000, 2)} km &nbsp; VEL ${fmt(vel, 0)} m/s &nbsp; THR ${Math.round((thr || 0) * 100)}%`;
+    el.innerHTML = `<span class="ph">${escapeHtml(PHASE_LABELS[phase] || phase || '—')}</span>ALT ${fmt(alt / 1000, 2)} km &nbsp; VEL ${fmt(vel, 0)} m/s &nbsp; THR ${Math.round((thr || 0) * 100)}%`;
   }
 
   function hwChip(label, on) {
@@ -957,7 +957,7 @@
       const plan = await api('/api/mission/plan', { method: 'POST', body: JSON.stringify(currentSetup()) });
       const colors = { ok: 'var(--green)', warn: 'var(--amber, orange)', fail: 'var(--red)' };
       el.innerHTML = plan.checks.map((c) =>
-        `<div style="color:${colors[c.status]}">${c.status === 'ok' ? '✓' : c.status === 'warn' ? '⚠' : '✗'} ${c.message}</div>`).join('');
+        `<div style="color:${colors[c.status]}">${c.status === 'ok' ? '✓' : c.status === 'warn' ? '⚠' : '✗'} ${escapeHtml(c.message)}</div>`).join('');
     } catch (err) {
       el.textContent = '';
     }
@@ -1173,7 +1173,7 @@
 
     const failedCriteria = (a?.failed_criteria || []);
     const failedCriteriaHtml = failedCriteria.length
-      ? `<div class="help-text" style="margin-top:8px;">Failed gates: ${failedCriteria.map((f) => `<span class="badge bad" style="margin-right:4px;">${f}</span>`).join('')}</div>`
+      ? `<div class="help-text" style="margin-top:8px;">Failed gates: ${failedCriteria.map((f) => `<span class="badge bad" style="margin-right:4px;">${escapeHtml(f)}</span>`).join('')}</div>`
       : '';
 
     content.innerHTML = `
@@ -1185,7 +1185,7 @@
         </div>
         <div>
           <h2>${success ? 'Mission Successful' : 'Mission Incomplete'}</h2>
-          <p>${outcomes.reason || ''}</p>
+          <p>${escapeHtml(outcomes.reason || '')}</p>
           ${failedCriteriaHtml}
         </div>
       </div>
