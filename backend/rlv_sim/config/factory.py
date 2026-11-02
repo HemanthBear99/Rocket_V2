@@ -62,6 +62,20 @@ def _with_overrides(config: SimulationConfig, **overrides: Any) -> SimulationCon
     return config
 
 
+def config_to_dict(config: SimulationConfig) -> dict[str, Any]:
+    """Config as loadable overrides: the reserve without the wind adjustment,
+    which _with_overrides adds again on load."""
+    from dataclasses import asdict
+
+    from rlv_sim.mission.planner import wind_reserve_adjustment_kg
+
+    data = asdict(config)
+    data["stage1_landing_fuel_reserve_kg"] = (
+        config.stage1_landing_fuel_reserve_kg - wind_reserve_adjustment_kg(config)
+    )
+    return data
+
+
 def create_default_config(**overrides: Any) -> SimulationConfig:
     """Create a default research-profile configuration.
 

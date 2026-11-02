@@ -444,12 +444,15 @@ class SimulationConfig:
     def meco_mass_kg(self) -> float:
         """Stacked-vehicle mass at main-engine cutoff.
 
-        Stage 1 dry + stage 2 wet + payload + the stage 1 landing reserve.
+        Stage 1 dry + stage 2 wet + payload + the stage 1 landing reserve,
+        plus runtime_initial_mass_offset_kg: a mass dispersion is structure
+        carried by stage 1, not extra ascent propellant.
         Single source of truth for ascent guidance, the mission manager and
         the ascent loop's dry-mass floor.
         """
         return (
-            float(self.stage1_dry_mass)
+            float(self.runtime_initial_mass_offset_kg)
+            + float(self.stage1_dry_mass)
             + float(self.stage2_dry_mass)
             + float(self.stage2_prop_mass)
             + float(self.payload_mass)
@@ -608,6 +611,14 @@ class SimulationConfig:
                 "demo_coast_max_dt must be >= dt "
                 f"({self.demo_coast_max_dt} < {self.dt})"
             )
+        # Altitude, ground contact and guidance all measure from one sea-level
+        # sphere; a raised pad or landing site cannot be touched down on.
+        for name in ("launch_site_altitude_m", "booster_landing_site_altitude_m"):
+            if float(getattr(self, name)) != 0.0:
+                errors.append(
+                    f"{name} must be 0: the simulator models a single sea-level "
+                    f"surface (got {getattr(self, name)})"
+                )
         if self.booster_landing_guidance not in ("heuristic", "gfold", "plugin"):
             errors.append(
                 "booster_landing_guidance must be 'heuristic', 'gfold' or 'plugin', "
@@ -685,7 +696,7 @@ class SimulationConfig:
         )
         if liftoff_mass + self.runtime_initial_mass_offset_kg < self.meco_mass_kg:
             errors.append(
-                "runtime_initial_mass_offset_kg leaves no ascent propellant above MECO mass"
+                "stage masses leave no ascent propellant above MECO mass"
             )
 
         if errors:

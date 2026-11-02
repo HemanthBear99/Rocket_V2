@@ -61,7 +61,8 @@ def plan_mission(config: SimulationConfig) -> dict:
     s1_dry = float(config.stage1_dry_mass)
     s2_wet = float(config.stage2_dry_mass) + float(config.stage2_prop_mass)
     payload = float(config.payload_mass)
-    m0 = s1_dry + float(config.stage1_prop_mass) + s2_wet + payload
+    m0 = (s1_dry + float(config.stage1_prop_mass) + s2_wet + payload
+          + float(config.runtime_initial_mass_offset_kg))
 
     s1_isp = 0.5 * (C.ISP + C.ISP_VAC) * isp_scale
     dv_s1 = s1_isp * G0 * math.log(m0 / config.meco_mass_kg)

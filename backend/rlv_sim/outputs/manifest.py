@@ -7,13 +7,13 @@ import json
 import platform
 import sys
 from collections.abc import Sequence
-from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from rlv_sim import __version__
 from rlv_sim.config.definition import SimulationConfig
+from rlv_sim.config.factory import config_to_dict
 
 
 def _hash_file(path: Path) -> str | None:
@@ -51,7 +51,7 @@ def build_run_manifest(
         },
         "inputs": {
             "cli_argv": list(cli_argv or []),
-            "config": asdict(config),
+            "config": config_to_dict(config),
         },
         "dependencies": {
             "requirements_lock_sha256": _hash_file(lock_path),

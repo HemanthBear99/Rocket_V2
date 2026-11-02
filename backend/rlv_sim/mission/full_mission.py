@@ -77,6 +77,7 @@ def _step_vehicle(state, actuator, mgr, gs, log, abort_monitor, config, max_time
         validate_state(
             state,
             dry_mass=dry_mass,
+            max_mass=_configured_max_mass(config),
             quaternion_norm_tolerance=config.quaternion_norm_tolerance,
         )
     except ValidationError as e:
@@ -361,8 +362,10 @@ def _run_dual_vehicles(rt: _MissionRuntime, ascent: _AscentOutcome):
 
     s2_wet_mass = float(config.stage2_dry_mass) + float(config.stage2_prop_mass) + float(config.payload_mass)
     s2_dry_mass = float(config.stage2_dry_mass) + float(config.payload_mass)
-    s1_dry_mass = float(config.stage1_dry_mass)
-    booster_mass = s1_dry_mass + float(config.stage1_landing_fuel_reserve_kg)
+    # The mass dispersion is stage-1 structure; the booster takes whatever the
+    # stack actually holds beyond stage 2, so a MECO overshoot is not refunded.
+    s1_dry_mass = float(config.stage1_dry_mass) + float(config.runtime_initial_mass_offset_kg)
+    booster_mass = float(state.m) - s2_wet_mass
 
     orbiter_dv, booster_dv, orbiter_domega, booster_domega = _compute_separation_adjustments(
         state,

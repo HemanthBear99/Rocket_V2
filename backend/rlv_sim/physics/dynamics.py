@@ -32,6 +32,7 @@ from rlv_sim.physics.mass import (
     compute_center_of_mass,
     compute_inertia_tensor,
     compute_mass_derivative,
+    default_dry_mass,
 )
 
 if TYPE_CHECKING:
@@ -256,7 +257,7 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
 
     dry_mass = ctx.dry_mass
     if dry_mass is None:
-        dry_mass = C.STAGE2_DRY_MASS if ctx.stage == 2 else C.DRY_MASS
+        dry_mass = default_dry_mass(ctx.stage, ctx.config)
 
     _cfg = ctx.config
     _stage1_reserve = _cfg.stage1_landing_fuel_reserve_kg if _cfg is not None else None
@@ -316,6 +317,7 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         r=r,
         stage2_thrust_vac=_cfg.stage2_thrust_vac if _cfg is not None else None,
         stage2_isp_vac=_cfg.stage2_isp_vac if _cfg is not None else None,
+        stage1_thrust_n=_cfg.stage1_thrust_n if _cfg is not None else None,
     )
 
     from rlv_sim.physics.mass import compute_inertia_derivative

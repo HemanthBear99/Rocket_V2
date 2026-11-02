@@ -82,6 +82,7 @@ def compute_mass_flow_rate(
     r: np.ndarray = None,
     stage2_thrust_vac: float | None = None,
     stage2_isp_vac: float | None = None,
+    stage1_thrust_n: float | None = None,
 ) -> float:
     """
     Compute mass flow rate (negative while propellant is consumed).
@@ -103,6 +104,9 @@ def compute_mass_flow_rate(
     elif thrust_magnitude_override is not None:
         override_scale = float(thrust_magnitude_override) / max(C.THRUST_MAGNITUDE, 1e-9)
         mdot = C.MASS_FLOW_RATE * override_scale
+    elif stage1_thrust_n is not None:
+        # Same Isp as the reference flow, so configured thrust costs propellant.
+        mdot = float(stage1_thrust_n) / (C.ISP * C.G0)
     else:
         mdot = C.MASS_FLOW_RATE
 
@@ -122,12 +126,14 @@ def compute_mass_derivative(
     r: np.ndarray = None,
     stage2_thrust_vac: float | None = None,
     stage2_isp_vac: float | None = None,
+    stage1_thrust_n: float | None = None,
+    config=None,
 ) -> float:
     """
     Compute dm/dt with dry-mass floor enforcement.
     """
     if dry_mass is None:
-        dry_mass = C.STAGE2_DRY_MASS if stage == 2 else C.DRY_MASS
+        dry_mass = default_dry_mass(stage, config)
 
     propellant_remaining = m - dry_mass
     if propellant_remaining <= 0.0 or not thrust_on or throttle <= 0.0:
@@ -142,7 +148,17 @@ def compute_mass_derivative(
         r=r,
         stage2_thrust_vac=stage2_thrust_vac,
         stage2_isp_vac=stage2_isp_vac,
+        stage1_thrust_n=stage1_thrust_n,
     )
+
+
+def default_dry_mass(stage: int, config=None) -> float:
+    """Mass floor when a caller gives none: stage-1 burnout (stage 2 still
+    full) for stage 1, stage 2 empty for stage 2; payload stays aboard."""
+    s1_dry, _, s2_dry, s2_prop, payload = _vehicle_masses(config)
+    if stage == 2:
+        return s2_dry + payload
+    return s1_dry + s2_dry + s2_prop + payload
 
 
 def is_propellant_exhausted(m: float, dry_mass: float = C.DRY_MASS) -> bool:
@@ -187,7 +203,13 @@ def compute_center_of_mass(
     model = (vehicle_model or "stacked").lower()
 
     if model == "orbiter":
-        return 58.0 + _orbiter_propellant_fraction(m, config) * 5.0
+        # Same component stations as the stack, so the CG is continuous at
+        # separation and moves the right way as stage-2 propellant burns.
+        _, _, s2_dry, s2_prop_full, payload = _vehicle_masses(config)
+        s2_prop = _orbiter_propellant_fraction(m, config) * s2_prop_full
+        masses = np.array([s2_dry, s2_prop, payload], dtype=float)
+        stations = np.array([S2_DRY_CG_Z, S2_PROP_CG_Z, PAYLOAD_CG_Z], dtype=float)
+        return float(np.dot(masses, stations) / max(float(np.sum(masses)), 1.0))
 
     if model == "booster":
         s1_frac, _ = _booster_reserve_fraction(m, stage1_landing_reserve_kg, config)

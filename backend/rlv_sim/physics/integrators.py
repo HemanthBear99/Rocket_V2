@@ -18,7 +18,7 @@ from rlv_sim.core import constants as C
 from rlv_sim.core.frames import quaternion_normalize
 from rlv_sim.core.state import State
 from rlv_sim.physics.dynamics import DynamicsContext, state_derivative_vector
-from rlv_sim.physics.mass import compute_mass_derivative
+from rlv_sim.physics.mass import compute_mass_derivative, default_dry_mass
 
 
 def rk4_step(state: State, torque: np.ndarray, dt: float,
@@ -53,7 +53,7 @@ def rk4_step(state: State, torque: np.ndarray, dt: float,
 
     dry_mass = ctx.dry_mass
     if dry_mass is None:
-        dry_mass = C.STAGE2_DRY_MASS if ctx.stage == 2 else C.DRY_MASS
+        dry_mass = default_dry_mass(ctx.stage, ctx.config)
 
     if dt <= 0:
         raise ValueError(f"Time step dt must be positive, got {dt}")
@@ -75,6 +75,7 @@ def rk4_step(state: State, torque: np.ndarray, dt: float,
             isp_scale=_cfg.runtime_isp_scale if _cfg is not None else 1.0,
             stage2_thrust_vac=_cfg.stage2_thrust_vac if _cfg is not None else None,
             stage2_isp_vac=_cfg.stage2_isp_vac if _cfg is not None else None,
+            stage1_thrust_n=_cfg.stage1_thrust_n if _cfg is not None else None,
         )
         if mdot_now < 0.0 and state.m + mdot_now * dt < dry_mass:
             t_to_dry = (state.m - dry_mass) / (-mdot_now)

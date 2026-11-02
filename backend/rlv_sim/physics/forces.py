@@ -1183,7 +1183,8 @@ def _compute_force_breakdown(
         _deck_fin_deg = 0.0
         if getattr(config, 'aero_deck_path', None):
             _R = quaternion_to_rotation_matrix(q)
-            _v_body = _R.T @ (v - cross3(np.array([0.0, 0.0, C.EARTH_ROTATION_RATE]), r))
+            # Wind-relative, as lift and moment use, so drag sees the same alpha.
+            _v_body = _R.T @ compute_relative_velocity(r, v, wind_offset_mps=wind_offset_mps)
             _v_t = float(np.hypot(_v_body[0], _v_body[1]))
             _deck_alpha_deg = float(
                 np.degrees(np.arctan2(_v_t, max(abs(_v_body[2]), 1e-9)))
