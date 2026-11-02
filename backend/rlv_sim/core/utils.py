@@ -56,6 +56,11 @@ def wind_profile_context(modes):
         _WIND_PROFILE_MODES.reset(token)
 
 
+def wind_profile_active() -> bool:
+    """True while a run's wind-profile perturbation modes are active."""
+    return bool(_WIND_PROFILE_MODES.get())
+
+
 def wind_profile_perturbation(alt: float) -> float:
     """Altitude-dependent wind-speed perturbation (m/s) for the active run."""
     modes = _WIND_PROFILE_MODES.get()

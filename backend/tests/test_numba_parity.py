@@ -43,7 +43,6 @@ def test_impact_predictor_kernel_matches_python(monkeypatch, mass_kg):
     assert compiled[1] == pytest.approx(reference[1], abs=1e-6)
 
 
-@pytest.mark.xfail(strict=True, reason="RC8: compiled predictor omits runtime wind-profile modes")
 def test_impact_predictor_kernel_matches_python_with_wind_modes(monkeypatch):
     with utils.wind_profile_context(((8.0, 3000.0, 0.4),)):
         compiled = _predict(30_000.0)

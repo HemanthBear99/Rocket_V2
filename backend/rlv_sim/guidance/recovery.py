@@ -305,9 +305,14 @@ def compute_entry_energy_speed_gate(config: SimulationConfig) -> float:
 
 
 def _predictor_kernel_supported(include_drag: bool, config) -> bool:
-    """The compiled predictor models the analytic Cd(Mach) drag path only."""
+    """The compiled predictor models the analytic Cd(Mach) drag path only,
+    without the per-run wind-profile modes (those fall back to Python)."""
     if not include_drag:
         return True
+    from rlv_sim.core.utils import wind_profile_active
+
+    if wind_profile_active():
+        return False
     from rlv_sim.physics.forces import _get_aero_db
 
     path = getattr(config, "aero_deck_path", None) if config else None
