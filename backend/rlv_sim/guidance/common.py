@@ -164,7 +164,7 @@ def gamma_profile_from_altitude(
     turn_start_alt = (
         float(config.gravity_turn_start_altitude)
         if config is not None
-        else 500.0
+        else C.GRAVITY_TURN_START_ALTITUDE
     )
     transition_range = (
         float(config.gravity_turn_transition_range)

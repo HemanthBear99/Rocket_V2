@@ -313,6 +313,9 @@ def _predictor_kernel_supported(include_drag: bool, config) -> bool:
 
     if wind_profile_active():
         return False
+    # The kernel applies only the density scale, not the GRAM latitude modifier.
+    if bool(getattr(config, "enable_high_fidelity_gram", False)):
+        return False
     from rlv_sim.physics.forces import _get_aero_db
 
     path = getattr(config, "aero_deck_path", None) if config else None
@@ -799,6 +802,7 @@ def estimate_booster_touchdown_time(
     mass_kg: float,
     thrust_newton: float,
     safety_factor: float = 1.5,
+    dry_mass_kg: float | None = None,
 ) -> float:
     """
     Estimate remaining booster time-to-touchdown for pad-target prediction.
@@ -838,6 +842,7 @@ def estimate_booster_touchdown_time(
         mass_kg,
         thrust_newton,
         safety_factor=safety_factor,
+        dry_mass_kg=dry_mass_kg,
     )
     ignition_altitude = max(float(burn['burn_altitude']) * safety_factor, 0.0)
 

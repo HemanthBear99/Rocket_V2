@@ -580,6 +580,7 @@ def _check_runtime_safety_limits(
                     if bool(getattr(config, 'enable_atmosphere', True))
                     else 0.0
                 ),
+                config=config,
             )
             if abort_result.get('abort'):
                 return (

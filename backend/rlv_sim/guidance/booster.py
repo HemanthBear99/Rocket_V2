@@ -693,7 +693,9 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
                 # over the powered (braked) time to touchdown.
                 t_go_capture = float(np.clip(
                     estimate_booster_touchdown_time(
-                        ctx.r, ctx.v, ctx.m, cfg.landing_thrust_n, safety_factor=1.0,
+                        ctx.r, ctx.v, ctx.m,
+                        cfg.landing_thrust_n * cfg.runtime_thrust_scale, safety_factor=1.0,
+                        dry_mass_kg=cfg.stage1_dry_mass,
                     ),
                     8.0,
                     180.0,
@@ -956,7 +958,8 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
     v_horiz_mag = float(vec_norm(v_horiz_vec))
 
     g_loc = float(C.MU_EARTH / (float(vec_norm(ctx.r)) ** 2))
-    t_accel = float(cfg.landing_thrust_n / max(ctx.m, 1.0))
+    landing_thrust = float(cfg.landing_thrust_n) * float(cfg.runtime_thrust_scale)
+    t_accel = float(landing_thrust / max(ctx.m, 1.0))
     h = max(ctx.altitude, 0.5)
 
     target_descent_ceiling = 4.2 if near_pad_rtls else 3.0
@@ -980,8 +983,9 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
             ctx.r,
             ctx.v,
             ctx.m,
-            cfg.landing_thrust_n,
+            landing_thrust,
             safety_factor=1.0,
+            dry_mass_kg=cfg.stage1_dry_mass,
         ),
         1.0,
     )
@@ -1079,7 +1083,9 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
             max(a_horiz_budget, min(35.0, 0.75 * t_accel)),
         )
         a_horiz_budget *= landing_reserve_authority
-    reachable_distance = v_horiz_mag * t_go + 0.5 * a_horiz_budget * (t_go ** 2)
+    # Only motion toward the pad helps reach it.
+    closing_speed = max(float(np.dot(v_horiz_site, r_err_horiz)) / max(pad_error_m, 1e-9), 0.0)
+    reachable_distance = closing_speed * t_go + 0.5 * a_horiz_budget * (t_go ** 2)
     pad_reachable = pad_error_m <= max(350.0, reachable_distance)
 
     if not pad_reachable and not terminal_inside_pad_capture:
@@ -1087,6 +1093,7 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         if landing_vertical_priority:
             divert_fraction *= 0.25
         a_horiz_budget = min(a_avail_horiz, max(a_vert_for_budget, g_loc) * divert_fraction)
+        a_horiz_budget *= landing_reserve_authority
 
     t_stop = float(np.clip(
         t_go,
@@ -1236,8 +1243,9 @@ def compute_booster_guidance(
     landing_margin = cfg.booster_landing_propellant_margin_kg
     target_downrange_km = cfg.booster_landing_target_downrange_km
     burn_prediction = estimate_suicide_burn(
-        r, v, m, cfg.landing_planning_thrust_n,
+        r, v, m, cfg.landing_planning_thrust_n * cfg.runtime_thrust_scale,
         safety_factor=cfg.booster_landing_ignition_safety_factor,
+        dry_mass_kg=cfg.stage1_dry_mass,
     )
     ctx = _BoosterContext(
         r=r,

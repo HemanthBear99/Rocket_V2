@@ -15,7 +15,10 @@ from rlv_sim.core.utils import (
     compute_relative_velocity,
     vec_norm,
 )
-from rlv_sim.physics.forces import compute_atmosphere_properties
+from rlv_sim.physics.forces import (
+    compute_atmosphere_properties,
+    compute_configured_atmosphere_properties,
+)
 
 
 class AbortMonitor:
@@ -43,7 +46,8 @@ class AbortMonitor:
               attitude_error_rad: float = 0.0,
               wind_offset_mps: float = 0.0,
               enable_upper_atmosphere: bool = False,
-              atmosphere_density_scale: float = 1.0) -> dict:
+              atmosphere_density_scale: float = 1.0,
+              config=None) -> dict:
         """
         Check for abort conditions.
 
@@ -105,8 +109,12 @@ class AbortMonitor:
         altitude = float(vec_norm(r) - C.R_EARTH)
         v_rel = compute_relative_velocity(r, v, wind_offset_mps=wind_offset_mps)
         v_rel_mag = float(vec_norm(v_rel))
-        _, _, rho, _ = compute_atmosphere_properties(altitude, enable_upper_atm=enable_upper_atmosphere)
-        rho *= float(atmosphere_density_scale)
+        if config is not None:
+            # Same atmosphere (incl. GRAM modifier) the vehicle's guidance and physics see.
+            _, _, rho, _ = compute_configured_atmosphere_properties(altitude, config, r=r)
+        else:
+            _, _, rho, _ = compute_atmosphere_properties(altitude, enable_upper_atm=enable_upper_atmosphere)
+            rho *= float(atmosphere_density_scale)
 
         from rlv_sim.core.frames import rotate_vector_by_quaternion
         body_z = rotate_vector_by_quaternion(C.BODY_Z_AXIS, q)
