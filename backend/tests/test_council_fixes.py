@@ -30,11 +30,11 @@ def test_stage1_flow_follows_configured_thrust():
     assert doubled == pytest.approx(2.0 * base)
 
 
-def test_mass_dispersion_is_structure_not_propellant():
+def test_mass_dispersion_is_propellant_load():
     nominal = create_test_config()
     heavy = create_test_config(runtime_initial_mass_offset_kg=5000.0)
-    # The MECO floor rises with the offset, so ascent propellant is unchanged.
-    assert heavy.meco_mass_kg - nominal.meco_mass_kg == pytest.approx(5000.0)
+    # A loading error changes the burn, not the MECO mass or the booster's reserve.
+    assert heavy.meco_mass_kg == pytest.approx(nominal.meco_mass_kg)
 
 
 def test_orbiter_cg_continues_the_stack_stations():

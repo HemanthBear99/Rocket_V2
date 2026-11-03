@@ -444,15 +444,14 @@ class SimulationConfig:
     def meco_mass_kg(self) -> float:
         """Stacked-vehicle mass at main-engine cutoff.
 
-        Stage 1 dry + stage 2 wet + payload + the stage 1 landing reserve,
-        plus runtime_initial_mass_offset_kg: a mass dispersion is structure
-        carried by stage 1, not extra ascent propellant.
+        Stage 1 dry + stage 2 wet + payload + the stage 1 landing reserve.
+        Fixed: runtime_initial_mass_offset_kg is a propellant-loading error,
+        so it changes how long stage 1 burns, not where MECO falls.
         Single source of truth for ascent guidance, the mission manager and
         the ascent loop's dry-mass floor.
         """
         return (
-            float(self.runtime_initial_mass_offset_kg)
-            + float(self.stage1_dry_mass)
+            float(self.stage1_dry_mass)
             + float(self.stage2_dry_mass)
             + float(self.stage2_prop_mass)
             + float(self.payload_mass)
@@ -696,7 +695,7 @@ class SimulationConfig:
         )
         if liftoff_mass + self.runtime_initial_mass_offset_kg < self.meco_mass_kg:
             errors.append(
-                "stage masses leave no ascent propellant above MECO mass"
+                "runtime_initial_mass_offset_kg leaves no ascent propellant above MECO mass"
             )
 
         if errors:
