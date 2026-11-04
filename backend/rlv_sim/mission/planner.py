@@ -49,6 +49,43 @@ def wind_reserve_adjustment_kg(config: SimulationConfig, wind_offset_mps: float 
     return float(config.recovery_reserve_wind_sensitivity_kg_per_mps) * max(-wind, 0.0)
 
 
+def compute_stage2_propellant_needed(config: SimulationConfig) -> float:
+    """Solve for the Stage-2 propellant load that achieves orbital delta-v."""
+    isp_scale = float(config.runtime_isp_scale)
+    s1_dry = float(config.stage1_dry_mass)
+    s2_dry = float(config.stage2_dry_mass)
+    payload = float(config.payload_mass)
+    s1_prop_ascent = float(config.stage1_prop_mass) - float(config.stage1_landing_fuel_reserve_kg)
+    s1_isp = 0.5 * (float(config.stage1_isp_sl) + float(config.stage1_isp_vac)) * isp_scale
+    s2_isp_vac = float(config.stage2_isp_vac) * isp_scale
+
+    r_orbit = C.R_EARTH + float(config.orbit_target_altitude_m)
+    v_circ = math.sqrt(C.MU_EARTH / r_orbit)
+    v_rot = C.EARTH_ROTATION_RATE * C.R_EARTH * math.cos(math.radians(float(config.launch_site_lat_deg)))
+    dv_required = v_circ + ASCENT_LOSSES_MPS - v_rot
+
+    def total_dv(s2_prop: float) -> float:
+        meco = s1_dry + float(config.stage1_landing_fuel_reserve_kg) + s2_dry + s2_prop + payload
+        m0 = meco + s1_prop_ascent + float(config.runtime_initial_mass_offset_kg)
+        dv1 = s1_isp * G0 * math.log(m0 / max(meco, 1.0))
+        s2_final = s2_dry + payload + float(config.s2_landing_propellant_reserve_kg)
+        dv2 = s2_isp_vac * G0 * math.log(max(s2_dry + s2_prop + payload, 1.0) / max(s2_final, 1.0))
+        return dv1 + dv2
+
+    low = float(config.stage2_prop_mass)
+    if total_dv(low) >= dv_required:
+        return low
+
+    high = low * 3.0
+    for _ in range(40):
+        mid = 0.5 * (low + high)
+        if total_dv(mid) < dv_required:
+            low = mid
+        else:
+            high = mid
+    return float(math.ceil(high))
+
+
 def _status(value: float, required: float, warn_band: float) -> str:
     if value < required:
         return "fail"
@@ -80,11 +117,22 @@ def plan_mission(config: SimulationConfig) -> dict:
 
     twr = config.stage1_thrust_n * float(config.runtime_thrust_scale) / (m0 * G0)
 
+    orbit_delta_v = dv_s1 + dv_s2
+    s2_needed = compute_stage2_propellant_needed(config)
+    orbit_msg = (
+        f"Stack delta-v {orbit_delta_v:.0f} m/s vs {dv_required:.0f} m/s to reach "
+        f"{config.orbit_target_altitude_m / 1000:.0f} km"
+    )
+    if orbit_delta_v < dv_required:
+        extra_s2 = s2_needed - float(config.stage2_prop_mass)
+        orbit_msg += (
+            f" (propose: increase stage2_prop_mass to {s2_needed / 1000:.1f} t, +{extra_s2 / 1000:.1f} t)"
+        )
+
     checks = [
-        Check("orbit_delta_v", dv_s1 + dv_s2, dv_required, "m/s",
-              _status(dv_s1 + dv_s2, dv_required, MARGIN_WARN_MPS),
-              f"Stack delta-v {dv_s1 + dv_s2:.0f} m/s vs {dv_required:.0f} m/s to reach "
-              f"{config.orbit_target_altitude_m / 1000:.0f} km"),
+        Check("orbit_delta_v", orbit_delta_v, dv_required, "m/s",
+              _status(orbit_delta_v, dv_required, MARGIN_WARN_MPS),
+              orbit_msg),
         Check("liftoff_twr", twr, MIN_LIFTOFF_TWR, "",
               _status(twr, MIN_LIFTOFF_TWR, 0.1),
               f"Liftoff thrust-to-weight {twr:.2f} (min {MIN_LIFTOFF_TWR})"),
@@ -102,5 +150,6 @@ def plan_mission(config: SimulationConfig) -> dict:
         "stage2_delta_v_mps": dv_s2,
         "liftoff_mass_kg": m0,
         "sized_recovery_reserve_kg": size_recovery_reserve(config),
+        "suggested_stage2_prop_mass_kg": s2_needed if orbit_delta_v < dv_required else None,
         "checks": [asdict(c) for c in checks],
     }

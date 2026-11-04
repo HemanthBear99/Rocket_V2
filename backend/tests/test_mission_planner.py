@@ -38,3 +38,19 @@ def test_auto_sized_reserve_tracks_vehicle_dry_mass():
     heavy = create_default_config(stage1_dry_mass=26000.0, auto_size_recovery_reserve=True)
     assert heavy.stage1_landing_fuel_reserve_kg > ref.stage1_landing_fuel_reserve_kg
     assert plan_mission(heavy)["checks"][2]["status"] == "ok"
+
+
+def test_heavy_payload_proposes_stage2_resize():
+    """12 t payload fails orbit check and planner proposes resizing Stage 2 propellant."""
+    cfg = create_default_config(payload_mass=12000.0)
+    res = plan_mission(cfg)
+    assert res["verdict"] == "fail"
+    s2_sug = res["suggested_stage2_prop_mass_kg"]
+    assert s2_sug is not None and s2_sug > cfg.stage2_prop_mass
+    assert "propose: increase stage2_prop_mass" in res["checks"][0]["message"]
+
+    # Applying the suggested Stage-2 propellant load meets the required orbital delta-v
+    fixed_cfg = create_default_config(payload_mass=12000.0, stage2_prop_mass=s2_sug)
+    fixed_res = plan_mission(fixed_cfg)
+    assert fixed_res["checks"][0]["status"] != "fail"
+    assert fixed_res["checks"][0]["value"] >= fixed_res["checks"][0]["required"]

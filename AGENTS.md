@@ -74,7 +74,7 @@ Config: `rlv_sim/config/definition.py` (frozen dataclass, validated) + `rlv_sim/
 1. ~~Rebuild the exe and installer~~ — done 2026-10-23 (`Vyom.exe` + `VyomSetup-0.3.0.exe`, smoke-tested).
 2. Make landing guidance robust with realistic descent drag (scale 0.68) so it can become default (target ≥94% MC; now 88%: tailwind cases arrive 100–380 m off target at 250 m).
 3. ~~Adaptive recovery reserve~~ — done (wind-aware reserve, 383 kg per m/s headwind).
-4. Stage-2 sizing in the mission planner (12 t payload currently fails; planner should propose the fix).
+4. ~~Stage-2 sizing in the mission planner~~ — done (planner calculates required Stage-2 propellant and proposes fix).
 5. Website: real app screenshots/recording section, Open Graph image, Vercel deploy.
 6. Code-signing certificate (owner to buy) → sign exe/installer in the build.
 7. Larger: entry/landing redesign (short hard entry burn) to close the Falcon 9 timing gap; more vehicle types
