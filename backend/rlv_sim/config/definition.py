@@ -202,6 +202,10 @@ class SimulationConfig:
     landing_engine_count: int = C.LANDING_ENGINE_COUNT
     vehicle_diameter_m: float = C.REFERENCE_DIAMETER
     stage2_isp_vac: float = C.STAGE2_ISP_VAC
+    # Stage-1 engine Isp at sea level and in vacuum; thrust between them
+    # follows ambient pressure, and propellant flow is thrust_sl / (isp_sl*g0).
+    stage1_isp_sl: float = C.ISP
+    stage1_isp_vac: float = C.ISP_VAC
     target_inclination_deg: float = 28.5
 
     booster_boostback_budget_kg: float = 43000.0
@@ -501,6 +505,8 @@ class SimulationConfig:
             ("payload_mass", "nonneg"),
             ("stage2_thrust_vac", "positive"),
             ("stage2_isp_vac", "positive"),
+            ("stage1_isp_sl", "positive"),
+            ("stage1_isp_vac", "positive"),
         ))
         if not (0.0 <= self.max_gimbal_angle_deg <= 30.0):
             errors.append(f"max_gimbal_angle_deg must be in [0, 30], got {self.max_gimbal_angle_deg}")

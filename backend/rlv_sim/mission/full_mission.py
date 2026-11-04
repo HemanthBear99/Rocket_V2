@@ -94,7 +94,7 @@ def _step_vehicle(state, actuator, mgr, gs, log, abort_monitor, config, max_time
         state, actuator, mgr, step_dt,
         dry_mass=dry_mass, stage=stage,
         vehicle_model=vehicle_model, gs=gs,
-        config=wind_cfg,
+        config=wind_cfg, guidance_config=config,
     )
     log.append(new_state, guid, ctrl)
     safety_reason = _check_runtime_safety_limits(
@@ -298,7 +298,7 @@ def _run_ascent(rt: _MissionRuntime) -> _AscentOutcome:
             state, actuator, mission_mgr, step_dt,
             dry_mass=current_dry_mass, stage=current_stage,
             vehicle_model="stacked", gs=gs_ascent,
-            config=step_config,
+            config=step_config, guidance_config=config,
         )
         ascent_log.append(state, guid_out, ctrl_out)
         _emit(MissionProgress(

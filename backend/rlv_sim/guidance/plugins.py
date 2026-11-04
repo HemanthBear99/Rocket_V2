@@ -156,8 +156,8 @@ def _describe(path: Path, name: str) -> dict[str, Any]:
               and isinstance(node.targets[0], ast.Name)):
             try:
                 value = ast.literal_eval(node.value)
-            except ValueError:
-                continue
+            except (ValueError, TypeError, SyntaxError, RecursionError, MemoryError):
+                continue  # not a plain literal: a bad plugin must not break the listing
             if isinstance(value, str):
                 strings[node.targets[0].id] = value
     error = None if has_command else f"Guidance plugin {name!r} has no landing_command(state) function"

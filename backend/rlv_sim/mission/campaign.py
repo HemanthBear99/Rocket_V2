@@ -331,8 +331,9 @@ def _max_aoa_above_dynamic_pressure(
 
 def _run_case(base: SimulationConfig, case: dict[str, Any]) -> dict[str, Any]:
     started = time.perf_counter()
-    config = apply_case(base, case)
+    config = base
     try:
+        config = apply_case(base, case)
         result = run_full_mission(config=config, verbose=False)
         assessment = assess_full_mission(result, config)
         touchdown_site = target_landing_site_eci(

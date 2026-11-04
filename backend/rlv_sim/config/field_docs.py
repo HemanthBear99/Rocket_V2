@@ -104,7 +104,8 @@ FIELD_DOCS: dict[str, str] = {
         "Geodetic longitude of the launch site, which sets the starting position on the Earth model."
     ),
     "launch_site_altitude_m": (
-        "Height of the launch pad above the reference Earth surface at the launch site."
+        "Launch pad height above sea level. Must be 0: the simulator models a single sea-level "
+        "surface, and validation rejects other values."
     ),
     "orbit_target_altitude_m": (
         "Target circular orbit altitude that orbit insertion aims to reach."
@@ -183,6 +184,12 @@ FIELD_DOCS: dict[str, str] = {
     ),
     "vehicle_diameter_m": (
         "Outer diameter of the vehicle, which sets the reference area for drag and lift."
+    ),
+    "stage1_isp_sl": (
+        "Stage-1 engine specific impulse at sea level; sets propellant flow for a given thrust."
+    ),
+    "stage1_isp_vac": (
+        "Stage-1 engine specific impulse in vacuum; thrust rises toward this as ambient pressure falls."
     ),
     "stage2_isp_vac": (
         "Vacuum specific impulse of the upper stage engine, which sets how much velocity each unit of "
@@ -316,7 +323,8 @@ FIELD_DOCS: dict[str, str] = {
         "Longitude of a custom booster landing site; leave empty to use the default landing target."
     ),
     "booster_landing_site_altitude_m": (
-        "Ground altitude of the custom booster landing site."
+        "Ground altitude of the custom booster landing site. Must be 0: the simulator models a "
+        "single sea-level surface, and validation rejects other values."
     ),
     "tvc_lever_arm_m": (
         "Distance from the engine gimbal plane to the vehicle centre of mass, which sets thrust- "

@@ -95,7 +95,7 @@ def compute_q_hold_throttle(r, v, v_rel, m, q_dyn, q_rate, config):
     a_cmd = a_req + g * v_vert / speed + drag / max(m, 1.0)
     # Available thrust at this altitude (pressure-compensated stage 1).
     thrust_sl = float(config.stage1_thrust_n) * float(config.runtime_thrust_scale)
-    thrust_vac = thrust_sl * C.ISP_VAC / C.ISP
+    thrust_vac = thrust_sl * float(config.stage1_isp_vac) / float(config.stage1_isp_sl)
     thrust = thrust_sl + (thrust_vac - thrust_sl) * max(0.0, 1.0 - pressure / C.ATM_P0)
     throttle = a_cmd * max(m, 1.0) / max(thrust, 1.0)
     return float(np.clip(throttle, min_throttle, max_throttle)), q_predicted

@@ -137,7 +137,9 @@
     if (!res.ok) {
       let detail = res.statusText;
       try { const j = await res.json(); detail = j.detail || JSON.stringify(j); } catch (_) {}
-      throw new Error(detail);
+      const err = new Error(detail);
+      err.status = res.status;
+      throw err;
     }
     return res.json();
   }
@@ -1813,7 +1815,15 @@
     fd.append('file', file);
     const name = $('#aero-import-name').value.trim();
     try {
-      const r = await api('/api/aero/import' + (name ? `?name=${encodeURIComponent(name)}` : ''), { method: 'POST', body: fd });
+      const url = '/api/aero/import' + (name ? `?name=${encodeURIComponent(name)}` : '');
+      let r;
+      try {
+        r = await api(url, { method: 'POST', body: fd });
+      } catch (err) {
+        // A deck with this name exists and saved scenarios may use it: replace only on confirmation.
+        if (err.status !== 409 || !window.confirm(`${err.message}. Replace it?`)) throw err;
+        r = await api(url + (name ? '&' : '?') + 'overwrite=true', { method: 'POST', body: fd });
+      }
       $('#aero-import-results').style.display = 'block';
       const failed = r.checks.filter((c) => !c.passed);
       $('#aero-import-warnings').innerHTML =

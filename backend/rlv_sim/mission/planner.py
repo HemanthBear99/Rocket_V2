@@ -37,7 +37,7 @@ class Check:
 
 def size_recovery_reserve(config: SimulationConfig) -> float:
     """Stage-1 propellant to hold back at MECO for a full RTLS of this vehicle."""
-    isp = C.ISP_VAC * float(config.runtime_isp_scale) * G0
+    isp = float(config.stage1_isp_vac) * float(config.runtime_isp_scale) * G0
     end = float(config.stage1_dry_mass) + float(config.booster_landing_reserve_kg)
     dv = RECOVERY_DV_REQUIRED_MPS + RECOVERY_DV_MARGIN_MPS
     return end * math.exp(dv / isp) - float(config.stage1_dry_mass)
@@ -64,7 +64,7 @@ def plan_mission(config: SimulationConfig) -> dict:
     m0 = (s1_dry + float(config.stage1_prop_mass) + s2_wet + payload
           + float(config.runtime_initial_mass_offset_kg))
 
-    s1_isp = 0.5 * (C.ISP + C.ISP_VAC) * isp_scale
+    s1_isp = 0.5 * (float(config.stage1_isp_sl) + float(config.stage1_isp_vac)) * isp_scale
     dv_s1 = s1_isp * G0 * math.log(m0 / config.meco_mass_kg)
     s2_final = float(config.stage2_dry_mass) + payload + float(config.s2_landing_propellant_reserve_kg)
     dv_s2 = float(config.stage2_isp_vac) * isp_scale * G0 * math.log((s2_wet + payload) / s2_final)
@@ -76,7 +76,7 @@ def plan_mission(config: SimulationConfig) -> dict:
 
     rec_start = s1_dry + float(config.stage1_landing_fuel_reserve_kg)
     rec_end = s1_dry + float(config.booster_landing_reserve_kg)
-    dv_recovery = C.ISP_VAC * isp_scale * G0 * math.log(rec_start / max(rec_end, 1.0))
+    dv_recovery = float(config.stage1_isp_vac) * isp_scale * G0 * math.log(rec_start / max(rec_end, 1.0))
 
     twr = config.stage1_thrust_n * float(config.runtime_thrust_scale) / (m0 * G0)
 

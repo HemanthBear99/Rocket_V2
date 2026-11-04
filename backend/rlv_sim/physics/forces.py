@@ -909,8 +909,9 @@ def compute_thrust_force(q: np.ndarray, r: np.ndarray, thrust_on: bool = True, t
             else (float(config.stage1_thrust_n) if config is not None else C.THRUST_MAGNITUDE)
         )
         thrust_sl *= float(thrust_scale)
-        pressure_thrust_scale = thrust_sl / max(C.THRUST_MAGNITUDE, 1e-9)
-        thrust_vac = pressure_thrust_scale * C.MASS_FLOW_RATE * C.ISP_VAC * C.G0
+        isp_sl = float(config.stage1_isp_sl) if config is not None else C.ISP
+        isp_vac = float(config.stage1_isp_vac) if config is not None else C.ISP_VAC
+        thrust_vac = thrust_sl * isp_vac / max(isp_sl, 1e-9)
 
         pressure_ratio = float(np.clip(P_amb / P0, 0.0, 1.2))
         thrust_magnitude = thrust_vac - (thrust_vac - thrust_sl) * pressure_ratio

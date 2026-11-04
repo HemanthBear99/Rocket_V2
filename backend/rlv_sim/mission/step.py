@@ -12,6 +12,7 @@ from rlv_sim.core.frames import rotate_vector_by_quaternion
 from rlv_sim.core.state import State
 from rlv_sim.core.utils import (
     axisymmetric_angle_of_attack,
+    compute_ground_relative_velocity,
     compute_relative_velocity,
     surface_relative_speed,
     vec_norm,
@@ -415,12 +416,8 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
     if phase == MissionPhase.S2_LANDING and state.altitude <= 0.1:
         if cfg is None:
             raise RuntimeError("S2 landing termination requires SimulationConfig")
-        v_touchdown = float(vec_norm(
-            compute_relative_velocity(
-                state.r, state.v,
-                wind_offset_mps=cfg.runtime_wind_offset_mps if cfg is not None else 0.0,
-            )
-        ))
+        # Speed against the ground (what the legs feel), not airspeed.
+        v_touchdown = float(vec_norm(compute_ground_relative_velocity(state.r, state.v)))
         downrange_km = great_circle_distance_m(
             state.r, rotating_launch_site_eci(state.t, config=cfg)
         ) / 1000.0
@@ -441,13 +438,9 @@ def check_termination(state: State, max_time: float, mission_mgr: MissionManager
         touchdown_tolerance_m = 0.1
         if phase == MissionPhase.BOOSTER_LANDING and state.altitude <= touchdown_tolerance_m:
             cfg = mission_mgr.config
-            v_touchdown_rel = float(vec_norm(
-                compute_relative_velocity(
-                    state.r,
-                    state.v,
-                    wind_offset_mps=cfg.runtime_wind_offset_mps,
-                )
-            ))
+            # Speed against the ground (what the legs feel), not airspeed; the
+            # same frame assess_touchdown_contact uses.
+            v_touchdown_rel = float(vec_norm(compute_ground_relative_velocity(state.r, state.v)))
             target_site = target_landing_site_eci(
                 state.t,
                 cfg.booster_landing_target_downrange_km,
@@ -622,10 +615,8 @@ def _thrust_magnitude(mission_mgr, phase, stage: int, vehicle_model: str,
 
 def _stage_max_torque(config: SimulationConfig, stage: int, vehicle_model: str,
                       s2_recovery_attitude: bool) -> float:
-    if s2_recovery_attitude:
-        return config.max_torque * (C.BOOSTER_MAX_TORQUE_NM / C.MAX_TORQUE)
-    if stage == 2:
-        return config.max_torque * (2.0e6 / C.MAX_TORQUE)
+    if s2_recovery_attitude or stage == 2:
+        return config.max_torque * (C.STAGE2_MAX_TORQUE_NM / C.MAX_TORQUE)
     if vehicle_model == "booster":
         return config.max_torque * (C.BOOSTER_MAX_TORQUE_NM / C.MAX_TORQUE)
     return config.max_torque
@@ -675,7 +666,8 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
                     dt: float, dry_mass: float = C.DRY_MASS, stage: int = 1,
                     vehicle_model: str = "stacked",
                     gs: GuidanceState | None = None,
-                    config: SimulationConfig | None = None) -> tuple:
+                    config: SimulationConfig | None = None,
+                    guidance_config: SimulationConfig | None = None) -> tuple:
     """
     Execute one complete simulation timestep.
 
@@ -706,7 +698,9 @@ def simulation_step(state: State, actuator: ActuatorState, mission_mgr: MissionM
     phase = mission_mgr.get_phase()
     stage1_landing_reserve_kg = config.stage1_landing_fuel_reserve_kg
 
-    guidance, gs = _run_guidance(state, gs, mission_mgr, config, dt)
+    # Guidance plans on the forecast (mean) wind; only the physics sees the
+    # per-step turbulence and gusts in `config`.
+    guidance, gs = _run_guidance(state, gs, mission_mgr, guidance_config or config, dt)
 
     guidance, gs, grid_fin_command = _run_booster_hardware(
         state, guidance, gs, mission_mgr, config, vehicle_model, dt,

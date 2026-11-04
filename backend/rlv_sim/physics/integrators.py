@@ -76,6 +76,7 @@ def rk4_step(state: State, torque: np.ndarray, dt: float,
             stage2_thrust_vac=_cfg.stage2_thrust_vac if _cfg is not None else None,
             stage2_isp_vac=_cfg.stage2_isp_vac if _cfg is not None else None,
             stage1_thrust_n=_cfg.stage1_thrust_n if _cfg is not None else None,
+            stage1_isp_sl=_cfg.stage1_isp_sl if _cfg is not None else None,
         )
         if mdot_now < 0.0 and state.m + mdot_now * dt < dry_mass:
             t_to_dry = (state.m - dry_mass) / (-mdot_now)

@@ -83,6 +83,7 @@ def compute_mass_flow_rate(
     stage2_thrust_vac: float | None = None,
     stage2_isp_vac: float | None = None,
     stage1_thrust_n: float | None = None,
+    stage1_isp_sl: float | None = None,
 ) -> float:
     """
     Compute mass flow rate (negative while propellant is consumed).
@@ -90,7 +91,7 @@ def compute_mass_flow_rate(
     Stage-2 mdot is always T/(Isp*g0) from the same thrust/Isp the force model
     uses, so effective Isp cannot drift from the configured vacuum Isp.
     """
-    if not thrust_on or throttle <= 0.0:
+    if not thrust_on or throttle < 0.01:
         return 0.0
 
     if stage == 2:
@@ -101,14 +102,15 @@ def compute_mass_flow_rate(
         )
         isp = float(stage2_isp_vac if stage2_isp_vac is not None else C.STAGE2_ISP_VAC)
         mdot = thrust / max(isp * C.G0, 1e-9)
-    elif thrust_magnitude_override is not None:
-        override_scale = float(thrust_magnitude_override) / max(C.THRUST_MAGNITUDE, 1e-9)
-        mdot = C.MASS_FLOW_RATE * override_scale
-    elif stage1_thrust_n is not None:
-        # Same Isp as the reference flow, so configured thrust costs propellant.
-        mdot = float(stage1_thrust_n) / (C.ISP * C.G0)
     else:
-        mdot = C.MASS_FLOW_RATE
+        if thrust_magnitude_override is not None:
+            thrust = float(thrust_magnitude_override)
+        elif stage1_thrust_n is not None:
+            thrust = float(stage1_thrust_n)
+        else:
+            thrust = C.THRUST_MAGNITUDE
+        isp_sl = float(stage1_isp_sl) if stage1_isp_sl is not None else C.ISP
+        mdot = thrust / max(isp_sl * C.G0, 1e-9)
 
     mdot *= float(thrust_scale) / max(float(isp_scale), 1e-9)
     return -mdot * float(np.clip(throttle, 0.0, 1.0))
@@ -128,6 +130,7 @@ def compute_mass_derivative(
     stage2_isp_vac: float | None = None,
     stage1_thrust_n: float | None = None,
     config=None,
+    stage1_isp_sl: float | None = None,
 ) -> float:
     """
     Compute dm/dt with dry-mass floor enforcement.
@@ -136,7 +139,7 @@ def compute_mass_derivative(
         dry_mass = default_dry_mass(stage, config)
 
     propellant_remaining = m - dry_mass
-    if propellant_remaining <= 0.0 or not thrust_on or throttle <= 0.0:
+    if propellant_remaining <= 0.0 or not thrust_on or throttle < 0.01:
         return 0.0
     return compute_mass_flow_rate(
         thrust_on=True,
@@ -149,6 +152,7 @@ def compute_mass_derivative(
         stage2_thrust_vac=stage2_thrust_vac,
         stage2_isp_vac=stage2_isp_vac,
         stage1_thrust_n=stage1_thrust_n,
+        stage1_isp_sl=stage1_isp_sl,
     )
 
 

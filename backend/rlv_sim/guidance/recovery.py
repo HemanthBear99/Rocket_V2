@@ -675,6 +675,7 @@ def estimate_suicide_burn(
     horizontal_weight: float = 1.0,
     isp: float | None = None,
     dry_mass_kg: float | None = None,
+    stage1_isp: tuple[float, float] | None = None,
 ) -> dict[str, float]:
     """
     Variable-mass landing ignition estimator.
@@ -709,7 +710,8 @@ def estimate_suicide_burn(
         from rlv_sim.physics.forces import compute_atmosphere_properties
         _, P_amb, _, _ = compute_atmosphere_properties(altitude)
         pressure_ratio = float(np.clip(P_amb / C.ATM_P0, 0.0, 1.2))
-        isp = C.ISP_VAC - (C.ISP_VAC - C.ISP) * pressure_ratio
+        isp_sl, isp_vac = stage1_isp if stage1_isp is not None else (C.ISP, C.ISP_VAC)
+        isp = isp_vac - (isp_vac - isp_sl) * pressure_ratio
     dry_mass = C.STAGE1_DRY_MASS if dry_mass_kg is None else float(dry_mass_kg)
 
     vertical = r / r_norm
@@ -803,6 +805,7 @@ def estimate_booster_touchdown_time(
     thrust_newton: float,
     safety_factor: float = 1.5,
     dry_mass_kg: float | None = None,
+    stage1_isp: tuple[float, float] | None = None,
 ) -> float:
     """
     Estimate remaining booster time-to-touchdown for pad-target prediction.
@@ -843,6 +846,7 @@ def estimate_booster_touchdown_time(
         thrust_newton,
         safety_factor=safety_factor,
         dry_mass_kg=dry_mass_kg,
+        stage1_isp=stage1_isp,
     )
     ignition_altitude = max(float(burn['burn_altitude']) * safety_factor, 0.0)
 

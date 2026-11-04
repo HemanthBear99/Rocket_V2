@@ -81,14 +81,15 @@ def _planner_mass_flow(
     r: np.ndarray | None = None,
     config: SimulationConfig | None = None,
 ) -> float:
-    scale = float(thrust_n) / max(float(C.THRUST_MAGNITUDE), 1e-9)
-    mdot = C.MASS_FLOW_RATE * scale * float(np.clip(throttle, 0.0, 1.0))
+    isp_sl = float(config.stage1_isp_sl) if config is not None else C.ISP
+    isp_vac = float(config.stage1_isp_vac) if config is not None else C.ISP_VAC
+    mdot = float(thrust_n) / (isp_sl * C.G0) * float(np.clip(throttle, 0.0, 1.0))
     if r is not None:
         altitude = float(vec_norm(r)) - C.R_EARTH
         _, P_amb, _, _ = compute_configured_atmosphere_properties(altitude, config)
         pressure_ratio = float(np.clip(P_amb / C.ATM_P0, 0.0, 1.2))
-        dynamic_isp = C.ISP_VAC - (C.ISP_VAC - C.ISP) * pressure_ratio
-        mdot *= C.ISP / max(dynamic_isp, 1e-9)
+        dynamic_isp = isp_vac - (isp_vac - isp_sl) * pressure_ratio
+        mdot *= isp_sl / max(dynamic_isp, 1e-9)
     return mdot
 
 
@@ -261,7 +262,8 @@ def score_recovery_candidates(
             )
             if best is None or candidate.score < best.score:
                 best = candidate
-    assert best is not None
+    if best is None:
+        raise RuntimeError("No valid candidate solution found")
     return best
 
 
@@ -696,6 +698,7 @@ def _entry_guidance(ctx: _BoosterContext) -> dict:
                         ctx.r, ctx.v, ctx.m,
                         cfg.landing_thrust_n * cfg.runtime_thrust_scale, safety_factor=1.0,
                         dry_mass_kg=cfg.stage1_dry_mass,
+                        stage1_isp=(cfg.stage1_isp_sl, cfg.stage1_isp_vac),
                     ),
                     8.0,
                     180.0,
@@ -986,6 +989,7 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
             landing_thrust,
             safety_factor=1.0,
             dry_mass_kg=cfg.stage1_dry_mass,
+            stage1_isp=(cfg.stage1_isp_sl, cfg.stage1_isp_vac),
         ),
         1.0,
     )
@@ -1060,6 +1064,7 @@ def _landing_guidance(ctx: _BoosterContext, gs: GuidanceState) -> dict:
         thrust_scale=cfg.runtime_thrust_scale,
         isp_scale=cfg.runtime_isp_scale,
         r=ctx.r,
+        stage1_isp_sl=cfg.stage1_isp_sl,
     )
     (
         landing_reserve_authority,
@@ -1246,6 +1251,7 @@ def compute_booster_guidance(
         r, v, m, cfg.landing_planning_thrust_n * cfg.runtime_thrust_scale,
         safety_factor=cfg.booster_landing_ignition_safety_factor,
         dry_mass_kg=cfg.stage1_dry_mass,
+        stage1_isp=(cfg.stage1_isp_sl, cfg.stage1_isp_vac),
     )
     ctx = _BoosterContext(
         r=r,

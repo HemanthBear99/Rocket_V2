@@ -126,6 +126,8 @@ MAX_TORQUE = 3.2e7
 
 
 BOOSTER_MAX_TORQUE_NM = 1.2e7
+# Stage-2 (orbiter) attitude torque authority at the reference max_torque.
+STAGE2_MAX_TORQUE_NM = 2.0e6
 
 # Controller gain-scheduling tuning knob for the recovered booster's attitude
 # control loop ONLY (see _simulation_step.py's control_inertia calculation).

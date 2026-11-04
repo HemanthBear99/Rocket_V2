@@ -318,6 +318,7 @@ def compute_state_derivative(r: np.ndarray, v: np.ndarray, q: np.ndarray,
         stage2_thrust_vac=_cfg.stage2_thrust_vac if _cfg is not None else None,
         stage2_isp_vac=_cfg.stage2_isp_vac if _cfg is not None else None,
         stage1_thrust_n=_cfg.stage1_thrust_n if _cfg is not None else None,
+        stage1_isp_sl=_cfg.stage1_isp_sl if _cfg is not None else None,
     )
 
     from rlv_sim.physics.mass import compute_inertia_derivative

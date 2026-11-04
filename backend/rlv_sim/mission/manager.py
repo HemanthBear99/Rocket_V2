@@ -164,6 +164,7 @@ class MissionManager:
             self.config.landing_planning_thrust_n * self.config.runtime_thrust_scale,
             safety_factor=self.config.booster_landing_ignition_safety_factor,
             dry_mass_kg=self.config.stage1_dry_mass,
+            stage1_isp=(self.config.stage1_isp_sl, self.config.stage1_isp_vac),
         )
         h_ignite = float(burn['burn_altitude'])
         return min(
@@ -543,6 +544,7 @@ class MissionManager:
             self.config.landing_planning_thrust_n * self.config.runtime_thrust_scale,
             safety_factor=self.config.booster_landing_ignition_safety_factor,
             dry_mass_kg=self.config.stage1_dry_mass,
+            stage1_isp=(self.config.stage1_isp_sl, self.config.stage1_isp_vac),
         )
         h_ignite = float(burn['burn_altitude'])
 

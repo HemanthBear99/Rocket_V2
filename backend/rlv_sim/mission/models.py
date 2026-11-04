@@ -104,11 +104,14 @@ class SimulationLog:
         throttle_val = float(guidance.get('throttle', 1.0))
         thrust_on_val = bool(guidance.get('thrust_on', True))
         phase_str = str(guidance.get('phase', ''))
-        is_s2_phase = phase_str in ('ORBIT_INSERTION', 'COAST_PHASE') and state.m < C.STAGE2_WET_MASS * 1.1
-        thrust_mag_nominal = float(guidance.get(
-            'thrust_magnitude_n',
-            C.STAGE2_THRUST if is_s2_phase else C.THRUST_MAGNITUDE,
-        ))
+        # Fallback only when guidance omitted thrust: the configured engine of
+        # the stage that is flying (simulation_step records the stage).
+        cfg = getattr(state, 'sim_config', None)
+        if int(guidance.get('stage', 1)) == 2:
+            fallback_thrust = float(cfg.stage2_thrust_vac) if cfg is not None else C.STAGE2_THRUST
+        else:
+            fallback_thrust = float(cfg.stage1_thrust_n) if cfg is not None else C.THRUST_MAGNITUDE
+        thrust_mag_nominal = float(guidance.get('thrust_magnitude_n', fallback_thrust))
         thrust_mag = thrust_mag_nominal if thrust_on_val else 0.0
         actual_thrust_dir = rotate_vector_by_quaternion(C.BODY_Z_AXIS, state.q)
         thrust_vec = actual_thrust_dir * (throttle_val * thrust_mag)
